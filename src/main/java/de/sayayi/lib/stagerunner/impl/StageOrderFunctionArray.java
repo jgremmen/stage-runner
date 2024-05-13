@@ -3,6 +3,8 @@ package de.sayayi.lib.stagerunner.impl;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.reflect.Array;
+
 import static java.lang.System.arraycopy;
 import static java.util.Arrays.copyOf;
 
@@ -37,6 +39,7 @@ final class StageOrderFunctionArray<S extends Enum<S>>
   }
 
 
+  @SuppressWarnings("unchecked")
   int add(@NotNull StageOrderFunction<S> function)
   {
     int low = 0;
@@ -51,8 +54,10 @@ final class StageOrderFunctionArray<S extends Enum<S>>
         high = mid - 1;
     }
 
-    if (functions.length == size)
-      functions = copyOf(functions, size + 8);
+    if (functions == null)
+      functions = (StageOrderFunction<S>[])Array.newInstance(StageOrderFunction.class, 4);
+    else if (functions.length == size)
+      functions = copyOf(functions, size + 4);
 
     if (low < size)
       arraycopy(functions, low, functions, low + 1, size - low);

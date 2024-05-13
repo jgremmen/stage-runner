@@ -3,6 +3,8 @@ package de.sayayi.lib.stagerunner.impl;
 import de.sayayi.lib.stagerunner.StageFunction;
 import org.jetbrains.annotations.NotNull;
 
+import static de.sayayi.lib.stagerunner.StageConfigurer.DEFAULT_ORDER;
+
 
 /**
  * @author Jeroen Gremmen
@@ -14,6 +16,11 @@ final class StageOrderFunction<S extends Enum<S>>
   final @NotNull S stage;
   final int order;
   final @NotNull StageFunction<S> function;
+
+
+  StageOrderFunction(@NotNull S stage, @NotNull StageFunction<S> function) {
+    this(stage, DEFAULT_ORDER, function);
+  }
 
 
   StageOrderFunction(@NotNull S stage, int order, @NotNull StageFunction<S> function)
