@@ -25,5 +25,5 @@ build:
   artifacts:
     name: "stage-runner-artifacts"
     paths:
-      - stage-runner/.build/libs/*.jar
+      - .build/libs/*.jar
     expire_in: 2 weeks
