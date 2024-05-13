@@ -7,9 +7,14 @@ import static java.lang.System.arraycopy;
 import static java.util.Arrays.copyOf;
 
 
-final class StageOrderFunctionArray<S extends Enum<S>,D>
+/**
+ * @author Jeroen Gremmen
+ *
+ * @param <S>  Stage enum type
+ */
+final class StageOrderFunctionArray<S extends Enum<S>>
 {
-  StageOrderFunction<S,D>[] functions;
+  StageOrderFunction<S>[] functions;
   int size;
 
 
@@ -20,20 +25,19 @@ final class StageOrderFunctionArray<S extends Enum<S>,D>
   }
 
 
-  StageOrderFunctionArray(@NotNull StageOrderFunctionArray<S,D> array)
+  StageOrderFunctionArray(@NotNull StageOrderFunctionArray<S> array)
   {
-    functions = array.functions == null ? null : array.functions.clone();
-    size = array.size;
+    if (array.functions == null)
+    {
+      functions = null;
+      size = 0;
+    }
+    else
+      functions = copyOf(array.functions, size = array.size);
   }
 
 
-  @Contract(pure = true)
-  boolean isEmpty() {
-    return size == 0;
-  }
-
-
-  int add(@NotNull StageOrderFunction<S,D> function)
+  int add(@NotNull StageOrderFunction<S> function)
   {
     int low = 0;
 
@@ -61,10 +65,13 @@ final class StageOrderFunctionArray<S extends Enum<S>,D>
 
 
   @Contract(pure = true)
-  private int compare(@NotNull StageOrderFunction<S,D> newFunction,
-                      @NotNull StageOrderFunction<S,D> arrayFunction)
+  private int compare(@NotNull StageOrderFunction<S> newFunction,
+                      @NotNull StageOrderFunction<S> arrayFunction)
   {
-    final int cmp = newFunction.stage.compareTo(arrayFunction.stage);
-    return cmp == 0 ? Integer.compare(newFunction.order * 2 + 1, arrayFunction.order * 2) : cmp;
+    int cmp = newFunction.stage.compareTo(arrayFunction.stage);
+    if (cmp == 0 && (cmp = Integer.compare(newFunction.order, arrayFunction.order)) == 0)
+      cmp = 1;
+
+    return cmp;
   }
 }

@@ -1,18 +1,21 @@
 package de.sayayi.lib.stagerunner.impl;
 
 import de.sayayi.lib.stagerunner.StageConfigurer;
-import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 
-public abstract class AbstractStageRunnerFactory<S extends Enum<S>,D,C extends StageContext<S,D>>
-    implements StageRunnerFactory<S,D>, StageConfigurer<S,D>
+/**
+ * @author Jeroen Gremmen
+ *
+ * @param <S>  Stage enum type
+ */
+public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
+    implements StageRunnerFactory<S>, StageConfigurer<S>
 {
   final Class<S> stageEnumType;
-  final StageOrderFunctionArray<S,D> functions;
+  final StageOrderFunctionArray<S> functions;
 
 
   protected AbstractStageRunnerFactory(@NotNull Class<S> stageEnumType)
@@ -24,35 +27,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>,D,C extends S
 
 
   @Override
-  public void addStageFunction(@NotNull S stage, @NotNull StageFunction<S, D> function, int order) {
+  public void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function, int order) {
     functions.add(new StageOrderFunction<>(stage, order, function));
-  }
-
-
-  @Contract(value = "_ -> new", pure = true)
-  protected abstract @NotNull C createContext(D data);
-
-
-  @Contract(pure = true)
-  protected abstract @NotNull StageContextAccessor<S> createContextAccessor(@NotNull C context);
-
-
-  protected void preStageCallback(@NotNull C context) {
-  }
-
-
-  protected void preStageFunctionCallback(@NotNull C context) {
-  }
-
-
-  protected void postStageFunctionCallback(@NotNull C context) {
-  }
-
-
-  protected void postStageCallback(@NotNull C context) {}
-
-
-  protected void stageExceptionHandler(@NotNull C context, @NotNull Throwable exception) {
-    context.abort();
   }
 }

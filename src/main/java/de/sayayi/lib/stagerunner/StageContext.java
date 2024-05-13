@@ -10,12 +10,11 @@ import java.util.Set;
  * @author Jeroen Gremmen
  *
  * @param <S>  Stage enum type
- * @param <D>  Data type
  */
-public interface StageContext<S extends Enum<S>,D> extends StageConfigurer<S,D>
+public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
 {
   @Contract(pure = true)
-  D getData();
+  <T> T getData(@NotNull String name);
 
 
   @Contract(pure = true)
@@ -38,13 +37,8 @@ public interface StageContext<S extends Enum<S>,D> extends StageConfigurer<S,D>
 
 
   @Contract(pure = true)
+  @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   boolean isAborted();
-
-
-  default void stageExceptionHandler(@NotNull StageContext<S,D> context,
-                                     @NotNull Throwable exception) {
-    abort();
-  }
 
 
 
@@ -53,6 +47,7 @@ public interface StageContext<S extends Enum<S>,D> extends StageConfigurer<S,D>
   {
     IDLE,
     RUNNING,
-    FINISHED
+    FINISHED,
+    ABORTED
   }
 }

@@ -3,17 +3,20 @@ package de.sayayi.lib.stagerunner.impl;
 import de.sayayi.lib.stagerunner.StageFunction;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Map.Entry;
 
-
-final class StageOrderFunction<S extends Enum<S>,D> implements Entry<S,StageFunction<S,D>>
+/**
+ * @author Jeroen Gremmen
+ *
+ * @param <S>  Stage enum type
+ */
+final class StageOrderFunction<S extends Enum<S>>
 {
   final @NotNull S stage;
   final int order;
-  final @NotNull StageFunction<S,D> function;
+  final @NotNull StageFunction<S> function;
 
 
-  StageOrderFunction(@NotNull S stage, int order, @NotNull StageFunction<S,D> function)
+  StageOrderFunction(@NotNull S stage, int order, @NotNull StageFunction<S> function)
   {
     this.stage = stage;
     this.order = order;
@@ -22,19 +25,29 @@ final class StageOrderFunction<S extends Enum<S>,D> implements Entry<S,StageFunc
 
 
   @Override
-  public S getKey() {
-    return stage;
+  public boolean equals(Object o)
+  {
+    if (this == o)
+      return true;
+    if (!(o instanceof StageOrderFunction))
+      return false;
+
+    final StageOrderFunction<?> that = (StageOrderFunction<?>) o;
+
+    return order == that.order && stage == that.stage && function.equals(that.function);
   }
 
 
   @Override
-  public StageFunction<S,D> getValue() {
-    return function;
+  public int hashCode() {
+    return (stage.hashCode() * 31 + order) * 31 + function.hashCode();
   }
 
 
   @Override
-  public StageFunction<S,D> setValue(StageFunction<S,D> value) {
-    throw new UnsupportedOperationException("setValue");
+  public String toString()
+  {
+    return "StageOrderFunction{stage=" + stage + ",order=" + order + ",function=" +
+        Integer.toString(function.hashCode(), 16) + '}';
   }
 }

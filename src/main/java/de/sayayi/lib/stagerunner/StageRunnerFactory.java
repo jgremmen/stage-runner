@@ -9,8 +9,8 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param <S>  Stage enum type
  */
-public interface StageRunnerFactory<S extends Enum<S>,D>
+public interface StageRunnerFactory<S extends Enum<S>>
 {
   @Contract(value = "-> new", pure = true)
-  @NotNull StageRunner<S,D> createRunner();
+  @NotNull StageRunner<S> createRunner();
 }
