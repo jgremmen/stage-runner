@@ -1,0 +1,29 @@
+# CI script
+image: localhost:5000/sayayi-jdk:17
+
+stages:
+  - build
+
+variables:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+  GRADLE_USER_HOME: ".gradle-cache"
+
+before_script:
+  - export JAVA_HOME="/usr/lib/jvm/jdk-17"
+  - chmod +x ./gradlew
+
+cache:
+  paths:
+    - .gradle-cache
+
+build:
+  stage: build
+  tags:
+    - docker
+  script:
+    - ./gradlew clean build
+  artifacts:
+    name: "stage-runner-artifacts"
+    paths:
+      - stage-runner/.build/libs/*.jar
+    expire_in: 2 weeks
