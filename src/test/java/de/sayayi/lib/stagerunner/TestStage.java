@@ -1,10 +1,10 @@
-package de.sayayi.lib.stagerunner.impl;
+package de.sayayi.lib.stagerunner;
 
 
 /**
  * @author Jeroen Gremmen
  */
-enum TestStage
+public enum TestStage
 {
   INIT,
   START,

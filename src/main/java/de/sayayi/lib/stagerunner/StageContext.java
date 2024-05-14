@@ -18,10 +18,6 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
 
 
   @Contract(pure = true)
-  @NotNull State getState();
-
-
-  @Contract(pure = true)
   @NotNull S getCurrentStage();
 
 
@@ -48,6 +44,12 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
     IDLE,
     RUNNING,
     FINISHED,
-    ABORTED
+    ABORTED;
+
+
+    @Contract(pure = true)
+    public boolean isTerminated() {
+      return this == FINISHED || this == ABORTED;
+    }
   }
 }

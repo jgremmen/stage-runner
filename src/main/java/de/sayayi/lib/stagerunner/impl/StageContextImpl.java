@@ -28,7 +28,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   private final Map<String,Object> data;
   private State state;
 
-  private int currentFunctionIndex;
+  private int nextFunctionIndex;
   private boolean abort;
 
 
@@ -51,7 +51,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       state = IDLE;
     }
 
-    currentFunctionIndex = 0;
+    nextFunctionIndex = 0;
     abort = false;
   }
 
@@ -60,12 +60,6 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @SuppressWarnings("unchecked")
   public <T> T getData(@NotNull String name) {
     return (T)data.get(name);
-  }
-
-
-  @Override
-  public @NotNull State getState() {
-    return state;
   }
 
 
@@ -78,13 +72,13 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public @NotNull S getCurrentStage()
   {
-    if (state == IDLE)
+    if (state == IDLE || nextFunctionIndex == 0)
       throw new IllegalStateException("stage runner has not started yet");
 
-    if (state == FINISHED)
-      throw new IllegalStateException("stage runner has finished");
+    if (state.isTerminated())
+      throw new IllegalStateException("stage runner has terminated");
 
-    return functions.functions[currentFunctionIndex].stage;
+    return functions.functions[nextFunctionIndex - 1].stage;
   }
 
 
@@ -102,15 +96,15 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   {
     final Set<S> remainingStages = EnumSet.noneOf(stageRunnerFactory.stageEnumType);
 
-    if (state == IDLE || state == RUNNING)
+    if (!state.isTerminated())
     {
       Arrays
-          .stream(functions.functions, currentFunctionIndex, functions.size)
+          .stream(functions.functions, nextFunctionIndex, functions.size)
           .map(stageOrderFunction -> stageOrderFunction.stage)
           .forEach(remainingStages::add);
 
-      if (state == RUNNING)
-        remainingStages.remove(functions.functions[currentFunctionIndex].stage);
+      if (state == RUNNING && nextFunctionIndex > 0)
+        remainingStages.remove(functions.functions[nextFunctionIndex - 1].stage);
     }
 
     return remainingStages;
@@ -120,12 +114,12 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function, int order)
   {
-    if (state == FINISHED || state == ABORTED)
-      throw new IllegalStateException("stage runner has finished");
+    if (state.isTerminated())
+      throw new IllegalStateException("stage runner has terminated");
 
     final int index = functions.add(new StageOrderFunction<>(stage, order, function));
 
-    if (state == RUNNING && index < currentFunctionIndex)
+    if (state == RUNNING && index < nextFunctionIndex)
     {
       abort();
       throw new IllegalStateException("stage runner has passed beyond stage " + stage +
@@ -142,7 +136,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
   void run(@NotNull StageRunner<S> stageRunner)
   {
-    if (state == FINISHED)
+    if (state.isTerminated())
       return;
 
     if (state != IDLE)
@@ -153,15 +147,18 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     state = RUNNING;
 
     try {
-      while(!abort && currentFunctionIndex < functions.size)
+      while(!abort && nextFunctionIndex < functions.size)
       {
-        final StageOrderFunction<S> stageFunctionEntry = functions.functions[currentFunctionIndex++];
+        final StageOrderFunction<S> stageFunctionEntry = functions.functions[nextFunctionIndex++];
         final S currentStage = stageFunctionEntry.stage;
 
         if (currentStage != lastStage)
         {
           if (lastStage != null)
+          {
+            processedStages.add(lastStage);
             stageRunner.postStageCallback(this, lastStage);
+          }
 
           lastStage = null;
           stageRunner.preStageCallback(this);
@@ -181,7 +178,10 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       state = abort ? ABORTED : FINISHED;
 
       if (!abort && lastStage != null)
+      {
+        processedStages.add(lastStage);
         stageRunner.postStageCallback(this, lastStage);
+      }
     }
   }
 }

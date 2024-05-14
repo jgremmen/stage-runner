@@ -1,10 +1,11 @@
 package de.sayayi.lib.stagerunner.impl;
 
+import de.sayayi.lib.stagerunner.TestStage;
 import lombok.val;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static de.sayayi.lib.stagerunner.impl.TestStage.*;
+import static de.sayayi.lib.stagerunner.TestStage.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
