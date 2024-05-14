@@ -22,8 +22,6 @@ dependencies {
   // java
   compileOnlyApi 'org.jetbrains:annotations-java5:24.1.0'
 
-  implementation 'org.springframework:spring-beans:5.3.34'
-
 
   // test
   testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
