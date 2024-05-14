@@ -1,6 +1,8 @@
 plugins {
-    id 'java-library'
+  id 'java-library'
 }
+
+apply plugin: 'com.adarshr.test-logger'
 
 
 group = 'de.sayayi.lib'
@@ -34,4 +36,13 @@ dependencies {
 
 test {
   useJUnitPlatform()
+}
+
+
+jar.dependsOn test
+
+
+testlogger {
+  theme 'mocha'
+  slowThreshold 2500
 }

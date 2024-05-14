@@ -1,2 +1,12 @@
 rootProject.name = 'stage-runner'
 
+
+buildscript {
+  repositories {
+    gradlePluginPortal()
+  }
+
+  dependencies {
+    classpath 'com.adarshr:gradle-test-logger-plugin:4.0.0'
+  }
+}
