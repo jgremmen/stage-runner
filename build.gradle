@@ -1,16 +1,30 @@
 plugins {
   id 'java-library'
+  id 'maven-publish'
+  id 'signing'
 }
 
 apply plugin: 'com.adarshr.test-logger'
 
 
 group = 'de.sayayi.lib'
-version = '1.0-SNAPSHOT'
+version = '0.1'
 description = 'Stage Runner'
 
 
 layout.buildDirectory = '.build'
+
+
+compileJava {
+  sourceCompatibility = 1.8
+  targetCompatibility = 1.8
+}
+
+
+java {
+  withJavadocJar()
+  withSourcesJar()
+}
 
 
 repositories {
@@ -40,7 +54,102 @@ test {
 jar.dependsOn test
 
 
+tasks.withType(Jar).configureEach {
+  includeEmptyDirs = false
+  preserveFileTimestamps = true
+  reproducibleFileOrder = true
+
+  manifest {
+    attributes(
+        'Implementation-Vendor': 'Jeroen Gremmen',
+        'Implementation-Vendor-Id': 'de.sayayi',
+        'Implementation-Title': project.name,
+        'Implementation-Version': project.version,
+        'Created-By': System.getProperty('java.version'),
+        'Built-Date': new Date().format('yyyy-MM-dd HH:mm:ss')
+    )
+  }
+
+  from(rootDir) {
+    include 'LICENSE'
+    into 'META-INF'
+    expand(
+        copyright: new Date().format('yyyy'),
+        version: project.version)
+  }
+}
+
+
 testlogger {
   theme 'mocha'
   slowThreshold 2500
+}
+
+
+def snapshot = version.toString().endsWith('-SNAPSHOT')
+def tmpRepositoryDirectory = rootProject.layout.buildDirectory
+    .dir('repository').get()
+    .dir(snapshot ? 'snapshot' : 'release')
+    .asFile
+
+publishing {
+  repositories {
+    maven {
+      name = 'mavenTemp'
+      url = tmpRepositoryDirectory
+    }
+
+    maven {
+      name = 'mavenCentral'
+      url = snapshot
+          ? 'https://oss.sonatype.org/content/repositories/snapshots'
+          : 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
+
+      credentials {
+        username = rootProject.findProperty('mavenCentral.username')
+        password = rootProject.findProperty('mavenCentral.password')
+      }
+    }
+  }
+
+  publications {
+
+    maven(MavenPublication) {
+      from components.java
+
+      pom {
+        name = 'Stage Runner Library'
+        description = 'Stage Runner'
+        url = 'https://github.com/jgremmen/stage-runner'
+        inceptionYear = '2024'
+
+        licenses {
+          license {
+            name = 'Apache License, Version 2.0'
+            url = 'https://www.apache.org/licenses/LICENSE-2.0'
+            distribution = 'repo'
+          }
+        }
+
+        developers {
+          developer {
+            id = 'jgremmen'
+            name = 'Jeroen Gremmen'
+            email = 'jeroen.gremmen@sayayi.de'
+          }
+        }
+
+        scm {
+          connection = 'scm:git:git://github.com/jgremmen/stage-runner.git'
+          developerConnection = 'scm:git:git://github.com/jgremmen/stage-runner.git'
+          url = 'https://github.com/jgremmen/stage-runner'
+        }
+      }
+    }
+  }
+}
+
+
+signing {
+  sign publishing.publications.maven
 }
