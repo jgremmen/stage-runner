@@ -8,6 +8,7 @@ import org.jetbrains.annotations.NotNull;
  *
  * @param <S>  Stage enum type
  */
+@FunctionalInterface
 public interface StageConfigurer<S extends Enum<S>>
 {
   int DEFAULT_ORDER = 1000;

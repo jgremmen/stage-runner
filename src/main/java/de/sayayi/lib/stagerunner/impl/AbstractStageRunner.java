@@ -12,8 +12,7 @@ import java.util.Map;
  *
  * @param <S>  Stage enum type
  */
-public abstract class AbstractStageRunner<S extends Enum<S>>
-    implements StageRunner<S>
+public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRunner<S>
 {
   private final AbstractStageRunnerFactory<S> stageRunnerFactory;
 

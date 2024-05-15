@@ -29,7 +29,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   private State state;
 
   private int nextFunctionIndex;
-  private boolean abort;
+  private boolean aborted;
 
 
   protected StageContextImpl(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory,
@@ -52,7 +52,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     }
 
     nextFunctionIndex = 0;
-    abort = false;
+    aborted = false;
   }
 
 
@@ -65,7 +65,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
   @Contract(pure = true)
   public boolean isAborted() {
-    return abort;
+    return aborted;
   }
 
 
@@ -130,7 +130,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
   @Override
   public void abort() {
-    abort = true;
+    aborted = true;
   }
 
 
@@ -147,7 +147,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     state = RUNNING;
 
     try {
-      while(!abort && nextFunctionIndex < functions.size)
+      while(!aborted && nextFunctionIndex < functions.size)
       {
         final StageOrderFunction<S> stageFunctionEntry = functions.functions[nextFunctionIndex++];
         final S currentStage = stageFunctionEntry.stage;
@@ -175,16 +175,16 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         }
       }
     } finally {
-      state = abort ? State.ABORTED : FINISHED;
+      state = aborted ? State.ABORTED : FINISHED;
 
-      if (!abort && lastStage != null)
+      if (!aborted && lastStage != null)
       {
         processedStages.add(lastStage);
         callback.postStageCallback(this, lastStage);
       }
     }
 
-    return !abort;
+    return !aborted;
   }
 
 

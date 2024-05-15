@@ -14,7 +14,7 @@ import org.jetbrains.annotations.NotNull;
 public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
     implements StageRunnerFactory<S>, StageConfigurer<S>
 {
-  final Class<S> stageEnumType;
+  protected final Class<S> stageEnumType;
   final StageOrderFunctionArray<S> functions;
 
 
