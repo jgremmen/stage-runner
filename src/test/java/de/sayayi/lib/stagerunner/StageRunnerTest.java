@@ -9,10 +9,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.opentest4j.AssertionFailedError;
 
-import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 import static de.sayayi.lib.stagerunner.TestStage.*;
 import static java.util.Arrays.asList;
@@ -173,13 +170,21 @@ class StageRunnerTest
 
 
 
-  private static class MyStageRunner extends AbstractStageRunner<TestStage>
+  private static class MyStageRunner
+      extends AbstractStageRunner<TestStage>
+      implements StageRunnerCallback<TestStage>
   {
     private final List<String> log = new ArrayList<>();
 
 
     private MyStageRunner(@NotNull AbstractStageRunnerFactory<TestStage> stageRunnerFactory) {
       super(stageRunnerFactory);
+    }
+
+
+    @Override
+    public boolean run(@NotNull Map<String, Object> data) {
+      return super.run(data, this);
     }
 
 
@@ -214,7 +219,7 @@ class StageRunnerTest
       if (exception instanceof AssertionFailedError)
         throw exception;
 
-      super.stageExceptionHandler(context, exception);
+      StageRunnerCallback.super.stageExceptionHandler(context, exception);
     }
   }
 }

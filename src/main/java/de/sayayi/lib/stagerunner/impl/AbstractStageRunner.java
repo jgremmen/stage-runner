@@ -1,6 +1,7 @@
 package de.sayayi.lib.stagerunner.impl;
 
 import de.sayayi.lib.stagerunner.StageRunner;
+import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -23,12 +24,7 @@ public abstract class AbstractStageRunner<S extends Enum<S>>
 
 
   @Override
-  public boolean run(@NotNull Map<String,Object> data)
-  {
-    final StageContextImpl<S> stageContext = new StageContextImpl<>(stageRunnerFactory, data);
-
-    stageContext.run(this);
-
-    return !stageContext.isAborted();
+  public boolean run(@NotNull Map<String,Object> data, @NotNull StageRunnerCallback<S> callback) {
+    return new StageContextImpl<>(stageRunnerFactory, data).run(callback);
   }
 }

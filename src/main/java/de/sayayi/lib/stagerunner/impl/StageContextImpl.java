@@ -2,7 +2,7 @@ package de.sayayi.lib.stagerunner.impl;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
-import de.sayayi.lib.stagerunner.StageRunner;
+import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -11,7 +11,7 @@ import java.util.EnumSet;
 import java.util.Map;
 import java.util.Set;
 
-import static de.sayayi.lib.stagerunner.StageContext.State.*;
+import static de.sayayi.lib.stagerunner.impl.StageContextImpl.State.*;
 import static java.util.Collections.emptySet;
 
 
@@ -134,10 +134,10 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
-  void run(@NotNull StageRunner<S> stageRunner)
+  boolean run(@NotNull StageRunnerCallback<S> callback)
   {
     if (state.isTerminated())
-      return;
+      return true;
 
     if (state != IDLE)
       throw new IllegalStateException();
@@ -157,31 +157,50 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
           if (lastStage != null)
           {
             processedStages.add(lastStage);
-            stageRunner.postStageCallback(this, lastStage);
+            callback.postStageCallback(this, lastStage);
           }
 
           lastStage = null;
-          stageRunner.preStageCallback(this);
+          callback.preStageCallback(this);
           lastStage = currentStage;
         }
 
-        stageRunner.preStageFunctionCallback(this);
+        callback.preStageFunctionCallback(this);
         try {
           stageFunctionEntry.function.process(this);
         } catch(Throwable ex) {
-          stageRunner.stageExceptionHandler(this, ex);
+          callback.stageExceptionHandler(this, ex);
         } finally {
-          stageRunner.postStageFunctionCallback(this);
+          callback.postStageFunctionCallback(this);
         }
       }
     } finally {
-      state = abort ? ABORTED : FINISHED;
+      state = abort ? State.ABORTED : FINISHED;
 
       if (!abort && lastStage != null)
       {
         processedStages.add(lastStage);
-        stageRunner.postStageCallback(this, lastStage);
+        callback.postStageCallback(this, lastStage);
       }
+    }
+
+    return !abort;
+  }
+
+
+
+
+  enum State
+  {
+    IDLE,
+    RUNNING,
+    FINISHED,
+    ABORTED;
+
+
+    @Contract(pure = true)
+    boolean isTerminated() {
+      return this == FINISHED || this == ABORTED;
     }
   }
 }

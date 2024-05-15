@@ -10,29 +10,13 @@ import java.util.Map;
  *
  * @param <S>  Stage enum type
  */
+@FunctionalInterface
 public interface StageRunner<S extends Enum<S>>
 {
-  boolean run(@NotNull Map<String,Object> data);
-
-
-  default void preStageCallback(@NotNull StageContext<S> stageContext) {
+  default boolean run(@NotNull Map<String,Object> data) {
+    return run(data, new StageRunnerCallback<S>() {});
   }
 
 
-  default void preStageFunctionCallback(@NotNull StageContext<S> stageContext) {
-  }
-
-
-  default void postStageFunctionCallback(@NotNull StageContext<S> stageContext) {
-  }
-
-
-  default void postStageCallback(@NotNull StageContext<S> stageContext, @NotNull S stage) {
-  }
-
-
-  default void stageExceptionHandler(@NotNull StageContext<S> context,
-                                     @NotNull Throwable exception) {
-    context.abort();
-  }
+  boolean run(@NotNull Map<String,Object> data, @NotNull StageRunnerCallback<S> callback);
 }
