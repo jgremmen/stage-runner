@@ -23,7 +23,7 @@ import static java.util.Collections.emptySet;
 public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 {
   private final AbstractStageRunnerFactory<S> stageRunnerFactory;
-  private final StageOrderFunctionArray<S> functions;
+  private final StageOrderFunctionArray<S> functionArray;
   private final Set<S> processedStages;
   private final Map<String,Object> data;
   private State state;
@@ -38,15 +38,15 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     this.stageRunnerFactory = stageRunnerFactory;
     this.data = data;
 
-    if (stageRunnerFactory.functions.size == 0)
+    if (stageRunnerFactory.functionArray.size == 0)
     {
-      functions = new StageOrderFunctionArray<>();
+      functionArray = new StageOrderFunctionArray<>();
       processedStages = emptySet();
       state = FINISHED;
     }
     else
     {
-      functions = new StageOrderFunctionArray<>(stageRunnerFactory.functions);
+      functionArray = new StageOrderFunctionArray<>(stageRunnerFactory.functionArray);
       processedStages = EnumSet.noneOf(stageRunnerFactory.stageEnumType);
       state = IDLE;
     }
@@ -78,7 +78,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     if (state.isTerminated())
       throw new IllegalStateException("stage runner has terminated");
 
-    return functions.functions[nextFunctionIndex - 1].stage;
+    return functionArray.functions[nextFunctionIndex - 1].stage;
   }
 
 
@@ -99,25 +99,26 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     if (!state.isTerminated())
     {
       Arrays
-          .stream(functions.functions, nextFunctionIndex, functions.size)
+          .stream(functionArray.functions, nextFunctionIndex, functionArray.size)
           .map(stageOrderFunction -> stageOrderFunction.stage)
           .forEach(remainingStages::add);
 
       if (state == RUNNING && nextFunctionIndex > 0)
-        remainingStages.remove(functions.functions[nextFunctionIndex - 1].stage);
+        remainingStages.remove(functionArray.functions[nextFunctionIndex - 1].stage);
     }
 
     return remainingStages;
   }
 
-
   @Override
-  public void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function, int order)
+  public void addStageFunction(@NotNull S stage, String description,
+                               @NotNull StageFunction<S> function,
+                               int order)
   {
     if (state.isTerminated())
       throw new IllegalStateException("stage runner has terminated");
 
-    final int index = functions.add(new StageOrderFunction<>(stage, order, function));
+    final int index = functionArray.add(new StageOrderFunction<>(stage, description, order, function));
 
     if (state == RUNNING && index < nextFunctionIndex)
     {
@@ -147,9 +148,9 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     state = RUNNING;
 
     try {
-      while(!aborted && nextFunctionIndex < functions.size)
+      while(!aborted && nextFunctionIndex < functionArray.size)
       {
-        final StageOrderFunction<S> stageFunctionEntry = functions.functions[nextFunctionIndex++];
+        final StageOrderFunction<S> stageFunctionEntry = functionArray.functions[nextFunctionIndex++];
         final S currentStage = stageFunctionEntry.stage;
 
         if (currentStage != lastStage)
@@ -165,7 +166,8 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
           lastStage = currentStage;
         }
 
-        callback.preStageFunctionCallback(this);
+        callback.preStageFunctionCallback(this,
+            functionArray.functions[nextFunctionIndex - 1].description);
         try {
           stageFunctionEntry.function.process(this);
         } catch(Throwable ex) {

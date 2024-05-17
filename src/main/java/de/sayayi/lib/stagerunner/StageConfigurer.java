@@ -15,9 +15,19 @@ public interface StageConfigurer<S extends Enum<S>>
 
 
   default void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function) {
-    addStageFunction(stage, function, DEFAULT_ORDER);
+    addStageFunction(stage, null, function, DEFAULT_ORDER);
   }
 
 
-  void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function, int order);
+  default void addStageFunction(@NotNull S stage, String description, @NotNull StageFunction<S> function) {
+    addStageFunction(stage, description, function, DEFAULT_ORDER);
+  }
+
+
+  default void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function, int order) {
+    addStageFunction(stage, null, function, order);
+  }
+
+
+  void addStageFunction(@NotNull S stage, String description, @NotNull StageFunction<S> function, int order);
 }

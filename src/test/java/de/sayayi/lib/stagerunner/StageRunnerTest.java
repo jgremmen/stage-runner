@@ -140,14 +140,15 @@ class StageRunnerTest
   {
     val factory = new MyStageRunnerFactory();
 
-    factory.addStageFunction(START, ctx -> ctx.addStageFunction(PROCESS, c -> {}));
-    factory.addStageFunction(END, ctx -> {});
+    factory.addStageFunction(START, "S", ctx ->
+        ctx.addStageFunction(PROCESS, "P", c -> {}));
+    factory.addStageFunction(END, "E", ctx -> {});
 
     val runner = factory.createRunner();
 
     assertTrue(runner.run(emptyMap()));
     assertEquals(
-        asList(">START", ">fn", "<fn", "<START", ">PROCESS", ">fn", "<fn", "<PROCESS", ">END", ">fn", "<fn", "<END"),
+        asList(">START", ">fn(S)", "<fn", "<START", ">PROCESS", ">fn(P)", "<fn", "<PROCESS", ">END", ">fn(E)", "<fn", "<END"),
         runner.log);
   }
 
@@ -199,10 +200,9 @@ class StageRunnerTest
       log.add("<" + stage);
     }
 
-
     @Override
-    public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
-      log.add(">fn");
+    public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext, String description) {
+      log.add(">fn" + (description == null ? "" : "(" + description + ')'));
     }
 
 

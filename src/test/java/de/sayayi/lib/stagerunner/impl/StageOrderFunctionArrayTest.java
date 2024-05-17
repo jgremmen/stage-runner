@@ -56,13 +56,13 @@ class StageOrderFunctionArrayTest
     val array = new StageOrderFunctionArray<TestStage>();
 
     // prepare
-    assertEquals(0, array.add(new StageOrderFunction<>(PROCESS, 100, ctx -> {})));
+    assertEquals(0, array.add(new StageOrderFunction<>(PROCESS, null, 100, ctx -> {})));
 
     // vary order
-    assertEquals(0, array.add(new StageOrderFunction<>(PROCESS, 90, ctx -> {})));
-    assertEquals(1, array.add(new StageOrderFunction<>(PROCESS, 95, ctx -> {})));
-    assertEquals(2, array.add(new StageOrderFunction<>(PROCESS, 95, ctx -> {})));
-    assertEquals(4, array.add(new StageOrderFunction<>(PROCESS, 100, ctx -> {})));
-    assertEquals(5, array.add(new StageOrderFunction<>(PROCESS, 200, ctx -> {})));
+    assertEquals(0, array.add(new StageOrderFunction<>(PROCESS, null, 90, ctx -> {})));
+    assertEquals(1, array.add(new StageOrderFunction<>(PROCESS, null, 95, ctx -> {})));
+    assertEquals(2, array.add(new StageOrderFunction<>(PROCESS, null, 95, ctx -> {})));
+    assertEquals(4, array.add(new StageOrderFunction<>(PROCESS, null, 100, ctx -> {})));
+    assertEquals(5, array.add(new StageOrderFunction<>(PROCESS, null, 200, ctx -> {})));
   }
 }

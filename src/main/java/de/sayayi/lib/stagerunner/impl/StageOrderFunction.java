@@ -14,18 +14,21 @@ import static de.sayayi.lib.stagerunner.StageConfigurer.DEFAULT_ORDER;
 final class StageOrderFunction<S extends Enum<S>>
 {
   final @NotNull S stage;
+  final String description;
   final int order;
   final @NotNull StageFunction<S> function;
 
 
   StageOrderFunction(@NotNull S stage, @NotNull StageFunction<S> function) {
-    this(stage, DEFAULT_ORDER, function);
+    this(stage, null, DEFAULT_ORDER, function);
   }
 
 
-  StageOrderFunction(@NotNull S stage, int order, @NotNull StageFunction<S> function)
+  StageOrderFunction(@NotNull S stage, String description, int order,
+                     @NotNull StageFunction<S> function)
   {
     this.stage = stage;
+    this.description = description;
     this.order = order;
     this.function = function;
   }

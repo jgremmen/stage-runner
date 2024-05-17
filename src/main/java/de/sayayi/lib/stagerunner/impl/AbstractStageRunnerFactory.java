@@ -15,19 +15,21 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
     implements StageRunnerFactory<S>, StageConfigurer<S>
 {
   protected final Class<S> stageEnumType;
-  final StageOrderFunctionArray<S> functions;
+  final StageOrderFunctionArray<S> functionArray;
 
 
   protected AbstractStageRunnerFactory(@NotNull Class<S> stageEnumType)
   {
     this.stageEnumType = stageEnumType;
 
-    functions = new StageOrderFunctionArray<>();
+    functionArray = new StageOrderFunctionArray<>();
   }
 
 
   @Override
-  public void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function, int order) {
-    functions.add(new StageOrderFunction<>(stage, order, function));
+  public void addStageFunction(@NotNull S stage, String description,
+                               @NotNull StageFunction<S> function,
+                               int order) {
+    functionArray.add(new StageOrderFunction<>(stage, description, order, function));
   }
 }

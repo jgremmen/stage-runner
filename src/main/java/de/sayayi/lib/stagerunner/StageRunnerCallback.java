@@ -14,7 +14,8 @@ public interface StageRunnerCallback<S extends Enum<S>>
   }
 
 
-  default void preStageFunctionCallback(@NotNull StageContext<S> stageContext) {
+  default void preStageFunctionCallback(@NotNull StageContext<S> stageContext,
+                                        String description) {
   }
 
 
