@@ -4,6 +4,8 @@ import org.jetbrains.annotations.NotNull;
 
 
 /**
+ * The stage configurer provides methods to add new stage functions.
+ *
  * @author Jeroen Gremmen
  *
  * @param <S>  Stage enum type
