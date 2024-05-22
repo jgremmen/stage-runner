@@ -57,7 +57,12 @@ final class StageOrderFunction<S extends Enum<S>>
   @Override
   public String toString()
   {
-    return "StageOrderFunction(stage=" + stage + ",order=" + order + ",function=" +
-        Integer.toString(function.hashCode(), 16) + ')';
+    final StringBuilder s = new StringBuilder(getClass().getSimpleName())
+        .append("(stage=").append(stage).append('@').append(order);
+
+    if (description != null && !description.isEmpty())
+      s.append(",description=").append(description);
+
+    return s.append(')').toString();
   }
 }
