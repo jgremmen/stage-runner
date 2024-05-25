@@ -36,6 +36,9 @@ dependencies {
   // java
   compileOnlyApi 'org.jetbrains:annotations-java5:24.1.0'
 
+  // https://mvnrepository.com/artifact/org.springframework/spring-context
+  implementation 'org.springframework:spring-context:5.3.36'
+
 
   // test
   testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
@@ -43,12 +46,18 @@ dependencies {
 
   testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+  // https://mvnrepository.com/artifact/org.springframework/spring-test
+  testImplementation 'org.springframework:spring-test:5.3.36'
 }
 
 
 test {
   useJUnitPlatform()
 }
+
+
+compileTestJava.options.compilerArgs.add '-parameters'
 
 
 jar.dependsOn test
