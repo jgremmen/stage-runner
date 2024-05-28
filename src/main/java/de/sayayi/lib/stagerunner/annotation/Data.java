@@ -1,4 +1,4 @@
-package de.sayayi.lib.stagerunner.spring.annotation;
+package de.sayayi.lib.stagerunner.annotation;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -11,5 +11,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 public @interface Data
 {
-  String value() default "";
+  String name();
+
+  boolean ignoreIfNotSet() default false;
 }

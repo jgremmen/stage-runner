@@ -2,6 +2,7 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.TestStage;
+import de.sayayi.lib.stagerunner.annotation.Data;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,7 @@ class StageRunnerFactoryProcessorTest
   void functionalInterface() throws Exception
   {
     assertEquals(
-        MyRunnerInterface.class.getMethod("run", String.class, List.class),
+        MyRunnerInterface.class.getMethod("run", String.class, List.class, int.class),
         new StageRunnerFactoryProcessor<>(MyRunnerInterface.class, StageDef.class)
             .findFunctionalInterfaceMethod(MyRunnerInterface.class));
   }
@@ -37,7 +38,7 @@ class StageRunnerFactoryProcessorTest
 
   @Test
   void testInterface() {
-    myRunnerInterface.run("important-task", Arrays.asList(1, 67, -4));
+    myRunnerInterface.run("important-task", Arrays.asList(1, 67, -4), 56);
   }
 
 
@@ -60,7 +61,7 @@ class StageRunnerFactoryProcessorTest
   public static class MyBean
   {
     @StageDef(stage = TestStage.INIT, comment = "Initialize")
-    public void init(StageContext<TestStage> context, List<Integer> map) {
+    public void init(StageContext<TestStage> context, List<Long> map) {
     }
 
 
@@ -69,7 +70,7 @@ class StageRunnerFactoryProcessorTest
 
 
     @StageDef(stage = TestStage.PROCESS, comment = "Process task")
-    public void task(String task) {
+    public void task(String task, @Data(name = "count") int n) {
     }
   }
 }

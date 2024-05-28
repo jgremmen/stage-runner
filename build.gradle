@@ -39,6 +39,9 @@ dependencies {
   // https://mvnrepository.com/artifact/org.springframework/spring-context
   implementation 'org.springframework:spring-context:5.3.36'
 
+  // https://mvnrepository.com/artifact/net.bytebuddy/byte-buddy
+  implementation 'net.bytebuddy:byte-buddy:1.14.16'
+
 
   // test
   testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'

@@ -31,6 +31,32 @@ public final class StageFunctionAnnotation
   }
 
 
+
+  public @NotNull Class<? extends Annotation> getAnnotationType() {
+    return annotationType;
+  }
+
+
+  public @NotNull Class<? extends Enum<?>> getStageType() {
+    return stageType;
+  }
+
+
+  public @NotNull String getStageProperty() {
+    return stageProperty;
+  }
+
+
+  public String getOrderProperty() {
+    return orderProperty;
+  }
+
+
+  public String getDescriptionProperty() {
+    return descriptionProperty;
+  }
+
+
   @Contract(pure = true)
   public static @NotNull StageFunctionAnnotation buildFrom(
       @NotNull Class<? extends Annotation> stageFunctionAnnotation)
