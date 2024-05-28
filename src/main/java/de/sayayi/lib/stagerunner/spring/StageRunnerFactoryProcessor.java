@@ -3,7 +3,7 @@ package de.sayayi.lib.stagerunner.spring;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.annotation.Data;
-import de.sayayi.lib.stagerunner.annotation.bytebuddy.StageFunctionBuilder;
+import de.sayayi.lib.stagerunner.annotation.proxy.StageFunctionBuilder;
 import de.sayayi.lib.stagerunner.impl.DefaultStageRunnerFactory;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -244,42 +244,6 @@ public class StageRunnerFactoryProcessor<R>
     } catch(Exception ex) {
       throw new RuntimeException(ex);
     }
-/*
-    final int parameterCount = stageFunction.getParameterCount();
-
-    //noinspection unchecked
-    final Function<StageContext<S>,Object>[] parameterFunctions = new Function[parameterCount];
-    final ResolvableType stageContextType =
-        forClassWithGenerics(StageContext.class, stageFunctionAnnotation.stageType);
-    final String[] parameterNames = parameterNameDiscoverer.getParameterNames(stageFunction);
-    final StageFunctionAdapter<S> stageFunctionAdapter =
-        new StageFunctionAdapter<>(conversionService, singletonBean, stageFunction);
-
-    for(int p = 0; p < parameterCount; p++)
-    {
-      final MethodParameter methodParameter = new MethodParameter(stageFunction, p);
-      final TypeDescriptor parameterType = new TypeDescriptor(methodParameter);
-      final ResolvableType resolvableType = parameterType.getResolvableType();
-
-      if (resolvableType.isAssignableFrom(stageContextType))
-        parameterFunctions[p] = stageFunctionAdapter::parameterStageContext;
-      else
-      {
-        final NameWithQualifier nameQualifier = findDataNameForStageFunctionParameter(
-            methodParameter.getParameterAnnotation(Data.class), parameterType,
-            parameterNames == null ? null : parameterNames[p]);
-
-        parameterFunctions[p] = nameQualifier.qualifier == TypeQualifier.CONVERTABLE
-            ? ctx -> stageFunctionAdapter.parameterStageData(ctx, nameQualifier.name, parameterType)
-            : ctx -> stageFunctionAdapter.parameterStageData(ctx, nameQualifier.name);
-      }
-    }
-
-    stageFunctionAdapter.setParameterFunctions(parameterFunctions);
-
-    return stageFunctionAdapter;
-
- */
   }
 
 

@@ -58,6 +58,7 @@ class StageRunnerFactoryProcessorTest
 
 
   @Component
+  @SuppressWarnings("unused")
   public static class MyBean
   {
     @StageDef(stage = TestStage.INIT, comment = "Initialize")

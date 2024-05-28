@@ -115,14 +115,12 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
             .build(),
         method, parameters);
 
-    final TypeDescriptor[] targetTypes = Arrays
-        .stream(parameters)
-        .map(p -> p.getQualifier() == CONVERTABLE ? p.getType() : null)
-        .toArray(TypeDescriptor[]::new);
-
     return stageFunctionClass
         .getConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
-        .newInstance(bean, conversionService, targetTypes);
+        .newInstance(bean, conversionService, Arrays
+            .stream(parameters)
+            .map(p -> p.getQualifier() == CONVERTABLE ? p.getType() : null)
+            .toArray(TypeDescriptor[]::new));
   }
 
 
