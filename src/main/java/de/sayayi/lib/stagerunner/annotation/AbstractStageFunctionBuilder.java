@@ -23,7 +23,7 @@ import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.util.StringUtils.hasLength;
 
 
-public abstract class AbstractStageFunctionBuilder<S extends Enum<S>>
+public abstract class AbstractStageFunctionBuilder
 {
   protected final StageFunctionAnnotation stageFunctionAnnotation;
   protected final ConversionService conversionService;
@@ -44,7 +44,8 @@ public abstract class AbstractStageFunctionBuilder<S extends Enum<S>>
   }
 
 
-  public @NotNull StageFunction<S> buildFor(@NotNull Object bean, @NotNull Method method)
+  public @NotNull <S extends Enum<S>> StageFunction<S> buildFor(Object bean,
+                                                                @NotNull Method method)
       throws ReflectiveOperationException
   {
     final int parameterCount = method.getParameterCount();
@@ -75,8 +76,8 @@ public abstract class AbstractStageFunctionBuilder<S extends Enum<S>>
   }
 
 
-  protected abstract @NotNull StageFunction<S> buildFor(
-      @NotNull Object bean,
+  protected abstract @NotNull <S extends Enum<S>> StageFunction<S> buildFor(
+      Object bean,
       @NotNull Method method,
       @NotNull NameWithQualifierAndType[] parameters)
       throws ReflectiveOperationException;
@@ -191,6 +192,26 @@ public abstract class AbstractStageFunctionBuilder<S extends Enum<S>>
 
 
     @Override
+    public boolean equals(Object o)
+    {
+      if (this == o)
+        return true;
+      if (!(o instanceof NameWithQualifierAndType))
+        return false;
+
+      final NameWithQualifierAndType that = (NameWithQualifierAndType)o;
+
+      return name.equals(that.name) && qualifier == that.qualifier && type.equals(that.type);
+    }
+
+
+    @Override
+    public int hashCode() {
+      return super.hashCode() * 31 + type.hashCode();
+    }
+
+
+    @Override
     public String toString() {
       return "NameWithQualifierAndType(name=" + name + ",qualifier=" + qualifier + ",type=" + type + ')';
     }
@@ -227,6 +248,26 @@ public abstract class AbstractStageFunctionBuilder<S extends Enum<S>>
     {
       int cmp = qualifier.compareTo(o.qualifier);
       return cmp == 0 ? name.compareTo(o.name) : cmp;
+    }
+
+
+    @Override
+    public boolean equals(Object o)
+    {
+      if (this == o)
+        return true;
+      if (!(o instanceof NameWithQualifier))
+        return false;
+
+      final NameWithQualifier that = (NameWithQualifier)o;
+
+      return name.equals(that.name) && qualifier == that.qualifier;
+    }
+
+
+    @Override
+    public int hashCode() {
+      return name.hashCode() * 31 + qualifier.hashCode();
     }
 
 

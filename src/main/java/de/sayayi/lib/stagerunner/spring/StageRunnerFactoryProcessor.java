@@ -2,8 +2,8 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
+import de.sayayi.lib.stagerunner.annotation.AbstractStageFunctionBuilder;
 import de.sayayi.lib.stagerunner.annotation.Data;
-import de.sayayi.lib.stagerunner.annotation.proxy.StageFunctionBuilder;
 import de.sayayi.lib.stagerunner.impl.DefaultStageRunnerFactory;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -37,6 +37,7 @@ import static java.util.Objects.requireNonNull;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
+import static org.springframework.util.ClassUtils.isPresent;
 
 
 @SuppressWarnings("rawtypes")
@@ -52,7 +53,7 @@ public class StageRunnerFactoryProcessor<R>
 
   private BeanFactory beanFactory;
   private ConversionService conversionService;
-
+  private AbstractStageFunctionBuilder stageFunctionBuilder;
 
 
   @SuppressWarnings("unchecked")
@@ -76,7 +77,7 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @Override
-  public void afterPropertiesSet()
+  public void afterPropertiesSet() throws ReflectiveOperationException
   {
     if (beanFactory != null && conversionService == null)
     {
@@ -88,6 +89,17 @@ public class StageRunnerFactoryProcessor<R>
     }
 
     analyseStageRunnerInterfaceMethod();
+
+    if (isPresent("net.bytebuddy.ByteBuddy", StageRunnerFactoryProcessor.class.getClassLoader()))
+    {
+      stageFunctionBuilder = new de.sayayi.lib.stagerunner.annotation.bytebuddy.StageFunctionBuilder(
+          stageFunctionAnnotation.annotationType, conversionService, dataNameTypeMap);
+    }
+    else
+    {
+      stageFunctionBuilder = new de.sayayi.lib.stagerunner.annotation.proxy.StageFunctionBuilder(
+          stageFunctionAnnotation.annotationType, conversionService, dataNameTypeMap);
+    }
   }
 
 
@@ -236,9 +248,6 @@ public class StageRunnerFactoryProcessor<R>
   private <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(
       @NotNull Object singletonBean, @NotNull Method stageFunction)
   {
-    StageFunctionBuilder<S> stageFunctionBuilder = new StageFunctionBuilder<>(
-        stageFunctionAnnotation.annotationType, conversionService, dataNameTypeMap);
-
     try {
       return stageFunctionBuilder.buildFor(singletonBean, stageFunction);
     } catch(Exception ex) {

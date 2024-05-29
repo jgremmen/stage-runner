@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static de.sayayi.lib.stagerunner.annotation.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
 import static net.bytebuddy.jar.asm.Opcodes.ACC_FINAL;
@@ -41,7 +42,7 @@ import static net.bytebuddy.jar.asm.Opcodes.ACC_PUBLIC;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
 
-public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFunctionBuilder<S>
+public class StageFunctionBuilder extends AbstractStageFunctionBuilder
 {
   private static final FieldAccess.Defined FIELD_ACCESS_BEAN = FieldAccess
       .forField(TypeDescription.ForLoadedType.of(AbstractStageFunction.class)
@@ -61,7 +62,10 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
           .filter(named("convert").and(takesArguments(2)))
           .getOnly();
 
-  private final NamingStrategy namingStrategy;
+  private static final BaseNameResolver BASE_NAME_RESOLVER =
+      new BaseNameResolver.ForGivenType(TypeDescription.ForLoadedType.of(StageFunction.class));
+
+  private final Map<CacheKey,Class<? extends StageFunction<?>>> stageFunctionClassCache;
 
 
   public StageFunctionBuilder(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
@@ -70,14 +74,13 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
   {
     super(stageFunctionAnnotationType, conversionService, dataTypeMap);
 
-    namingStrategy = new SuffixingRandom(stageFunctionAnnotation.getStageType().getSimpleName(),
-        new BaseNameResolver.ForGivenType(TypeDescription.ForLoadedType.of(StageFunction.class)));
+    stageFunctionClassCache = new ConcurrentHashMap<>();
   }
 
 
   @Override
-  protected @NotNull StageFunction<S> buildFor(@NotNull Object bean, @NotNull Method method,
-                                               @NotNull NameWithQualifierAndType[] parameters)
+  protected @NotNull <S extends Enum<S>> StageFunction<S> buildFor(
+      Object bean, @NotNull Method method, @NotNull NameWithQualifierAndType[] parameters)
       throws ReflectiveOperationException
   {
     final MethodDescription methodDescription = new MethodDescription.ForLoadedMethod(method);
@@ -88,24 +91,33 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
   }
 
 
-  protected @NotNull StageFunction<S> buildForNoConversion(
-      @NotNull Object bean,
-      @NotNull MethodDescription method,
-      @NotNull NameWithQualifierAndType[] parameters)
+  protected @NotNull <S extends Enum<S>> StageFunction<S> buildForNoConversion(
+      Object bean, @NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters)
       throws ReflectiveOperationException
   {
-    final Class<? extends StageFunction<S>> stageFunctionClass = createStageFunctionType(
-        TypeDescription.Generic.Builder
-            .parameterizedType(AbstractStageFunction.class, stageFunctionAnnotation.getStageType())
-            .build(),
-        method, parameters);
+    if (method.isStatic())
+    {
+      final Class<? extends StageFunction<S>> stageFunctionClass =
+          createStageFunctionType(TypeDescription.Generic.Builder
+              .parameterizedType(StageFunction.class, stageFunctionAnnotation.getStageType())
+              .build(), method, parameters);
 
-    return stageFunctionClass.getConstructor(Object.class).newInstance(bean);
+      return stageFunctionClass.newInstance();
+    }
+    else
+    {
+      final Class<? extends StageFunction<S>> stageFunctionClass =
+          createStageFunctionType(TypeDescription.Generic.Builder
+              .parameterizedType(AbstractStageFunction.class, stageFunctionAnnotation.getStageType())
+              .build(), method, parameters);
+
+      return stageFunctionClass.getConstructor(Object.class).newInstance(bean);
+    }
   }
 
 
-  protected @NotNull StageFunction<S> buildForWithConversion(
-      @NotNull Object bean,
+  protected @NotNull <S extends Enum<S>> StageFunction<S> buildForWithConversion(
+      Object bean,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters) throws ReflectiveOperationException
   {
@@ -125,20 +137,31 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
 
 
   @SuppressWarnings({"unchecked", "resource"})
-  protected @NotNull Class<? extends StageFunction<S>> createStageFunctionType(
+  protected @NotNull <S extends Enum<S>> Class<? extends StageFunction<S>> createStageFunctionType(
       @NotNull TypeDescription.Generic superType,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters)
   {
-    return (Class<? extends StageFunction<S>>)new ByteBuddy()
-        .with(namingStrategy)
-        .subclass(superType)
-        .modifiers(ACC_PUBLIC | ACC_FINAL)
-        .method(named("process")).intercept(implProcess(method, parameters))
-        .method(isToString()).intercept(implToString(method))
-        .make()
-        .load(stageFunctionAnnotation.getAnnotationType().getClassLoader())
-        .getLoaded();
+    return (Class<? extends StageFunction<S>>)stageFunctionClassCache
+        .computeIfAbsent(new CacheKey(method, parameters), ck -> (Class<? extends StageFunction<?>>)
+            new ByteBuddy()
+                .with(createNamingStrategy(method))
+                .subclass(superType)
+                .modifiers(ACC_PUBLIC | ACC_FINAL)
+                .method(named("process")).intercept(implProcess(method, parameters))
+                .method(isToString()).intercept(implToString(method))
+                .make()
+                .load(stageFunctionAnnotation.getAnnotationType().getClassLoader())
+                .getLoaded());
+  }
+
+
+  @Contract(pure = true)
+  protected @NotNull NamingStrategy createNamingStrategy(@NotNull MethodDescription method)
+  {
+    return new SuffixingRandom(
+        stageFunctionAnnotation.getStageType().getSimpleName() + '$' + method.getName(),
+        BASE_NAME_RESOLVER);
   }
 
 
@@ -148,9 +171,12 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
     final List<StackManipulation> stackManipulations = new ArrayList<>();
     final ParameterList<?> methodParameters = method.getParameters();
 
-    stackManipulations.add(MethodVariableAccess.loadThis());
-    stackManipulations.add(FIELD_ACCESS_BEAN.read());
-    stackManipulations.add(TypeCasting.to(method.getDeclaringType()));
+    if (!method.isStatic())
+    {
+      stackManipulations.add(MethodVariableAccess.loadThis());
+      stackManipulations.add(FIELD_ACCESS_BEAN.read());
+      stackManipulations.add(TypeCasting.to(method.getDeclaringType()));
+    }
 
     for(int p = 0; p < parameters.length; p++)
     {
@@ -201,7 +227,7 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
 
   @Contract(pure = true)
   protected @NotNull Implementation implToString(@NotNull MethodDescription method) {
-    return FixedValue.value(StageFunction.class.getSimpleName() + " proxy for " + method);
+    return FixedValue.value(StageFunction.class.getSimpleName() + " adapter for " + method);
   }
 
 
@@ -209,10 +235,10 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
 
   public static abstract class AbstractStageFunction<S extends Enum<S>> implements StageFunction<S>
   {
-    protected final @NotNull Object bean;
+    protected final Object bean;
 
 
-    protected AbstractStageFunction(@NotNull Object bean) {
+    protected AbstractStageFunction(Object bean) {
       this.bean = bean;
     }
   }
@@ -227,7 +253,7 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
     private final @NotNull TypeDescriptor[] targetTypes;
 
 
-    protected AbstractStageFunctionWithConversion(@NotNull Object bean,
+    protected AbstractStageFunctionWithConversion(Object bean,
                                                   @NotNull ConversionService conversionService,
                                                   @NotNull TypeDescriptor[] targetTypes)
     {
@@ -241,6 +267,42 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
     @SuppressWarnings("unused")
     protected Object convert(Object value, int p) {
       return conversionService.convert(value, TypeDescriptor.forObject(value), targetTypes[p]);
+    }
+  }
+
+
+
+
+  private static final class CacheKey
+  {
+    private final @NotNull MethodDescription method;
+    private final @NotNull NameWithQualifierAndType[] parameters;
+
+
+    private CacheKey(@NotNull MethodDescription method,
+                     @NotNull NameWithQualifierAndType[] parameters)
+    {
+      this.method = method;
+      this.parameters = parameters;
+    }
+
+
+    @Override
+    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+    public boolean equals(Object o)
+    {
+      if (this == o)
+        return true;
+
+      final CacheKey that = (CacheKey)o;
+
+      return method.equals(that.method) && Arrays.equals(parameters, that.parameters);
+    }
+
+
+    @Override
+    public int hashCode() {
+      return method.hashCode() * 31 + Arrays.hashCode(parameters);
     }
   }
 }
