@@ -92,6 +92,9 @@ tasks.withType(Jar).configureEach {
 }
 
 
+javadoc.options.addStringOption('Xdoclint:none', '-quiet')
+
+
 testlogger {
   theme 'mocha'
   slowThreshold 2500
