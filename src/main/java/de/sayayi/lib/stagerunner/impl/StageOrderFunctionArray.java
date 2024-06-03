@@ -70,8 +70,7 @@ final class StageOrderFunctionArray<S extends Enum<S>>
 
 
   @Contract(pure = true)
-  private int compare(@NotNull StageOrderFunction<S> newFunction,
-                      @NotNull StageOrderFunction<S> arrayFunction)
+  private int compare(@NotNull StageOrderFunction<S> newFunction, @NotNull StageOrderFunction<S> arrayFunction)
   {
     int cmp = newFunction.stage.compareTo(arrayFunction.stage);
     if (cmp == 0 && (cmp = Integer.compare(newFunction.order, arrayFunction.order)) == 0)
