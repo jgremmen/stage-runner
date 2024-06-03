@@ -225,9 +225,9 @@ public class StageRunnerFactoryProcessor<R>
         //noinspection unchecked
         stageRunnerFactory.addStageFunction(
             stageFunctionAnnotationAttributes.getEnum(stageFunctionAnnotation.stageProperty),
+            stageFunctionAnnotationAttributes.getNumber(stageFunctionAnnotation.orderProperty).intValue(),
             stageFunctionAnnotationAttributes.getString(stageFunctionAnnotation.descriptionProperty),
-            createStageFunction(singletonBean, method),
-            stageFunctionAnnotationAttributes.getNumber(stageFunctionAnnotation.orderProperty).intValue());
+            createStageFunction(singletonBean, method));
       }
     }
   }

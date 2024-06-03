@@ -3,6 +3,7 @@ package de.sayayi.lib.stagerunner.impl;
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
+import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -73,10 +74,10 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   public @NotNull S getCurrentStage()
   {
     if (state == IDLE || nextFunctionIndex == 0)
-      throw new IllegalStateException("stage runner has not started yet");
+      throw new StageRunnerException("stage runner has not started yet");
 
     if (state.isTerminated())
-      throw new IllegalStateException("stage runner has terminated");
+      throw new StageRunnerException("stage runner has terminated");
 
     return functionArray.functions[nextFunctionIndex - 1].stage;
   }
@@ -111,20 +112,17 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
   @Override
-  public void addStageFunction(@NotNull S stage, String description,
-                               @NotNull StageFunction<S> function,
-                               int order)
+  public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
   {
     if (state.isTerminated())
-      throw new IllegalStateException("stage runner has terminated");
+      throw new StageRunnerException("stage runner has terminated");
 
     final int index = functionArray.add(new StageOrderFunction<>(stage, description, order, function));
 
     if (state == RUNNING && index < nextFunctionIndex)
     {
       abort();
-      throw new IllegalStateException("stage runner has passed beyond stage " + stage +
-          " and order " + order);
+      throw new StageRunnerException("stage runner has passed beyond stage " + stage + " and order " + order);
     }
   }
 
@@ -141,7 +139,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       return true;
 
     if (state != IDLE)
-      throw new IllegalStateException();
+      throw new StageRunnerException("stage runner must be in idle state");
 
     S lastStage = null;
 
