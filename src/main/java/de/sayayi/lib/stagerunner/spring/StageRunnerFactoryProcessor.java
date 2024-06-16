@@ -4,11 +4,11 @@ import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.annotation.AbstractStageFunctionBuilder;
 import de.sayayi.lib.stagerunner.annotation.Data;
+import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.impl.DefaultStageRunnerFactory;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.springframework.beans.BeansException;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.InitializingBean;
@@ -20,7 +20,6 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProce
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ResolvableType;
-import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
@@ -37,6 +36,7 @@ import static java.util.Objects.requireNonNull;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
+import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotationAttributes;
 import static org.springframework.util.ClassUtils.isPresent;
 
 
@@ -63,7 +63,7 @@ public class StageRunnerFactoryProcessor<R>
   {
     this.stageRunnerInterfaceType = stageRunnerInterfaceType;
     this.stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotation);
-    this.stageRunnerFactory = new DefaultStageRunnerFactory(this.stageFunctionAnnotation.stageType);
+    this.stageRunnerFactory = new DefaultStageRunnerFactory(this.stageFunctionAnnotation.getStageType());
 
     stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
 
@@ -77,7 +77,7 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @Override
-  public void afterPropertiesSet() throws ReflectiveOperationException
+  public void afterPropertiesSet()
   {
     if (beanFactory != null && conversionService == null)
     {
@@ -92,13 +92,14 @@ public class StageRunnerFactoryProcessor<R>
 
     if (isPresent("net.bytebuddy.ByteBuddy", StageRunnerFactoryProcessor.class.getClassLoader()))
     {
+      // preferred, as it produces the fastest stage function implementations
       stageFunctionBuilder = new de.sayayi.lib.stagerunner.annotation.bytebuddy.StageFunctionBuilder(
-          stageFunctionAnnotation.annotationType, conversionService, dataNameTypeMap);
+          stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap);
     }
     else
     {
       stageFunctionBuilder = new de.sayayi.lib.stagerunner.annotation.proxy.StageFunctionBuilder(
-          stageFunctionAnnotation.annotationType, conversionService, dataNameTypeMap);
+          stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap);
     }
   }
 
@@ -110,8 +111,8 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @Override
-  public Object postProcessAfterInitialization(@NotNull Object bean, @NotNull String beanName)
-      throws BeansException
+  public @NotNull Object postProcessAfterInitialization(@NotNull Object bean,
+                                                        @NotNull String beanName)
   {
     try {
       if (beanFactory.isSingleton(beanName))
@@ -125,15 +126,15 @@ public class StageRunnerFactoryProcessor<R>
 
   @Override
   public void postProcessBeanDefinitionRegistry(@NotNull BeanDefinitionRegistry beanDefinitionRegistry)
-      throws BeansException
   {
-    final RootBeanDefinition bd = new RootBeanDefinition(stageRunnerInterfaceType,
-        SCOPE_SINGLETON, this::createStageRunnerProxy);
+    final RootBeanDefinition bd =
+        new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
 
     bd.setTargetType(ResolvableType.forClass(stageRunnerInterfaceType));
     bd.setScope(SCOPE_SINGLETON);
     bd.setLazyInit(false);
-    bd.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.stageType.getName());
+    bd.setDescription("Auto-detected StageRunner for " +
+        stageFunctionAnnotation.getStageType().getName());
 
     beanDefinitionRegistry.registerBeanDefinition(stageRunnerInterfaceType.getName(), bd);
   }
@@ -154,7 +155,7 @@ public class StageRunnerFactoryProcessor<R>
   @NotNull Method findFunctionalInterfaceMethod(@NotNull Class<?> interfaceType)
   {
     if (!interfaceType.isInterface())
-      throw new IllegalArgumentException(interfaceType.getName() + " is not an interface");
+      throw new StageRunnerException(interfaceType.getName() + " is not an interface");
 
     Method functionalInterfaceMethod = null;
 
@@ -162,13 +163,13 @@ public class StageRunnerFactoryProcessor<R>
       if (!method.isDefault())
       {
         if (functionalInterfaceMethod != null)
-          throw new IllegalArgumentException(interfaceType.getName() + " is not a functional interface");
+          throw new StageRunnerException(interfaceType.getName() + " is not a functional interface");
 
         functionalInterfaceMethod = method;
       }
 
     if (functionalInterfaceMethod == null)
-      throw new IllegalArgumentException(interfaceType.getName() + " has no functional method");
+      throw new StageRunnerException(interfaceType.getName() + " has no functional method");
 
     return functionalInterfaceMethod;
   }
@@ -179,7 +180,7 @@ public class StageRunnerFactoryProcessor<R>
     final String[] parameterNames = new DefaultParameterNameDiscoverer()
         .getParameterNames(stageRunnerInterfaceMethod);
     final ResolvableType callbackType = forClassWithGenerics(
-        StageRunnerCallback.class, stageFunctionAnnotation.stageType);
+        StageRunnerCallback.class, stageFunctionAnnotation.getStageType());
     final Parameter[] parameters = stageRunnerInterfaceMethod.getParameters();
 
     for(int p = 0; p < dataNames.length; p++)
@@ -207,13 +208,13 @@ public class StageRunnerFactoryProcessor<R>
 
     if (parameterName.isEmpty())
     {
-      throw new IllegalStateException("Unable to detect data name for parameter " + (p + 1) +
+      throw new StageRunnerException("unable to detect data name for parameter " + (p + 1) +
           " in stage runner function " + stageRunnerInterfaceMethod);
     }
 
     if (dataNameTypeMap.containsKey(parameterName))
     {
-      throw new IllegalStateException("Duplicate data name '" + parameterName +
+      throw new StageRunnerException("duplicate data name '" + parameterName +
           "' for parameter" + (p + 1) + " in stage runner function " +
           stageRunnerInterfaceMethod);
     }
@@ -222,34 +223,34 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  private void analyseStageFunctions(@NotNull Object singletonBean)
+  private void analyseStageFunctions(@NotNull Object bean)
   {
-    final Class<?> beanType = singletonBean.getClass();
-    final Class<? extends Annotation> annotationType = stageFunctionAnnotation.annotationType;
+    final Class<?> beanType = bean.getClass();
+    final Class<? extends Annotation> annotationType = stageFunctionAnnotation.getAnnotationType();
 
     for(final Method method: beanType.getMethods())
     {
-      final AnnotationAttributes stageFunctionAnnotationAttributes = AnnotatedElementUtils
-          .findMergedAnnotationAttributes(method, annotationType, false, false);
+      final AnnotationAttributes stageFunctionAnnotationAttributes =
+          findMergedAnnotationAttributes(method, annotationType, false, false);
 
       if (stageFunctionAnnotationAttributes != null)
       {
         //noinspection unchecked
         stageRunnerFactory.addStageFunction(
-            stageFunctionAnnotationAttributes.getEnum(stageFunctionAnnotation.stageProperty),
-            stageFunctionAnnotationAttributes.getString(stageFunctionAnnotation.descriptionProperty),
-            createStageFunction(singletonBean, method),
-            stageFunctionAnnotationAttributes.getNumber(stageFunctionAnnotation.orderProperty).intValue());
+            stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes),
+            stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes),
+            createStageFunction(bean, method),
+            stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes));
       }
     }
   }
 
 
   private <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(
-      @NotNull Object singletonBean, @NotNull Method stageFunction)
+      @NotNull Object bean, @NotNull Method stageFunction)
   {
     try {
-      return stageFunctionBuilder.buildFor(singletonBean, stageFunction);
+      return stageFunctionBuilder.buildFor(bean, stageFunction);
     } catch(Exception ex) {
       throw new RuntimeException(ex);
     }
