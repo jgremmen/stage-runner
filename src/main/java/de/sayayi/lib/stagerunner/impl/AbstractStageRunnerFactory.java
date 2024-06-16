@@ -27,9 +27,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
 
 
   @Override
-  public void addStageFunction(@NotNull S stage, String description,
-                               @NotNull StageFunction<S> function,
-                               int order) {
+  public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function) {
     functionArray.add(new StageOrderFunction<>(stage, description, order, function));
   }
 }
