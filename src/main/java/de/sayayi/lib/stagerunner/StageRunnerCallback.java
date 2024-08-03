@@ -14,8 +14,7 @@ public interface StageRunnerCallback<S extends Enum<S>>
   }
 
 
-  default void preStageFunctionCallback(@NotNull StageContext<S> stageContext,
-                                        String description) {
+  default void preStageFunctionCallback(@NotNull StageContext<S> stageContext, String description) {
   }
 
 
@@ -27,8 +26,7 @@ public interface StageRunnerCallback<S extends Enum<S>>
   }
 
 
-  default void stageExceptionHandler(@NotNull StageContext<S> context,
-                                     @NotNull Throwable exception) {
+  default void stageExceptionHandler(@NotNull StageContext<S> context, @NotNull Throwable exception) {
     context.abort();
   }
 }
