@@ -16,7 +16,7 @@ import java.util.function.Function;
 import static de.sayayi.lib.stagerunner.annotation.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
 
 
-public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFunctionBuilder<S>
+public class StageFunctionBuilder extends AbstractStageFunctionBuilder
 {
   public StageFunctionBuilder(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
                               @NotNull ConversionService conversionService,
@@ -26,8 +26,8 @@ public class StageFunctionBuilder<S extends Enum<S>> extends AbstractStageFuncti
 
 
   @Override
-  protected @NotNull StageFunction<S> buildFor(@NotNull Object bean, @NotNull Method method,
-                                               @NotNull NameWithQualifierAndType[] parameters)
+  protected @NotNull <S extends Enum<S>> StageFunction<S> buildFor(
+      @NotNull Object bean, @NotNull Method method, @NotNull NameWithQualifierAndType[] parameters)
   {
     final int parameterCount = method.getParameterCount();
 

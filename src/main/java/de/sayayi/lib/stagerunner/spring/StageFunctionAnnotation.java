@@ -1,20 +1,24 @@
 package de.sayayi.lib.stagerunner.spring;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.core.annotation.AnnotationAttributes;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Objects;
 
+import static de.sayayi.lib.stagerunner.StageConfigurer.DEFAULT_ORDER;
+
 
 public final class StageFunctionAnnotation
 {
-  final @NotNull Class<? extends Annotation> annotationType;
-  final @NotNull Class<? extends Enum<?>> stageType;
-  final @NotNull String stageProperty;
-  final String orderProperty;
-  final String descriptionProperty;
+  private final @NotNull Class<? extends Annotation> annotationType;
+  private final @NotNull Class<? extends Enum<?>> stageType;
+  private final @NotNull String stageProperty;
+  private final String orderProperty;
+  private final String descriptionProperty;
 
 
   private StageFunctionAnnotation(@NotNull Class<? extends Annotation> annotationType,
@@ -31,29 +35,54 @@ public final class StageFunctionAnnotation
   }
 
 
-
+  @Contract(pure = true)
   public @NotNull Class<? extends Annotation> getAnnotationType() {
     return annotationType;
   }
 
 
+  @Contract(pure = true)
   public @NotNull Class<? extends Enum<?>> getStageType() {
     return stageType;
   }
 
 
+  @Contract(pure = true)
   public @NotNull String getStageProperty() {
     return stageProperty;
   }
 
 
+  @Contract(pure = true)
+  public @NotNull Enum<?> getStage(@NotNull AnnotationAttributes annotationAttributes) {
+    return annotationAttributes.getEnum(stageProperty);
+  }
+
+
+  @Contract(pure = true)
   public String getOrderProperty() {
     return orderProperty;
   }
 
 
+  @Contract(pure = true)
+  public int getOrder(@NotNull AnnotationAttributes annotationAttributes)
+  {
+    return orderProperty == null
+        ? DEFAULT_ORDER
+        : annotationAttributes.getNumber(orderProperty).intValue();
+  }
+
+
+  @Contract(pure = true)
   public String getDescriptionProperty() {
     return descriptionProperty;
+  }
+
+
+  @Contract(pure = true)
+  public String getDescription(@NotNull AnnotationAttributes annotationAttributes) {
+    return descriptionProperty == null ? null : annotationAttributes.getString(descriptionProperty);
   }
 
 
@@ -73,10 +102,10 @@ public final class StageFunctionAnnotation
       if (method.isAnnotationPresent(StageDefinition.Stage.class))
       {
         if (stagePropertyName != null)
-          throw new IllegalArgumentException("Duplicate @Stage annotation for " + method);
+          throw new StageRunnerException("Duplicate @Stage annotation for " + method);
 
         if (!Enum.class.isAssignableFrom(stageType = method.getReturnType()))
-          throw new IllegalArgumentException("Stage type is not an enum for " + method);
+          throw new StageRunnerException("Stage type is not an enum for " + method);
 
         stagePropertyName = propertyName;
       }
@@ -84,10 +113,10 @@ public final class StageFunctionAnnotation
       {
         final Class<?> orderType = method.getReturnType();
         if (orderType != int.class && orderType != short.class && orderType != byte.class)
-          throw new IllegalArgumentException("Order type is not an int or short for " + method);
+          throw new StageRunnerException("Order type is not an int or short for " + method);
 
         if (orderPropertyName != null)
-          throw new IllegalArgumentException("Duplicate @Order annotation for " + method);
+          throw new StageRunnerException("Duplicate @Order annotation for " + method);
 
         orderPropertyName = propertyName;
       }
@@ -95,17 +124,17 @@ public final class StageFunctionAnnotation
       {
         final Class<?> descriptionType = method.getReturnType();
         if (descriptionType != String.class)
-          throw new IllegalArgumentException("Description type is not a String for " + method);
+          throw new StageRunnerException("Description type is not a String for " + method);
 
         if (descriptionPropertyName != null)
-          throw new IllegalArgumentException("Duplicate @Description annotation for " + method);
+          throw new StageRunnerException("Duplicate @Description annotation for " + method);
 
         descriptionPropertyName = propertyName;
       }
     }
 
     if (stagePropertyName == null)
-      throw new IllegalArgumentException("No @Stage annotation found for " + stageFunctionAnnotation);
+      throw new StageRunnerException("No @Stage annotation found for " + stageFunctionAnnotation);
 
     //noinspection unchecked
     return new StageFunctionAnnotation(
@@ -139,13 +168,13 @@ public final class StageFunctionAnnotation
   @Override
   public int hashCode()
   {
-    int hash = (annotationType.hashCode() * 31 + stageType.hashCode()) * 31 + stageProperty.hashCode();
+    int hash = (annotationType.hashCode() * 29 + stageType.hashCode()) * 29 + stageProperty.hashCode();
 
     if (orderProperty != null)
-      hash = hash * 31 + orderProperty.hashCode();
+      hash = hash * 29 + orderProperty.hashCode();
 
     if (descriptionProperty != null)
-      hash = hash * 31 + descriptionProperty.hashCode();
+      hash = hash * 29 + descriptionProperty.hashCode();
 
     return hash;
   }

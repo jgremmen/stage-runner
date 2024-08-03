@@ -16,10 +16,10 @@ class StageFunctionAnnotationTest
   {
     final StageFunctionAnnotation sfa = StageFunctionAnnotation.buildFrom(StageDef.class);
 
-    assertEquals(StageDef.class, sfa.annotationType);
-    assertEquals(TestStage.class, sfa.stageType);
-    assertEquals("stage", sfa.stageProperty);
-    assertEquals("priority", sfa.orderProperty);
-    assertEquals("comment", sfa.descriptionProperty);
+    assertEquals(StageDef.class, sfa.getAnnotationType());
+    assertEquals(TestStage.class, sfa.getStageType());
+    assertEquals("stage", sfa.getStageProperty());
+    assertEquals("priority", sfa.getOrderProperty());
+    assertEquals("comment", sfa.getDescriptionProperty());
   }
 }

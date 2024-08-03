@@ -1,5 +1,7 @@
 package de.sayayi.lib.stagerunner.exception;
 
+import org.jetbrains.annotations.NotNull;
+
 
 /**
  * @author Jeroen Gremmen
@@ -7,12 +9,11 @@ package de.sayayi.lib.stagerunner.exception;
  */
 public class StageRunnerException extends RuntimeException
 {
-  public StageRunnerException(String message) {
+  public StageRunnerException(@NotNull String message) {
     super(message);
   }
 
-
-  public StageRunnerException(String message, Throwable cause) {
+  public StageRunnerException(@NotNull String message, Throwable cause) {
     super(message, cause);
   }
 }
