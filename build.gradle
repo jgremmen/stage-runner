@@ -37,21 +37,21 @@ dependencies {
   compileOnlyApi 'org.jetbrains:annotations-java5:24.1.0'
 
   // https://mvnrepository.com/artifact/org.springframework/spring-context
-  implementation 'org.springframework:spring-context:5.3.36'
+  implementation 'org.springframework:spring-context:5.3.37'
 
   // https://mvnrepository.com/artifact/net.bytebuddy/byte-buddy
-  implementation 'net.bytebuddy:byte-buddy:1.14.16'
+  implementation 'net.bytebuddy:byte-buddy:1.14.18'
 
 
   // test
-  testAnnotationProcessor 'org.projectlombok:lombok:1.18.32'
-  testCompileOnly 'org.projectlombok:lombok:1.18.32'
+  testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
+  testCompileOnly 'org.projectlombok:lombok:1.18.34'
 
-  testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
   // https://mvnrepository.com/artifact/org.springframework/spring-test
-  testImplementation 'org.springframework:spring-test:5.3.36'
+  testImplementation 'org.springframework:spring-test:5.3.37'
 }
 
 
