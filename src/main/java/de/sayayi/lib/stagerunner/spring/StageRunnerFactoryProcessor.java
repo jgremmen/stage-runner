@@ -79,11 +79,11 @@ public class StageRunnerFactoryProcessor<R>
   @Override
   public void afterPropertiesSet()
   {
-    if (beanFactory != null && conversionService == null)
+    if (conversionService == null)
     {
       try {
         conversionService = beanFactory.getBean(ConversionService.class);
-      } catch(NoSuchBeanDefinitionException ex) {
+      } catch(NullPointerException | NoSuchBeanDefinitionException ex) {
         conversionService = DefaultConversionService.getSharedInstance();
       }
     }
@@ -111,8 +111,7 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @Override
-  public @NotNull Object postProcessAfterInitialization(@NotNull Object bean,
-                                                        @NotNull String beanName)
+  public @NotNull Object postProcessAfterInitialization(@NotNull Object bean, @NotNull String beanName)
   {
     try {
       if (beanFactory.isSingleton(beanName))
@@ -215,8 +214,7 @@ public class StageRunnerFactoryProcessor<R>
     if (dataNameTypeMap.containsKey(parameterName))
     {
       throw new StageRunnerException("duplicate data name '" + parameterName +
-          "' for parameter" + (p + 1) + " in stage runner function " +
-          stageRunnerInterfaceMethod);
+          "' for parameter" + (p + 1) + " in stage runner function " + stageRunnerInterfaceMethod);
     }
 
     return parameterName;

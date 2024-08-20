@@ -44,8 +44,7 @@ public abstract class AbstractStageFunctionBuilder
   }
 
 
-  public @NotNull <S extends Enum<S>> StageFunction<S> buildFor(Object bean,
-                                                                @NotNull Method method)
+  public @NotNull <S extends Enum<S>> StageFunction<S> buildFor(Object bean, @NotNull Method method)
       throws ReflectiveOperationException
   {
     final int parameterCount = method.getParameterCount();
@@ -148,8 +147,7 @@ public abstract class AbstractStageFunctionBuilder
 
 
   @Contract(pure = true)
-  private TypeQualifier qualifyParameterType(@NotNull TypeDescriptor parameterType,
-                                             @NotNull ResolvableType dataType)
+  private TypeQualifier qualifyParameterType(@NotNull TypeDescriptor parameterType, @NotNull ResolvableType dataType)
   {
     final ResolvableType parameterResolvableType = parameterType.getResolvableType();
 
@@ -177,8 +175,7 @@ public abstract class AbstractStageFunctionBuilder
     protected final @NotNull TypeDescriptor type;
 
 
-    protected NameWithQualifierAndType(@NotNull NameWithQualifier nameWithQualifier,
-                                       @NotNull TypeDescriptor type)
+    protected NameWithQualifierAndType(@NotNull NameWithQualifier nameWithQualifier, @NotNull TypeDescriptor type)
     {
       super(nameWithQualifier.name, nameWithQualifier.qualifier);
 

@@ -33,8 +33,7 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
 
     //noinspection unchecked
     final Function<StageContext<S>,Object>[] parameterFunctions = new Function[parameterCount];
-    final StageFunctionAdapter<S> stageFunctionAdapter =
-        new StageFunctionAdapter<>(bean, method);
+    final StageFunctionAdapter<S> stageFunctionAdapter = new StageFunctionAdapter<>(bean, method);
 
     for(int p = 0; p < parameterCount; p++)
     {
