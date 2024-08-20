@@ -214,12 +214,12 @@ class StageRunnerTest
 
     @Override
     @SneakyThrows
-    public void stageExceptionHandler(@NotNull StageContext<TestStage> context, @NotNull Throwable exception)
+    public void stageExceptionHandler(@NotNull StageContext<TestStage> stageContext, @NotNull Throwable exception)
     {
       if (exception instanceof AssertionFailedError)
         throw exception;
 
-      StageRunnerCallback.super.stageExceptionHandler(context, exception);
+      StageRunnerCallback.super.stageExceptionHandler(stageContext, exception);
     }
   }
 }
