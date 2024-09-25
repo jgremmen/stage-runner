@@ -2,7 +2,6 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
-import de.sayayi.lib.stagerunner.annotation.AbstractStageFunctionBuilder;
 import de.sayayi.lib.stagerunner.annotation.Data;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.impl.DefaultStageRunnerFactory;
@@ -37,7 +36,6 @@ import static org.springframework.beans.factory.config.ConfigurableBeanFactory.S
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotationAttributes;
-import static org.springframework.util.ClassUtils.isPresent;
 
 
 @SuppressWarnings("rawtypes")
@@ -90,16 +88,10 @@ public class StageRunnerFactoryProcessor<R>
 
     analyseStageRunnerInterfaceMethod();
 
-    if (isPresent("net.bytebuddy.ByteBuddy", StageRunnerFactoryProcessor.class.getClassLoader()))
+    if (stageFunctionBuilder == null)
     {
-      // preferred, as it produces the fastest stage function implementations
-      stageFunctionBuilder = new de.sayayi.lib.stagerunner.annotation.bytebuddy.StageFunctionBuilder(
-          stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap);
-    }
-    else
-    {
-      stageFunctionBuilder = new de.sayayi.lib.stagerunner.annotation.proxy.StageFunctionBuilder(
-          stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap);
+      setStageFunctionBuilder(new StageFunctionBuilder(
+          stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap));
     }
   }
 
@@ -130,10 +122,8 @@ public class StageRunnerFactoryProcessor<R>
         new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
 
     bd.setTargetType(ResolvableType.forClass(stageRunnerInterfaceType));
-    bd.setScope(SCOPE_SINGLETON);
     bd.setLazyInit(false);
-    bd.setDescription("Auto-detected StageRunner for " +
-        stageFunctionAnnotation.getStageType().getName());
+    bd.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.getStageType().getName());
 
     beanDefinitionRegistry.registerBeanDefinition(stageRunnerInterfaceType.getName(), bd);
   }
@@ -264,5 +254,10 @@ public class StageRunnerFactoryProcessor<R>
   @SuppressWarnings("unused")
   public void setConversionService(@NotNull ConversionService conversionService) {
     this.conversionService = requireNonNull(conversionService);
+  }
+
+
+  public void setStageFunctionBuilder(AbstractStageFunctionBuilder stageFunctionBuilder) {
+    this.stageFunctionBuilder = requireNonNull(stageFunctionBuilder);
   }
 }

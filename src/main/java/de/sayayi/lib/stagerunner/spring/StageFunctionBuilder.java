@@ -1,8 +1,7 @@
-package de.sayayi.lib.stagerunner.annotation.bytebuddy;
+package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
-import de.sayayi.lib.stagerunner.annotation.AbstractStageFunctionBuilder;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.NamingStrategy;
 import net.bytebuddy.NamingStrategy.Suffixing.BaseNameResolver;
@@ -36,7 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static de.sayayi.lib.stagerunner.annotation.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
+import static de.sayayi.lib.stagerunner.spring.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
 import static net.bytebuddy.jar.asm.Opcodes.ACC_FINAL;
 import static net.bytebuddy.jar.asm.Opcodes.ACC_PUBLIC;
 import static net.bytebuddy.matcher.ElementMatchers.*;
@@ -68,9 +67,9 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
   private final Map<CacheKey,Class<? extends StageFunction<?>>> stageFunctionClassCache;
 
 
-  public StageFunctionBuilder(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
-                              @NotNull ConversionService conversionService,
-                              @NotNull Map<String,ResolvableType> dataTypeMap)
+  StageFunctionBuilder(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
+                       @NotNull ConversionService conversionService,
+                       @NotNull Map<String,ResolvableType> dataTypeMap)
   {
     super(stageFunctionAnnotationType, conversionService, dataTypeMap);
 
@@ -246,8 +245,7 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
 
 
 
-  public static abstract class AbstractStageFunctionWithConversion<S extends Enum<S>>
-      extends AbstractStageFunction<S>
+  public static abstract class AbstractStageFunctionWithConversion<S extends Enum<S>> extends AbstractStageFunction<S>
   {
     private final @NotNull ConversionService conversionService;
     private final @NotNull TypeDescriptor[] targetTypes;
@@ -288,7 +286,7 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
 
 
     @Override
-    @SuppressWarnings("EqualsWhichDoesntCheckParameterClass")
+    @SuppressWarnings({"EqualsWhichDoesntCheckParameterClass", "EqualsDoesntCheckParameterClass"})
     public boolean equals(Object o)
     {
       if (this == o)

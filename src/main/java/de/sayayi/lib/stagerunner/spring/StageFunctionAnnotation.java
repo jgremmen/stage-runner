@@ -111,23 +111,23 @@ public final class StageFunctionAnnotation
       }
       else if (method.isAnnotationPresent(StageDefinition.Order.class))
       {
-        final Class<?> orderType = method.getReturnType();
-        if (orderType != int.class && orderType != short.class && orderType != byte.class)
-          throw new StageRunnerException("Order type is not an int or short for " + method);
-
         if (orderPropertyName != null)
           throw new StageRunnerException("Duplicate @Order annotation for " + method);
+
+        final Class<?> orderType = method.getReturnType();
+        if (orderType != int.class && orderType != short.class)
+          throw new StageRunnerException("Order type is not an int or short for " + method);
 
         orderPropertyName = propertyName;
       }
       else if (method.isAnnotationPresent(StageDefinition.Description.class))
       {
+        if (descriptionPropertyName != null)
+          throw new StageRunnerException("Duplicate @Description annotation for " + method);
+
         final Class<?> descriptionType = method.getReturnType();
         if (descriptionType != String.class)
           throw new StageRunnerException("Description type is not a String for " + method);
-
-        if (descriptionPropertyName != null)
-          throw new StageRunnerException("Duplicate @Description annotation for " + method);
 
         descriptionPropertyName = propertyName;
       }
