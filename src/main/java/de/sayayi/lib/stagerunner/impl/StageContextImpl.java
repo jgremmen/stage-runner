@@ -7,10 +7,9 @@ import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.Arrays;
-import java.util.EnumSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.function.Predicate;
 
 import static de.sayayi.lib.stagerunner.impl.StageContextImpl.State.*;
 import static java.util.Collections.emptySet;
@@ -27,8 +26,9 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   private final StageOrderFunctionArray<S> functionArray;
   private final Set<S> processedStages;
   private final Map<String,Object> data;
-  private State state;
+  private final Set<String> enabledStageFunctionNames;
 
+  private State state;
   private int nextFunctionIndex;
   private boolean aborted;
 
@@ -54,6 +54,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
     nextFunctionIndex = 0;
     aborted = false;
+    enabledStageFunctionNames = new HashSet<>();
   }
 
 
@@ -111,6 +112,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     return remainingStages;
   }
 
+
   @Override
   public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
   {
@@ -124,6 +126,37 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       abort();
       throw new StageRunnerException("stage runner has passed beyond stage " + stage + " and order " + order);
     }
+  }
+
+
+  @Override
+  public @NotNull Set<String> enableNamedStageFunctions(@NotNull Predicate<String> nameFilter)
+  {
+    if (state.isTerminated())
+      throw new StageRunnerException("stage runner has terminated");
+
+    final Set<String> enabledFunctions = new HashSet<>();
+    String name;
+
+    for(Entry<String,StageOrderFunction<S>> stageFunctionEntry: stageRunnerFactory.namedStageFunctions.entrySet())
+      if (!enabledStageFunctionNames.contains(name = stageFunctionEntry.getKey()) && nameFilter.test(name))
+      {
+        final StageOrderFunction<S> stageFunction = stageFunctionEntry.getValue();
+        final int index = functionArray.add(stageFunction);
+
+        if (state == RUNNING && index < nextFunctionIndex)
+        {
+          abort();
+          throw new StageRunnerException("stage runner has passed beyond stage " + stageFunction.stage +
+              " and order " + stageFunction.order + " for stage function '" + name + '\'');
+        }
+
+        stageFunctionEntry.setValue(null);
+        enabledFunctions.add(name);
+        enabledStageFunctionNames.add(name);
+      }
+
+    return enabledFunctions;
   }
 
 

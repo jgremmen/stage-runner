@@ -5,6 +5,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 
 
 /**
@@ -65,4 +66,12 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
   @Contract(pure = true)
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   boolean isAborted();
+
+
+  default @NotNull Set<String> enableNamedStageFunction(@NotNull String name) {
+    return enableNamedStageFunctions(n -> n.equals(name));
+  }
+
+
+  @NotNull Set<String> enableNamedStageFunctions(@NotNull Predicate<String> nameFilter);
 }
