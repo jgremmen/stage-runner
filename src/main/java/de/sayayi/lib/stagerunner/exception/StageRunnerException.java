@@ -13,6 +13,7 @@ public class StageRunnerException extends RuntimeException
     super(message);
   }
 
+
   public StageRunnerException(@NotNull String message, Throwable cause) {
     super(message, cause);
   }
