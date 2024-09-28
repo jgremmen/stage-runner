@@ -1,6 +1,7 @@
 package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
+import de.sayayi.lib.stagerunner.spring.annotation.StageDefinition;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.annotation.AnnotationAttributes;
@@ -19,19 +20,22 @@ public final class StageFunctionAnnotation
   private final @NotNull String stageProperty;
   private final String orderProperty;
   private final String descriptionProperty;
+  private final String nameProperty;
 
 
   private StageFunctionAnnotation(@NotNull Class<? extends Annotation> annotationType,
                                   @NotNull Class<? extends Enum<?>> stageType,
                                   @NotNull String stageProperty,
                                   String orderProperty,
-                                  String descriptionProperty)
+                                  String descriptionProperty,
+                                  String nameProperty)
   {
     this.annotationType = annotationType;
     this.stageType = stageType;
     this.stageProperty = stageProperty;
     this.orderProperty = orderProperty;
     this.descriptionProperty = descriptionProperty;
+    this.nameProperty = nameProperty;
   }
 
 
@@ -87,6 +91,23 @@ public final class StageFunctionAnnotation
 
 
   @Contract(pure = true)
+  public String getNameProperty() {
+    return nameProperty;
+  }
+
+
+  @Contract(pure = true)
+  public String getName(@NotNull AnnotationAttributes annotationAttributes)
+  {
+    if (nameProperty == null)
+      return null;
+
+    final String name = annotationAttributes.getString(nameProperty);
+    return name.isEmpty() ? null : name;
+  }
+
+
+  @Contract(pure = true)
   public static @NotNull StageFunctionAnnotation buildFrom(
       @NotNull Class<? extends Annotation> stageFunctionAnnotation)
   {
@@ -94,12 +115,23 @@ public final class StageFunctionAnnotation
     String stagePropertyName = null;
     String orderPropertyName = null;
     String descriptionPropertyName = null;
+    String namePropertyName = null;
 
     for(final Method method: stageFunctionAnnotation.getDeclaredMethods())
     {
       final String propertyName = method.getName();
 
-      if (method.isAnnotationPresent(StageDefinition.Stage.class))
+      if (method.isAnnotationPresent(StageDefinition.Name.class))
+      {
+        if (namePropertyName != null)
+          throw new StageRunnerException("Duplicate @Name annotation for " + method);
+
+        if (method.getReturnType() != String.class)
+          throw new StageRunnerException("Stage function name is not a String for " + method);
+
+        namePropertyName = propertyName;
+      }
+      else if (method.isAnnotationPresent(StageDefinition.Stage.class))
       {
         if (stagePropertyName != null)
           throw new StageRunnerException("Duplicate @Stage annotation for " + method);
@@ -142,7 +174,8 @@ public final class StageFunctionAnnotation
         (Class<? extends Enum<?>>)stageType,
         stagePropertyName,
         orderPropertyName,
-        descriptionPropertyName);
+        descriptionPropertyName,
+        namePropertyName);
   }
 
 
@@ -192,6 +225,8 @@ public final class StageFunctionAnnotation
       s.append(",order=").append(orderProperty).append("()");
     if (descriptionProperty != null)
       s.append(",description=").append(descriptionProperty).append("()");
+    if (nameProperty != null)
+      s.append(",name=").append(nameProperty).append("()");
 
     return s.append(')').toString();
   }

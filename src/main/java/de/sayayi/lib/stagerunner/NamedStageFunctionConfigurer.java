@@ -8,12 +8,13 @@ import static de.sayayi.lib.stagerunner.StageConfigurer.DEFAULT_ORDER;
 /**
  * The named stage configurer provides methods to add new stage functions, which can be enabled by name.
  *
- * @author Jeroen Gremmen
- *
  * @param <S>  Stage enum type
+ *
+ * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 @FunctionalInterface
-public interface NamedStageConfigurer<S extends Enum<S>>
+public interface NamedStageFunctionConfigurer<S extends Enum<S>>
 {
   /**
    * Add a named stage function to {@code stage}. The function will be inserted appropriately using the

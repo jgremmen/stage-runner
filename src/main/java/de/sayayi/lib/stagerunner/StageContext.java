@@ -60,6 +60,9 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
   @NotNull Set<S> getRemainingStages();
 
 
+  /**
+   * Abort stage context running.
+   */
   void abort();
 
 
@@ -68,10 +71,28 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
   boolean isAborted();
 
 
-  default @NotNull Set<String> enableNamedStageFunction(@NotNull String name) {
-    return enableNamedStageFunctions(n -> n.equals(name));
+  /**
+   *
+   * @param name  name of the stage function to enabler
+   *
+   * @return  {@code true} if a stage function with {@code name} exists and has been enabled by this invocation,
+   *          {@code false} otherwise
+   *
+   * @since 0.3.0
+   */
+  default boolean enableNamedStageFunction(@NotNull String name) {
+    return !enableNamedStageFunctions(n -> n.equals(name)).isEmpty();
   }
 
 
+  /**
+   *
+   * @param nameFilter  name filter predicate. A stage function is added if and only if the predicate
+   *                    ({@link Predicate#test(Object)}) returns {@code true}
+   *
+   * @return  a set with the stage function names, which have been enabled, never {@code null}
+   *
+   * @since 0.3.0
+   */
   @NotNull Set<String> enableNamedStageFunctions(@NotNull Predicate<String> nameFilter);
 }

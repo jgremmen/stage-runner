@@ -18,6 +18,7 @@ class StageFunctionAnnotationTest
 
     assertEquals(StageDef.class, sfa.getAnnotationType());
     assertEquals(TestStage.class, sfa.getStageType());
+    assertEquals("scope", sfa.getNameProperty());
     assertEquals("stage", sfa.getStageProperty());
     assertEquals("priority", sfa.getOrderProperty());
     assertEquals("comment", sfa.getDescriptionProperty());

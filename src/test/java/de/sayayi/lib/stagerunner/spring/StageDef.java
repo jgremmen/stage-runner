@@ -2,6 +2,7 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.TestStage;
+import de.sayayi.lib.stagerunner.spring.annotation.StageDefinition;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -14,6 +15,9 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Retention(RUNTIME)
 public @interface StageDef
 {
+  @StageDefinition.Name
+  String scope() default "";
+
   @StageDefinition.Stage
   TestStage stage();
 

@@ -2,9 +2,9 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
-import de.sayayi.lib.stagerunner.annotation.Data;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.impl.DefaultStageRunnerFactory;
+import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -211,6 +211,7 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  @SuppressWarnings("unchecked")
   private void analyseStageFunctions(@NotNull Object bean)
   {
     final Class<?> beanType = bean.getClass();
@@ -223,12 +224,16 @@ public class StageRunnerFactoryProcessor<R>
 
       if (stageFunctionAnnotationAttributes != null)
       {
-        //noinspection unchecked
-        stageRunnerFactory.addStageFunction(
-            stageFunctionAnnotationAttributes.getEnum(stageFunctionAnnotation.getStageProperty()),
-            stageFunctionAnnotationAttributes.getNumber(stageFunctionAnnotation.getOrderProperty()).intValue(),
-            stageFunctionAnnotationAttributes.getString(stageFunctionAnnotation.getDescriptionProperty()),
-            createStageFunction(bean, method));
+        final Enum<?> stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
+        final int order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
+        final String description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
+        final StageFunction<?> function = createStageFunction(bean, method);
+        final String name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
+
+        if (name != null)
+          stageRunnerFactory.namedStageFunction(name, stageEnum, order, description, function);
+        else
+          stageRunnerFactory.addStageFunction(stageEnum, order, description, function);
       }
     }
   }
