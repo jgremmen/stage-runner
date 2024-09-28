@@ -1,4 +1,4 @@
-package de.sayayi.lib.stagerunner.annotation;
+package de.sayayi.lib.stagerunner.spring.annotation;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;

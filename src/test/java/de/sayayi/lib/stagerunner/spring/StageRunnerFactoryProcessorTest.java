@@ -2,7 +2,7 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.TestStage;
-import de.sayayi.lib.stagerunner.annotation.Data;
+import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;

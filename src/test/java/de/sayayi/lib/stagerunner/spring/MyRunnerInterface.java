@@ -1,6 +1,6 @@
 package de.sayayi.lib.stagerunner.spring;
 
-import de.sayayi.lib.stagerunner.annotation.Data;
+import de.sayayi.lib.stagerunner.spring.annotation.Data;
 
 import java.util.List;
 

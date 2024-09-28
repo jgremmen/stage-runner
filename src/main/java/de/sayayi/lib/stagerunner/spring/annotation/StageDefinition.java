@@ -1,4 +1,4 @@
-package de.sayayi.lib.stagerunner.spring;
+package de.sayayi.lib.stagerunner.spring.annotation;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -9,6 +9,16 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 public interface StageDefinition
 {
+  /**
+   * Marks the annotation method which returns the name.
+   * The return value must be of type {@code String}.
+   */
+  @Target(METHOD)
+  @Retention(RUNTIME)
+  @interface Name {
+  }
+
+
   /**
    * Marks the annotation method which returns the stage.
    * The return value must be an enumeration.
