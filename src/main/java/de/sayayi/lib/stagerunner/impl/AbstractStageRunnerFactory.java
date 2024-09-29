@@ -21,6 +21,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
     implements StageRunnerFactory<S>, StageConfigurer<S>, NamedStageFunctionConfigurer<S>
 {
   protected final Class<S> stageEnumType;
+
   final StageOrderFunctionArray<S> functionArray;
   final Map<String,StageOrderFunction<S>> namedStageFunctions;
 

@@ -8,6 +8,8 @@ import java.util.Map;
 
 
 /**
+ * Abstract implementation of {@link StageRunner}.
+ *
  * @author Jeroen Gremmen
  *
  * @param <S>  Stage enum type
