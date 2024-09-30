@@ -168,7 +168,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   boolean run(@NotNull StageRunnerCallback<S> callback)
   {
     if (state.isTerminated())
-      return true;
+      return !aborted;
 
     if (state != IDLE)
       throw new StageRunnerException("stage runner must be in idle state");

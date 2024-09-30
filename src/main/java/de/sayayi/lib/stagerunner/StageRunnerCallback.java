@@ -13,6 +13,13 @@ import org.jetbrains.annotations.NotNull;
 public interface StageRunnerCallback<S extends Enum<S>>
 {
   /**
+   * Default callback instance aborting stage runner execution in case of an exception.
+   */
+  @SuppressWarnings("rawtypes")
+  StageRunnerCallback<?> INSTANCE = new StageRunnerCallback() {};
+
+
+  /**
    * Callback method which is invoked at the beginning of a new stage.
    *
    * @param stageContext  stage context, not {@code null}

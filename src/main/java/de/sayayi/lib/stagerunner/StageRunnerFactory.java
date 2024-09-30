@@ -5,10 +5,13 @@ import org.jetbrains.annotations.NotNull;
 
 
 /**
+ * Factory for creating stage runner instances.
+ *
  * @author Jeroen Gremmen
  *
  * @param <S>  Stage enum type
  */
+@FunctionalInterface
 public interface StageRunnerFactory<S extends Enum<S>>
 {
   /**

@@ -9,6 +9,16 @@ import java.util.function.Predicate;
 
 
 /**
+ * The stage context interface provides information about the stage runner:
+ * <ul>
+ *   <li>Data associated with this stage runner instance</li>
+ *   <li>Current stage</li>
+ *   <li>Processed and remaining stages</li>
+ *   <li>Methods for adding future stage functions</li>
+ *   <li>Methods for enabling pre-defined named stage functions</li>
+ *   <li>{@link #abort() Abort} function</li>
+ * </ul>
+ *
  * @author Jeroen Gremmen
  *
  * @param <S>  Stage enum type
@@ -66,12 +76,21 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
   void abort();
 
 
+  /**
+   * Tell, whether the stage runner has been aborted.
+   *
+   * @return  {@code true} if the stage runner has been aborted due to an invocation of {@link #abort()},
+   *          {@code false} otherwise
+   *
+   * @see #abort()
+   */
   @Contract(pure = true)
   @SuppressWarnings("BooleanMethodIsAlwaysInverted")
   boolean isAborted();
 
 
   /**
+   * Enable a named stage function by providing its exact {@code name}.
    *
    * @param name  name of the stage function to enabler
    *
@@ -79,6 +98,8 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
    *          {@code false} otherwise
    *
    * @since 0.3.0
+   * 
+   * @see #enableNamedStageFunctions(Predicate) 
    */
   default boolean enableNamedStageFunction(@NotNull String name) {
     return !enableNamedStageFunctions(n -> n.equals(name)).isEmpty();
@@ -86,6 +107,7 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
 
 
   /**
+   * Enable named stage functions by providing a name filter.
    *
    * @param nameFilter  name filter predicate. A stage function is added if and only if the predicate
    *                    ({@link Predicate#test(Object)}) returns {@code true}
