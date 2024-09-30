@@ -9,7 +9,7 @@ apply plugin: 'com.adarshr.test-logger'
 
 group = 'de.sayayi.lib'
 version = '0.3.0'
-description = 'Stage Runner'
+description = 'Stage Runner Framework'
 
 
 layout.buildDirectory = '.build'
@@ -53,26 +53,29 @@ repositories {
 }
 
 
+def springVersion = '5.3.39'
+
+
 dependencies {
   // java
-  compileOnlyApi 'org.jetbrains:annotations-java5:24.1.0'
+  compileOnlyApi 'org.jetbrains:annotations:25.0.0'
 
   // https://mvnrepository.com/artifact/org.springframework/spring-context
-  implementation 'org.springframework:spring-context:5.3.37'
+  implementation "org.springframework:spring-context:${springVersion}"
 
   // https://mvnrepository.com/artifact/net.bytebuddy/byte-buddy
-  implementation 'net.bytebuddy:byte-buddy:1.14.18'
+  implementation 'net.bytebuddy:byte-buddy:1.15.3'
 
 
   // test
   testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
   testCompileOnly 'org.projectlombok:lombok:1.18.34'
 
-  testImplementation 'org.junit.jupiter:junit-jupiter:5.10.3'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.11.1'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
   // https://mvnrepository.com/artifact/org.springframework/spring-test
-  testImplementation 'org.springframework:spring-test:5.3.37'
+  testImplementation "org.springframework:spring-test:${springVersion}"
 }
 
 
