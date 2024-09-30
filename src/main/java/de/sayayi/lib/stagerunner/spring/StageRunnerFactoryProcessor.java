@@ -1,9 +1,9 @@
 package de.sayayi.lib.stagerunner.spring;
 
+import de.sayayi.lib.stagerunner.DefaultStageRunnerFactory;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
-import de.sayayi.lib.stagerunner.impl.DefaultStageRunnerFactory;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -130,9 +130,9 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @Contract(pure = true)
+  @SuppressWarnings("unchecked")
   private @NotNull R createStageRunnerProxy()
   {
-    //noinspection unchecked
     return (R)Proxy.newProxyInstance(
         stageRunnerInterfaceType.getClassLoader(),
         new Class<?>[] { stageRunnerInterfaceType },

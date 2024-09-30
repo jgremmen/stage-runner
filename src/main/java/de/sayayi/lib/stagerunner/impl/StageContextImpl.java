@@ -20,7 +20,7 @@ import static java.util.Collections.emptySet;
  *
  * @param <S>  Stage enum type
  */
-public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
+final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 {
   private final AbstractStageRunnerFactory<S> stageRunnerFactory;
   private final StageOrderFunctionArray<S> functionArray;
@@ -33,8 +33,7 @@ public class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   private boolean aborted;
 
 
-  protected StageContextImpl(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory,
-                             @NotNull Map<String,Object> data)
+  StageContextImpl(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory, @NotNull Map<String,Object> data)
   {
     this.stageRunnerFactory = stageRunnerFactory;
     this.data = data;

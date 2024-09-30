@@ -1,6 +1,7 @@
-package de.sayayi.lib.stagerunner.impl;
+package de.sayayi.lib.stagerunner;
 
-import de.sayayi.lib.stagerunner.StageRunner;
+import de.sayayi.lib.stagerunner.impl.AbstractStageRunner;
+import de.sayayi.lib.stagerunner.impl.AbstractStageRunnerFactory;
 import org.jetbrains.annotations.NotNull;
 
 
