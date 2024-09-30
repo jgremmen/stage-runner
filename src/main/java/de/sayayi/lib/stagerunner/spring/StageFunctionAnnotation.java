@@ -108,6 +108,7 @@ public final class StageFunctionAnnotation
 
 
   @Contract(pure = true)
+  @SuppressWarnings("unchecked")
   public static @NotNull StageFunctionAnnotation buildFrom(
       @NotNull Class<? extends Annotation> stageFunctionAnnotation)
   {
@@ -168,7 +169,6 @@ public final class StageFunctionAnnotation
     if (stagePropertyName == null)
       throw new StageRunnerException("No @Stage annotation found for " + stageFunctionAnnotation);
 
-    //noinspection unchecked
     return new StageFunctionAnnotation(
         stageFunctionAnnotation,
         (Class<? extends Enum<?>>)stageType,
@@ -194,7 +194,8 @@ public final class StageFunctionAnnotation
         stageType == that.stageType &&
         stageProperty.equals(that.stageProperty) &&
         Objects.equals(orderProperty, that.orderProperty) &&
-        Objects.equals(descriptionProperty, that.descriptionProperty);
+        Objects.equals(descriptionProperty, that.descriptionProperty) &&
+        Objects.equals(nameProperty, that.nameProperty);
   }
 
 
@@ -208,6 +209,9 @@ public final class StageFunctionAnnotation
 
     if (descriptionProperty != null)
       hash = hash * 29 + descriptionProperty.hashCode();
+
+    if (nameProperty != null)
+      hash = hash * 29 + nameProperty.hashCode();
 
     return hash;
   }
