@@ -11,6 +11,11 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface StageRunnerFactory<S extends Enum<S>>
 {
+  /**
+   * Create a new stage runner.
+   *
+   * @return  newly created stage runner, never {@code null}
+   */
   @Contract(value = "-> new", pure = true)
   @NotNull StageRunner<S> createRunner();
 }
