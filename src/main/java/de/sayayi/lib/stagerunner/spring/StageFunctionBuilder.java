@@ -41,7 +41,7 @@ import static net.bytebuddy.jar.asm.Opcodes.ACC_PUBLIC;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
 
-public class StageFunctionBuilder extends AbstractStageFunctionBuilder
+class StageFunctionBuilder extends AbstractStageFunctionBuilder
 {
   private static final FieldAccess.Defined FIELD_ACCESS_BEAN = FieldAccess
       .forField(TypeDescription.ForLoadedType.of(AbstractStageFunction.class)
@@ -277,8 +277,7 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
     private final @NotNull NameWithQualifierAndType[] parameters;
 
 
-    private CacheKey(@NotNull MethodDescription method,
-                     @NotNull NameWithQualifierAndType[] parameters)
+    private CacheKey(@NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters)
     {
       this.method = method;
       this.parameters = parameters;

@@ -55,9 +55,8 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @SuppressWarnings("unchecked")
-  public StageRunnerFactoryProcessor(
-      @NotNull Class<R> stageRunnerInterfaceType,
-      @NotNull Class<? extends Annotation> stageFunctionAnnotation)
+  public StageRunnerFactoryProcessor(@NotNull Class<R> stageRunnerInterfaceType,
+                                     @NotNull Class<? extends Annotation> stageFunctionAnnotation)
   {
     this.stageRunnerInterfaceType = stageRunnerInterfaceType;
     this.stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotation);
@@ -188,14 +187,16 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  private @NotNull String getDataNameForParameter(
-      @Nullable Data dataAnnotation, @Nullable String[] parameterNames, int p)
+  @Contract(pure = true)
+  private @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
+                                                  @Nullable String[] parameterNames,
+                                                  int p)
   {
     String parameterName = dataAnnotation != null ? dataAnnotation.name() : "";
     if (parameterName.isEmpty() && parameterNames != null)
       parameterName = parameterNames[p];
 
-    if (parameterName.isEmpty())
+    if (parameterName == null || parameterName.isEmpty())
     {
       throw new StageRunnerException("unable to detect data name for parameter " + (p + 1) +
           " in stage runner function " + stageRunnerInterfaceMethod);
@@ -239,8 +240,8 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  private <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(
-      @NotNull Object bean, @NotNull Method stageFunction)
+  private <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(@NotNull Object bean,
+                                                                            @NotNull Method stageFunction)
   {
     try {
       return stageFunctionBuilder.buildFor(bean, stageFunction);
