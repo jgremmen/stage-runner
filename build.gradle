@@ -17,7 +17,7 @@ layout.buildDirectory = '.build'
 
 tasks.withType(JavaCompile).configureEach {
   javaCompiler = javaToolchains.compilerFor {
-    languageVersion = JavaLanguageVersion.of(8)
+    languageVersion = JavaLanguageVersion.of(11)
   }
 
   options.encoding = 'UTF-8'
@@ -25,11 +25,8 @@ tasks.withType(JavaCompile).configureEach {
 
 
 tasks.withType(Test).configureEach {
-  if (System.getProperty('test-pack-compat') == 'true')
-    jvmArgs '-Dtest-pack-compat=true'
-
   javaLauncher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(8)
+    languageVersion = JavaLanguageVersion.of(11)
   }
 
   defaultCharacterEncoding = 'UTF-8'
@@ -37,8 +34,8 @@ tasks.withType(Test).configureEach {
 
 
 compileJava {
-  sourceCompatibility = 1.8
-  targetCompatibility = 1.8
+  sourceCompatibility = 11
+  targetCompatibility = 11
 }
 
 
@@ -53,25 +50,26 @@ repositories {
 }
 
 
-def springVersion = '5.3.39'
+def springVersion = '[5.3.+,6.0)'
+def byteBuddyVersion = '[1.15,1.16)'
 
 
 dependencies {
   // java
-  compileOnlyApi 'org.jetbrains:annotations:25.0.0'
+  compileOnlyApi 'org.jetbrains:annotations:26.0.+'
 
   // https://mvnrepository.com/artifact/org.springframework/spring-context
   implementation "org.springframework:spring-context:${springVersion}"
 
   // https://mvnrepository.com/artifact/net.bytebuddy/byte-buddy
-  implementation 'net.bytebuddy:byte-buddy:1.15.3'
+  implementation "net.bytebuddy:byte-buddy:${byteBuddyVersion}"
 
 
   // test
-  testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
-  testCompileOnly 'org.projectlombok:lombok:1.18.34'
+  testAnnotationProcessor 'org.projectlombok:lombok:1.18.+'
+  testCompileOnly 'org.projectlombok:lombok:1.18.+'
 
-  testImplementation 'org.junit.jupiter:junit-jupiter:5.11.1'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.11.+'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
   // https://mvnrepository.com/artifact/org.springframework/spring-test
