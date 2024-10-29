@@ -2,19 +2,18 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.MethodParameter;
-import org.springframework.core.ParameterNameDiscoverer;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.TypeDescriptor;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -27,48 +26,38 @@ public abstract class AbstractStageFunctionBuilder
 {
   protected final StageFunctionAnnotation stageFunctionAnnotation;
   protected final ConversionService conversionService;
-  protected final Map<String,ResolvableType> dataTypeMap;
-  protected final ParameterNameDiscoverer parameterNameDiscoverer;
+  protected final Map<String,ResolvableType> dataNameTypeMap;
 
 
   protected AbstractStageFunctionBuilder(
       @NotNull Class<? extends Annotation> stageFunctionAnnotationType,
       @NotNull ConversionService conversionService,
-      @NotNull Map<String,ResolvableType> dataTypeMap)
+      @NotNull Map<String,ResolvableType> dataNameTypeMap)
   {
     this.conversionService = conversionService;
-    this.dataTypeMap = dataTypeMap;
+    this.dataNameTypeMap = dataNameTypeMap;
 
     stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotationType);
-    parameterNameDiscoverer = new DefaultParameterNameDiscoverer();
   }
 
 
   public @NotNull <S extends Enum<S>> StageFunction<S> buildFor(Object bean, @NotNull Method method)
       throws ReflectiveOperationException
   {
-    final int parameterCount = method.getParameterCount();
-    final String[] parameterNames = parameterNameDiscoverer.getParameterNames(method);
-    final NameWithQualifierAndType[] parameters = new NameWithQualifierAndType[parameterCount];
-    final ResolvableType contextType = forClassWithGenerics(
+    final Parameter[] methodParameters = method.getParameters();
+    final NameWithQualifierAndType[] parameters = new NameWithQualifierAndType[methodParameters.length];
+    final ResolvableType stageContextType = forClassWithGenerics(
         StageContext.class, stageFunctionAnnotation.getStageType());
 
-    for(int p = 0; p < parameterCount; p++)
+    for(int p = 0; p < methodParameters.length; p++)
     {
-      final MethodParameter methodParameter = new MethodParameter(method, p);
-      final TypeDescriptor parameterType = new TypeDescriptor(methodParameter);
-      final NameWithQualifier nameQualifier;
+      final TypeDescriptor parameterType = new TypeDescriptor(new MethodParameter(method, p));
 
-      if (parameterType.getResolvableType().isAssignableFrom(contextType))
-        nameQualifier = new NameWithQualifier("$context", TypeQualifier.ASSIGNABLE);
-      else
-      {
-        nameQualifier = findDataNameForParameter(
-            methodParameter.getParameterAnnotation(Data.class), parameterType,
-            parameterNames == null ? null : parameterNames[p]);
-      }
-
-      parameters[p] = new NameWithQualifierAndType(nameQualifier, parameterType);
+      parameters[p] = new NameWithQualifierAndType(
+          parameterType.getResolvableType().isAssignableFrom(stageContextType)
+              ? new NameWithQualifier("$context", TypeQualifier.ASSIGNABLE)
+              : findNameWithQualifier(methodParameters[p], parameterType),
+          parameterType);
     }
 
     return buildFor(bean, method, parameters);
@@ -83,54 +72,85 @@ public abstract class AbstractStageFunctionBuilder
 
 
   @Contract(pure = true)
-  private @NotNull NameWithQualifier findDataNameForParameter(@Nullable Data dataAnnotation,
-                                                              @NotNull TypeDescriptor parameterType,
-                                                              String parameterName)
+  private @NotNull NameWithQualifier findNameWithQualifier(@NotNull Parameter parameter,
+                                                           @NotNull TypeDescriptor parameterType)
   {
-    final List<NameWithQualifier> nameQualifiers = new ArrayList<>();
+    NameWithQualifier nameWithQualifier;
+
+    if ((nameWithQualifier = findNameWithQualifierByParameterName(parameter, parameterType)) == null &&
+        (nameWithQualifier = findNameWithQualifierByParameterType(parameter, parameterType)) == null)
+    {
+      throw new StageRunnerConfigurationException("Unknown data type for parameter " + parameter +
+          "; please specify @Data annotation and/or extend the conversion service");
+    }
+
+    return nameWithQualifier;
+  }
+
+
+  @Contract(pure = true)
+  private NameWithQualifier findNameWithQualifierByParameterName(@NotNull Parameter parameter,
+                                                                 @NotNull TypeDescriptor parameterType)
+  {
     ResolvableType dataType;
 
+    final Data dataAnnotation = parameter.getAnnotation(Data.class);
     if (dataAnnotation != null)
     {
       final String dataName = dataAnnotation.name();
+      if (!hasLength(dataName))
+        throw new StageRunnerConfigurationException("@Data name must not be empty for parameter " + parameter);
 
-      if ((dataType = dataTypeMap.get(dataName)) != null)
-      {
-        nameQualifiers.add(new NameWithQualifier(dataName,
-            qualifyParameterTypeOrFail(parameterType, dataType)));
-      }
+      if ((dataType = dataNameTypeMap.get(dataName)) != null)
+        return new NameWithQualifier(dataName, qualifyParameterTypeOrFail(parameterType, dataType));
+
+      throw new StageRunnerConfigurationException("Unknown @Data name '" + dataName + "' for parameter " + parameter);
     }
 
-    if (hasLength(parameterName) && (dataType = dataTypeMap.get(parameterName)) != null)
-    {
-      nameQualifiers.add(new NameWithQualifier(parameterName,
-          qualifyParameterTypeOrFail(parameterType, dataType)));
-    }
+    final String parameterName = parameter.getName();
+    if (hasLength(parameterName) && (dataType = dataNameTypeMap.get(parameterName)) != null)
+      return new NameWithQualifier(parameterName, qualifyParameterTypeOrFail(parameterType, dataType));
 
-    dataTypeMap.forEach((name,type) -> {
+    return null;
+  }
+
+
+  @Contract(pure = true)
+  private NameWithQualifier findNameWithQualifierByParameterType(@NotNull Parameter parameter,
+                                                                 @NotNull TypeDescriptor parameterType)
+  {
+    final List<NameWithQualifier> nameQualifiers = new ArrayList<>();
+
+    dataNameTypeMap.forEach((name, type) -> {
       TypeQualifier q = qualifyParameterType(parameterType, type);
       if (q != null)
-        nameQualifiers.add(new NameWithQualifier(name, q));
+      {
+        final NameWithQualifier nwq = new NameWithQualifier(name, q);
+        if (!nameQualifiers.contains(nwq))
+          nameQualifiers.add(nwq);
+      }
     });
 
-    if (nameQualifiers.isEmpty())
-      throw new IllegalStateException("");
+    NameWithQualifier nameWithQualifier = null;
 
-    NameWithQualifier nq1 = nameQualifiers.get(0);
-    if (nameQualifiers.size() > 1)
+    if (!nameQualifiers.isEmpty())
     {
-      nameQualifiers.sort(null);
-
-      NameWithQualifier nq2 = nameQualifiers.get(1);
-
-      if (!nq1.name.equals(nq2.name) && nq1.qualifier == nq2.qualifier)
+      nameWithQualifier = nameQualifiers.get(0);
+      if (nameQualifiers.size() > 1)
       {
-        throw new IllegalStateException("Ambiguous type for parameter " + parameterType +
-            ", please specify @Data annotation");
+        nameQualifiers.sort(null);
+
+        final NameWithQualifier nwq2 = nameQualifiers.get(1);
+
+        if (nameWithQualifier.qualifier == nwq2.qualifier && !nameWithQualifier.name.equals(nwq2.name))
+        {
+          throw new StageRunnerConfigurationException("Ambiguous type for parameter " + parameter +
+              "; please specify @Data annotation");
+        }
       }
     }
 
-    return nq1;
+    return nameWithQualifier;
   }
 
 
@@ -198,7 +218,9 @@ public abstract class AbstractStageFunctionBuilder
 
       final NameWithQualifierAndType that = (NameWithQualifierAndType)o;
 
-      return name.equals(that.name) && qualifier == that.qualifier && type.equals(that.type);
+      return qualifier == that.qualifier &&
+             name.equals(that.name) &&
+             type.getResolvableType().equals(that.type.getResolvableType());
     }
 
 
@@ -258,7 +280,7 @@ public abstract class AbstractStageFunctionBuilder
 
       final NameWithQualifier that = (NameWithQualifier)o;
 
-      return name.equals(that.name) && qualifier == that.qualifier;
+      return qualifier == that.qualifier && name.equals(that.name);
     }
 
 
