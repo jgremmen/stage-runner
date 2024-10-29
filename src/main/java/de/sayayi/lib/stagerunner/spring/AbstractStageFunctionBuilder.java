@@ -18,6 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import static de.sayayi.lib.stagerunner.spring.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.util.StringUtils.hasLength;
 
@@ -182,7 +183,7 @@ public abstract class AbstractStageFunctionBuilder
 
     if (conversionService.canConvert(
         new TypeDescriptor(dataType, null, null), parameterType))
-      return TypeQualifier.CONVERTABLE;
+      return CONVERTABLE;
 
     return null;
   }
@@ -203,8 +204,15 @@ public abstract class AbstractStageFunctionBuilder
     }
 
 
+    @Contract(pure = true)
     public @NotNull TypeDescriptor getType() {
       return type;
+    }
+
+
+    @Contract(pure = true)
+    public boolean isConvertableQualifier() {
+      return qualifier == CONVERTABLE;
     }
 
 

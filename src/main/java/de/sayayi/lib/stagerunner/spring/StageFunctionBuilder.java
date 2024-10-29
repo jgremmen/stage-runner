@@ -36,11 +36,15 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static de.sayayi.lib.stagerunner.spring.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
-import static net.bytebuddy.jar.asm.Opcodes.ACC_FINAL;
-import static net.bytebuddy.jar.asm.Opcodes.ACC_PUBLIC;
+import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
+import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
 
+/**
+ * @author Jeroen Gremmen
+ * @since 0.3.0
+ */
 class StageFunctionBuilder extends AbstractStageFunctionBuilder
 {
   private static final FieldAccess.Defined FIELD_ACCESS_BEAN = FieldAccess
@@ -84,7 +88,7 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
   {
     final MethodDescription methodDescription = new MethodDescription.ForLoadedMethod(method);
 
-    return Arrays.stream(parameters).anyMatch(p -> p.getQualifier() == CONVERTABLE)
+    return Arrays.stream(parameters).anyMatch(NameWithQualifierAndType::isConvertableQualifier)
         ? buildForWithConversion(bean, methodDescription, parameters)
         : buildForNoConversion(bean, methodDescription, parameters);
   }
@@ -101,7 +105,7 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
               .parameterizedType(StageFunction.class, stageFunctionAnnotation.getStageType())
               .build(), method, parameters);
 
-      return stageFunctionClass.newInstance();
+      return stageFunctionClass.getDeclaredConstructor().newInstance();
     }
     else
     {
@@ -110,7 +114,7 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
               .parameterizedType(AbstractStageFunction.class, stageFunctionAnnotation.getStageType())
               .build(), method, parameters);
 
-      return stageFunctionClass.getConstructor(Object.class).newInstance(bean);
+      return stageFunctionClass.getDeclaredConstructor(Object.class).newInstance(bean);
     }
   }
 
@@ -127,10 +131,10 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
         method, parameters);
 
     return stageFunctionClass
-        .getConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
+        .getDeclaredConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
         .newInstance(bean, conversionService, Arrays
             .stream(parameters)
-            .map(p -> p.getQualifier() == CONVERTABLE ? p.getType() : null)
+            .map(p -> p.isConvertableQualifier() ? p.getType() : null)
             .toArray(TypeDescriptor[]::new));
   }
 
@@ -146,7 +150,7 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
             new ByteBuddy()
                 .with(createNamingStrategy(method))
                 .subclass(superType)
-                .modifiers(ACC_PUBLIC | ACC_FINAL)
+                .modifiers(PUBLIC, FINAL)
                 .method(named("process")).intercept(implProcess(method, parameters))
                 .method(isToString()).intercept(implToString(method))
                 .make()
