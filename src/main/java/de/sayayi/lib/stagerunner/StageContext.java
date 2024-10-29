@@ -3,6 +3,7 @@ package de.sayayi.lib.stagerunner;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
@@ -117,4 +118,78 @@ public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
    * @since 0.3.0
    */
   @NotNull Set<String> enableNamedStageFunctions(@NotNull Predicate<String> nameFilter);
+
+
+  /**
+   * Returns a list of all active functions. Each function provides the {@link FunctionState state} it is currently in.
+   *
+   * @return  immutable list of all active functions, never {@code null}
+   *
+   * @since 0.3.0
+   */
+  @Contract(pure = true)
+  @NotNull List<Function> getFunctions();
+
+
+
+
+  /**
+   * @since 0.3.0
+   */
+  interface Function
+  {
+    /**
+     * Return the function state for this function.
+     *
+     * @return  function state, never {@code null}
+     */
+    @Contract(pure = true)
+    @NotNull FunctionState getFunctionState();
+
+
+    /**
+     * Returns the stage enum for this function.
+     *
+     * @return  stage enumeration, never {@code null}
+     */
+    @Contract(pure = true)
+    @NotNull Enum<?> getStage();
+
+
+    @Contract(pure = true)
+    int getOrder();
+
+
+    @Contract(pure = true)
+    String getDescription();
+  }
+
+
+
+
+  /**
+   * Stage function state.
+   *
+   * @since 0.3.0
+   *
+   * @see Function#getFunctionState()
+   * @see StageContext#getFunctions()
+   */
+  enum FunctionState
+  {
+    /** Function has been processed. */
+    PROCESSED,
+
+
+    /** Function is currently executing. */
+    EXECUTING,
+
+
+    /** Function execution failed. */
+    FAILED,
+
+
+    /** Function is waiting for execution. */
+    WAITING
+  }
 }

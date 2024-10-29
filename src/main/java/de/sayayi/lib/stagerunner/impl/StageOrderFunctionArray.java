@@ -1,12 +1,14 @@
 package de.sayayi.lib.stagerunner.impl;
 
+import de.sayayi.lib.stagerunner.StageContext.FunctionState;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.Array;
-
+import static de.sayayi.lib.stagerunner.StageContext.FunctionState.WAITING;
 import static java.lang.System.arraycopy;
+import static java.lang.reflect.Array.newInstance;
 import static java.util.Arrays.copyOf;
+import static java.util.Arrays.fill;
 
 
 /**
@@ -17,12 +19,14 @@ import static java.util.Arrays.copyOf;
 final class StageOrderFunctionArray<S extends Enum<S>>
 {
   StageOrderFunction<S>[] functions;
+  FunctionState[] executionState;
   int size;
 
 
   StageOrderFunctionArray()
   {
     functions = null;
+    executionState = null;
     size = 0;
   }
 
@@ -32,10 +36,14 @@ final class StageOrderFunctionArray<S extends Enum<S>>
     if (array.functions == null)
     {
       functions = null;
+      executionState = null;
       size = 0;
     }
     else
+    {
       functions = copyOf(array.functions, size = array.size);
+      fill(executionState = new FunctionState[size], WAITING);
+    }
   }
 
 
@@ -55,14 +63,25 @@ final class StageOrderFunctionArray<S extends Enum<S>>
     }
 
     if (functions == null)
-      functions = (StageOrderFunction<S>[])Array.newInstance(StageOrderFunction.class, 4);
+    {
+      functions = (StageOrderFunction<S>[])newInstance(StageOrderFunction.class, 4);
+      executionState = new FunctionState[4];
+    }
     else if (functions.length == size)
+    {
       functions = copyOf(functions, size + 4);
+      executionState = copyOf(executionState, size + 4);
+    }
 
-    if (low < size)
-      arraycopy(functions, low, functions, low + 1, size - low);
+    final int moveElements = size - low;
+    if (moveElements > 0)
+    {
+      arraycopy(functions, low, functions, low + 1, moveElements);
+      arraycopy(executionState, low, executionState, low + 1, moveElements);
+    }
 
     functions[low] = function;
+    executionState[low] = WAITING;
     size++;
 
     return low;

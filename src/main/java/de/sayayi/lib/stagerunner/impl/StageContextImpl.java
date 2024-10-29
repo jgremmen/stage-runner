@@ -11,6 +11,7 @@ import java.util.*;
 import java.util.Map.Entry;
 import java.util.function.Predicate;
 
+import static de.sayayi.lib.stagerunner.StageContext.FunctionState.*;
 import static de.sayayi.lib.stagerunner.impl.StageContextImpl.State.*;
 import static java.util.Collections.emptySet;
 
@@ -29,7 +30,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   private final Set<String> enabledStageFunctionNames;
 
   private State state;
-  private int nextFunctionIndex;
+  private int functionIndex;
   private boolean aborted;
 
 
@@ -51,7 +52,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       state = IDLE;
     }
 
-    nextFunctionIndex = 0;
+    functionIndex = -1;
     aborted = false;
     enabledStageFunctionNames = new HashSet<>();
   }
@@ -73,13 +74,13 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public @NotNull S getCurrentStage()
   {
-    if (state == IDLE || nextFunctionIndex == 0)
+    if (state == IDLE || functionIndex == -1)
       throw new StageRunnerException("stage runner has not started yet");
 
     if (state.isTerminated())
       throw new StageRunnerException("stage runner has terminated");
 
-    return functionArray.functions[nextFunctionIndex - 1].stage;
+    return functionArray.functions[functionIndex].stage;
   }
 
 
@@ -100,12 +101,12 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     if (!state.isTerminated())
     {
       Arrays
-          .stream(functionArray.functions, nextFunctionIndex, functionArray.size)
+          .stream(functionArray.functions, functionIndex + 1, functionArray.size)
           .map(stageOrderFunction -> stageOrderFunction.stage)
           .forEach(remainingStages::add);
 
-      if (state == RUNNING && nextFunctionIndex > 0)
-        remainingStages.remove(functionArray.functions[nextFunctionIndex - 1].stage);
+      if (state == RUNNING && functionIndex >= 0)
+        remainingStages.remove(functionArray.functions[functionIndex].stage);
     }
 
     return remainingStages;
@@ -120,7 +121,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
     final int index = functionArray.add(new StageOrderFunction<>(stage, description, order, function));
 
-    if (state == RUNNING && index < nextFunctionIndex)
+    if (state == RUNNING && index <= functionIndex)
     {
       abort();
       throw new StageRunnerException("stage runner has passed beyond stage " + stage + " and order " + order);
@@ -143,7 +144,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         final StageOrderFunction<S> stageFunction = stageFunctionEntry.getValue();
         final int index = functionArray.add(stageFunction);
 
-        if (state == RUNNING && index < nextFunctionIndex)
+        if (state == RUNNING && index <= functionIndex)
         {
           abort();
           throw new StageRunnerException("stage runner has passed beyond stage " + stageFunction.stage +
@@ -178,9 +179,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     state = RUNNING;
 
     try {
-      while(!aborted && nextFunctionIndex < functionArray.size)
+      while(!aborted && ++functionIndex < functionArray.size)
       {
-        final StageOrderFunction<S> stageFunctionEntry = functionArray.functions[nextFunctionIndex++];
+        final StageOrderFunction<S> stageFunctionEntry = functionArray.functions[functionIndex];
         final S currentStage = stageFunctionEntry.stage;
 
         if (currentStage != lastStage)
@@ -196,13 +197,17 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
           lastStage = currentStage;
         }
 
-        callback.preStageFunctionCallback(this,
-            functionArray.functions[nextFunctionIndex - 1].description);
+        functionArray.executionState[functionIndex] = EXECUTING;
+        callback.preStageFunctionCallback(this, stageFunctionEntry.description);
         try {
           stageFunctionEntry.function.process(this);
         } catch(Throwable ex) {
+          functionArray.executionState[functionIndex] = FAILED;
           callback.stageExceptionHandler(this, ex);
         } finally {
+          if (functionArray.executionState[functionIndex] == EXECUTING)
+            functionArray.executionState[functionIndex] = PROCESSED;
+
           callback.postStageFunctionCallback(this);
         }
       }
@@ -220,6 +225,18 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  @Override
+  public @NotNull List<Function> getFunctions()
+  {
+    final Function[] functions = new Function[functionArray.size];
+
+    for(int n = 0; n < functionArray.size; n++)
+      functions[n] = new FunctionAdapter(functionArray.executionState[n], functionArray.functions[n]);
+
+    return Arrays.asList(functions);
+  }
+
+
 
 
   enum State
@@ -233,6 +250,61 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     @Contract(pure = true)
     boolean isTerminated() {
       return this == FINISHED || this == ABORTED;
+    }
+  }
+
+
+
+
+  private static final class FunctionAdapter implements Function
+  {
+    private final FunctionState functionState;
+    private final StageOrderFunction<?> stageFunction;
+
+
+    private FunctionAdapter(@NotNull FunctionState functionState,
+                            @NotNull StageOrderFunction<?> stageFunction)
+    {
+      this.functionState = functionState;
+      this.stageFunction = stageFunction;
+    }
+
+
+    @Override
+    public @NotNull FunctionState getFunctionState() {
+      return functionState;
+    }
+
+
+    @Override
+    public @NotNull Enum<?> getStage() {
+      return stageFunction.stage;
+    }
+
+
+    @Override
+    public int getOrder() {
+      return stageFunction.order;
+    }
+
+
+    @Override
+    public String getDescription() {
+      return stageFunction.description;
+    }
+
+
+    @Override
+    public String toString()
+    {
+      final StringBuilder s = new StringBuilder("Function(state=").append(functionState).append(",stage=")
+          .append(getStage().name()).append('#').append(getOrder());
+
+      final String description = getDescription();
+      if (description != null && !description.isEmpty())
+        s.append(",description=").append(getDescription());
+
+      return s.append(')').toString();
     }
   }
 }
