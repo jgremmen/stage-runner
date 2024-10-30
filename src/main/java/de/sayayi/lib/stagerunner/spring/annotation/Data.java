@@ -12,6 +12,4 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public @interface Data
 {
   String name();
-
-  boolean ignoreIfNotSet() default false;
 }

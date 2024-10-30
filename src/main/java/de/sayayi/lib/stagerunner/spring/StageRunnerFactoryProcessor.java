@@ -3,6 +3,8 @@ package de.sayayi.lib.stagerunner.spring;
 import de.sayayi.lib.stagerunner.DefaultStageRunnerFactory;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
+import de.sayayi.lib.stagerunner.StageRunnerFactory;
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.jetbrains.annotations.Contract;
@@ -26,7 +28,6 @@ import org.springframework.core.convert.support.DefaultConversionService;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
-import java.lang.reflect.Proxy;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -45,6 +46,7 @@ public class StageRunnerFactoryProcessor<R>
   private final Class<R> stageRunnerInterfaceType;
   private final StageFunctionAnnotation stageFunctionAnnotation;
   private final DefaultStageRunnerFactory stageRunnerFactory;
+  private final boolean copyInterfaceMethodAnnotations;
   private final Method stageRunnerInterfaceMethod;
   private final String[] dataNames;
   private final Map<String,ResolvableType> dataNameTypeMap;
@@ -54,13 +56,21 @@ public class StageRunnerFactoryProcessor<R>
   private AbstractStageFunctionBuilder stageFunctionBuilder;
 
 
+  public StageRunnerFactoryProcessor(@NotNull Class<R> stageRunnerInterfaceType,
+                                     @NotNull Class<? extends Annotation> stageFunctionAnnotation) {
+    this(stageRunnerInterfaceType, stageFunctionAnnotation, false);
+  }
+
+
   @SuppressWarnings("unchecked")
   public StageRunnerFactoryProcessor(@NotNull Class<R> stageRunnerInterfaceType,
-                                     @NotNull Class<? extends Annotation> stageFunctionAnnotation)
+                                     @NotNull Class<? extends Annotation> stageFunctionAnnotation,
+                                     boolean copyInterfaceMethodAnnotations)
   {
     this.stageRunnerInterfaceType = stageRunnerInterfaceType;
     this.stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotation);
     this.stageRunnerFactory = new DefaultStageRunnerFactory(this.stageFunctionAnnotation.getStageType());
+    this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
 
     stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
 
@@ -130,12 +140,20 @@ public class StageRunnerFactoryProcessor<R>
 
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
-  private @NotNull R createStageRunnerProxy()
+  private <S extends Enum<S>> @NotNull R createStageRunnerProxy()
   {
-    return (R)Proxy.newProxyInstance(
-        stageRunnerInterfaceType.getClassLoader(),
-        new Class<?>[] { stageRunnerInterfaceType },
-        new StageRunnerInvocationHandler(stageRunnerInterfaceType, stageRunnerFactory, dataNames));
+    final Class<S> stageType = (Class)stageFunctionAnnotation.getStageType();
+    final Class<? extends R> stageRunnerProxyType =  new StageRunnerProxyBuilder<R,S>()
+        .createFor(stageRunnerInterfaceType, stageRunnerInterfaceMethod, stageType, dataNames,
+            copyInterfaceMethodAnnotations);
+
+    try {
+      return stageRunnerProxyType
+          .getDeclaredConstructor(StageRunnerFactory.class, String[].class)
+          .newInstance(stageRunnerFactory, dataNames);
+    } catch(Exception ex) {
+      throw new RuntimeException(ex);
+    }
   }
 
 
@@ -143,7 +161,7 @@ public class StageRunnerFactoryProcessor<R>
   @NotNull Method findFunctionalInterfaceMethod(@NotNull Class<?> interfaceType)
   {
     if (!interfaceType.isInterface())
-      throw new StageRunnerException(interfaceType.getName() + " is not an interface");
+      throw new StageRunnerConfigurationException(interfaceType.getName() + " is not an interface");
 
     Method functionalInterfaceMethod = null;
 
@@ -151,13 +169,17 @@ public class StageRunnerFactoryProcessor<R>
       if (!method.isDefault())
       {
         if (functionalInterfaceMethod != null)
-          throw new StageRunnerException(interfaceType.getName() + " is not a functional interface");
+          throw new StageRunnerConfigurationException(interfaceType.getName() + " is not a functional interface");
 
         functionalInterfaceMethod = method;
       }
 
     if (functionalInterfaceMethod == null)
-      throw new StageRunnerException(interfaceType.getName() + " has no functional method");
+      throw new StageRunnerConfigurationException(interfaceType.getName() + " has no functional method");
+
+    final Class<?> returnType = functionalInterfaceMethod.getReturnType();
+    if (returnType != boolean.class && returnType != void.class)
+      throw new StageRunnerConfigurationException(functionalInterfaceMethod + " must return boolean or void");
 
     return functionalInterfaceMethod;
   }

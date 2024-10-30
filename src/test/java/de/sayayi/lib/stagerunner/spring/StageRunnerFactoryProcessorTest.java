@@ -50,7 +50,7 @@ class StageRunnerFactoryProcessorTest
   {
     @Bean
     StageRunnerFactoryProcessor<MyRunnerInterface> processor() {
-      return new StageRunnerFactoryProcessor<>(MyRunnerInterface.class, StageDef.class);
+      return new StageRunnerFactoryProcessor<>(MyRunnerInterface.class, StageDef.class, true);
     }
   }
 
