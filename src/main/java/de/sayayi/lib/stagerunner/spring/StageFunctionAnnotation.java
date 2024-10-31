@@ -13,6 +13,10 @@ import java.util.Objects;
 import static de.sayayi.lib.stagerunner.StageConfigurer.DEFAULT_ORDER;
 
 
+/**
+ * @author Jeroen Gremmen
+ * @since 0.3.0
+ */
 public final class StageFunctionAnnotation
 {
   private final @NotNull Class<? extends Annotation> annotationType;
@@ -132,17 +136,19 @@ public final class StageFunctionAnnotation
 
         namePropertyName = propertyName;
       }
-      else if (method.isAnnotationPresent(StageDefinition.Stage.class))
+
+      if (method.isAnnotationPresent(StageDefinition.Stage.class))
       {
         if (stagePropertyName != null)
           throw new StageRunnerException("Duplicate @Stage annotation for " + method);
 
-        if (!Enum.class.isAssignableFrom(stageType = method.getReturnType()))
+        if (!Enum.class.isAssignableFrom(stageType = method.getReturnType()) || stageType == Enum.class)
           throw new StageRunnerException("Stage type is not an enum for " + method);
 
         stagePropertyName = propertyName;
       }
-      else if (method.isAnnotationPresent(StageDefinition.Order.class))
+
+      if (method.isAnnotationPresent(StageDefinition.Order.class))
       {
         if (orderPropertyName != null)
           throw new StageRunnerException("Duplicate @Order annotation for " + method);
@@ -153,7 +159,8 @@ public final class StageFunctionAnnotation
 
         orderPropertyName = propertyName;
       }
-      else if (method.isAnnotationPresent(StageDefinition.Description.class))
+
+      if (method.isAnnotationPresent(StageDefinition.Description.class))
       {
         if (descriptionPropertyName != null)
           throw new StageRunnerException("Duplicate @Description annotation for " + method);

@@ -23,6 +23,10 @@ import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.util.StringUtils.hasLength;
 
 
+/**
+ * @author Jeroen Gremmen
+ * @since 0.3.0
+ */
 public abstract class AbstractStageFunctionBuilder
 {
   protected final StageFunctionAnnotation stageFunctionAnnotation;

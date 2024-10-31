@@ -39,6 +39,10 @@ import static org.springframework.core.ResolvableType.forMethodParameter;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotationAttributes;
 
 
+/**
+ * @author Jeroen Gremmen
+ * @since 0.3.0
+ */
 @SuppressWarnings("rawtypes")
 public class StageRunnerFactoryProcessor<R>
     implements BeanPostProcessor, BeanDefinitionRegistryPostProcessor, BeanFactoryAware, InitializingBean
@@ -152,7 +156,8 @@ public class StageRunnerFactoryProcessor<R>
           .getDeclaredConstructor(StageRunnerFactory.class, String[].class)
           .newInstance(stageRunnerFactory, dataNames);
     } catch(Exception ex) {
-      throw new RuntimeException(ex);
+      throw new StageRunnerConfigurationException("failed to instantiate proxy for stage runner interface " +
+          stageRunnerProxyType, ex);
     }
   }
 

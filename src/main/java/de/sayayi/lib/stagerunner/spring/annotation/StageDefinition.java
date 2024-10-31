@@ -7,6 +7,10 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 
+/**
+ * @author Jeroen Gremmen
+ * @since 0.3.0
+ */
 public interface StageDefinition
 {
   /**

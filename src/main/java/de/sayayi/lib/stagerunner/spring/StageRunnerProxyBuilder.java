@@ -7,7 +7,6 @@ import net.bytebuddy.NamingStrategy.Suffixing.BaseNameResolver;
 import net.bytebuddy.NamingStrategy.SuffixingRandom;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.method.ParameterDescription;
-import net.bytebuddy.description.method.ParameterList;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.Implementation;
@@ -36,6 +35,10 @@ import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
 
+/**
+ * @author Jeroen Gremmen
+ * @since 0.3.0
+ */
 public class StageRunnerProxyBuilder<R,S extends Enum<S>>
 {
   private static final MethodDescription METHOD_ABSTRACT_RUNNER_PROXY_RUN = TypeDescription.ForLoadedType
@@ -99,7 +102,6 @@ public class StageRunnerProxyBuilder<R,S extends Enum<S>>
   {
     final TypeDescription stageRunnerCallbackType = TypeDescription.ForLoadedType.of(StageRunnerCallback.class);
     final List<StackManipulation> stackManipulations = new ArrayList<>();
-    final ParameterList<? extends ParameterDescription> parameters = method.getParameters();
     ParameterDescription stageRunnerCallbackParameter = null;
 
     stackManipulations.add(MethodVariableAccess.loadThis());
@@ -107,7 +109,7 @@ public class StageRunnerProxyBuilder<R,S extends Enum<S>>
     stackManipulations.add(Duplication.SINGLE);
     stackManipulations.add(MethodInvocation.invoke(CONSTRUCTOR_HASH_MAP));
 
-    for(final ParameterDescription parameter: parameters)
+    for(final ParameterDescription parameter: method.getParameters())
     {
       final TypeDescription parameterType = parameter.getType().asErasure();
 
