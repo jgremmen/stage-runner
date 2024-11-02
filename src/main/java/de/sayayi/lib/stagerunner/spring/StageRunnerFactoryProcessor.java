@@ -5,7 +5,7 @@ import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.NamingStrategy;
+import net.bytebuddy.NamingStrategy.SuffixingRandom;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.method.ParameterDescription;
 import net.bytebuddy.description.modifier.FieldManifestation;
@@ -171,24 +171,22 @@ public class StageRunnerFactoryProcessor<R>
 
     try {
       //noinspection resource
-      final Class<? extends R> stageRunnerProxyType = new ByteBuddy()
-          .with(new NamingStrategy.SuffixingRandom(stageType.getSimpleName()))
+      return new ByteBuddy()
+          .with(new SuffixingRandom(stageType.getSimpleName()))
           .subclass(stageRunnerInterfaceType, NO_CONSTRUCTORS)
           .modifiers(PUBLIC)
           .defineField("factory", stageRunnerFactoryType, PRIVATE, FieldManifestation.FINAL)
           .defineConstructor(PUBLIC)
               .withParameters(stageRunnerFactoryType)
-              .intercept(new ProxyConstructor())
+              .intercept(new ProxyConstructorImplementation())
           .define(stageRunnerInterfaceMethod)
-              .intercept(new ProxyMethod(method))
+              .intercept(new ProxyMethodImplementation(method))
               .annotateMethod(copyInterfaceMethodAnnotations ? method.getDeclaredAnnotations() : List.of())
           .method(isToString())
               .intercept(FixedValue.value("Proxy for interface " + stageRunnerInterfaceType.getName()))
           .make()
           .load(stageRunnerInterfaceType.getClassLoader())
-          .getLoaded();
-
-      return stageRunnerProxyType
+          .getLoaded()
           .getDeclaredConstructor(StageRunnerFactory.class)
           .newInstance(stageRunnerFactory);
     } catch(Exception ex) {
@@ -234,20 +232,15 @@ public class StageRunnerFactoryProcessor<R>
     final ResolvableType callbackType = forClassWithGenerics(
         StageRunnerCallback.class, stageFunctionAnnotation.getStageType());
     final Parameter[] parameters = stageRunnerInterfaceMethod.getParameters();
+    ResolvableType resolvableType;
 
     for(int p = 0; p < dataNames.length; p++)
-    {
-      final ResolvableType resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p);
-
-      if (!callbackType.isAssignableFrom(resolvableType))
+      if (!callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
       {
-        final String parameterName = getDataNameForParameter(
-            parameters[p].getAnnotation(Data.class), parameterNames, p);
-
-        dataNames[p] = parameterName;
-        dataNameTypeMap.put(parameterName, resolvableType);
+        dataNameTypeMap.put(
+            dataNames[p] = getDataNameForParameter(parameters[p].getAnnotation(Data.class), parameterNames, p),
+            resolvableType);
       }
-    }
   }
 
 
@@ -340,7 +333,7 @@ public class StageRunnerFactoryProcessor<R>
 
 
 
-  private static class ProxyConstructor implements Implementation
+  private static final class ProxyConstructorImplementation implements Implementation
   {
     @Override
     public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {
@@ -376,12 +369,12 @@ public class StageRunnerFactoryProcessor<R>
 
 
 
-  private class ProxyMethod implements Implementation
+  private final class ProxyMethodImplementation implements Implementation
   {
     private final MethodDescription method;
 
 
-    private ProxyMethod(@NotNull MethodDescription method) {
+    private ProxyMethodImplementation(@NotNull MethodDescription method) {
       this.method = method;
     }
 
@@ -497,7 +490,7 @@ public class StageRunnerFactoryProcessor<R>
       return List.of(MethodInvocation.invoke(
           typeDescription(Map.class)
               .getDeclaredMethods()
-              .filter(named("of").and(takesArguments(0)))
+              .filter(named("of").and(takesNoArguments()))
               .getOnly()));
     }
 
