@@ -3,7 +3,7 @@ package de.sayayi.lib.stagerunner.impl;
 import de.sayayi.lib.stagerunner.StageFunction;
 import org.jetbrains.annotations.NotNull;
 
-import static de.sayayi.lib.stagerunner.StageConfigurer.DEFAULT_ORDER;
+import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
 
 
 /**

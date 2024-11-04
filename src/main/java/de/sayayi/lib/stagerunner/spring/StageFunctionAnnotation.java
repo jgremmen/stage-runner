@@ -10,7 +10,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.Objects;
 
-import static de.sayayi.lib.stagerunner.StageConfigurer.DEFAULT_ORDER;
+import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
 
 
 /**

@@ -1,5 +1,6 @@
 package de.sayayi.lib.stagerunner;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.NotNull;
 
 
@@ -33,7 +34,7 @@ public interface StageRunnerCallback<S extends Enum<S>>
    *
    * @param stageContext  stage context, not {@code null}
    * @param description   optional description for the stage function which was provided on
-   *                      {@link StageConfigurer#addStageFunction(Enum, String, StageFunction) registration}
+   *                      {@link StageFunctionConfigurer#addStageFunction(Enum, String, StageFunction) registration}
    */
   default void preStageFunctionCallback(@NotNull StageContext<S> stageContext, String description) {
   }
@@ -63,7 +64,7 @@ public interface StageRunnerCallback<S extends Enum<S>>
   /**
    * Exception handler which is invoked if the stage function currently being processed throws an exception.
    * <p>
-   * The default implementation does not report the exception but only aborts the stage runner.
+   * The default implementation throws the exception wrapped inside a {@link StageRunnerException}.
    * <p>
    * Any exception thrown by this handler will lead to exiting the stage runner. On its way out, callback
    * {@link #postStageFunctionCallback(StageContext)} will be invoked.
@@ -71,7 +72,11 @@ public interface StageRunnerCallback<S extends Enum<S>>
    * @param stageContext  stage context, not {@code null}
    * @param exception     exception thrown by the current stage function, not {@code null}
    */
-  default void stageExceptionHandler(@NotNull StageContext<S> stageContext, @NotNull Throwable exception) {
-    stageContext.abort();
+  default void stageExceptionHandler(@NotNull StageContext<S> stageContext, @NotNull Throwable exception)
+  {
+    if (exception instanceof StageRunnerException)
+      throw (StageRunnerException)exception;
+    else
+      throw new StageRunnerException(exception.getMessage(), exception);
   }
 }

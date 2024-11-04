@@ -24,7 +24,7 @@ import java.util.function.Predicate;
  *
  * @param <S>  Stage enum type
  */
-public interface StageContext<S extends Enum<S>> extends StageConfigurer<S>
+public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer<S>
 {
   /**
    * Returns the stage data associated with {@code name}.
