@@ -3,6 +3,7 @@ package de.sayayi.lib.stagerunner.impl;
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -117,14 +118,14 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
   {
     if (state.isTerminated())
-      throw new StageRunnerException("stage runner has terminated");
+      throw new StageRunnerConfigurationException("stage runner has terminated");
 
     final int index = functionArray.add(new StageOrderFunction<>(stage, description, order, function));
 
     if (state == RUNNING && index <= functionIndex)
     {
       abort();
-      throw new StageRunnerException("stage runner has passed beyond stage " + stage + " and order " + order);
+      throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage + " and order " + order);
     }
   }
 
@@ -133,7 +134,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   public @NotNull Set<String> enableNamedStageFunctions(@NotNull Predicate<String> nameFilter)
   {
     if (state.isTerminated())
-      throw new StageRunnerException("stage runner has terminated");
+      throw new StageRunnerConfigurationException("stage runner has terminated");
 
     final Set<String> enabledFunctions = new HashSet<>();
     String name;
@@ -147,7 +148,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         if (state == RUNNING && index <= functionIndex)
         {
           abort();
-          throw new StageRunnerException("stage runner has passed beyond stage " + stageFunction.stage +
+          throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stageFunction.stage +
               " and order " + stageFunction.order + " for stage function '" + name + '\'');
         }
 
@@ -297,8 +298,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     @Override
     public String toString()
     {
-      final StringBuilder s = new StringBuilder("Function(state=").append(functionState).append(",stage=")
-          .append(getStage().name()).append('#').append(getOrder());
+      final StringBuilder s = new StringBuilder("Function(state=").append(getFunctionState())
+          .append(",stage=").append(getStage().name()).append('#').append(getOrder());
 
       final String description = getDescription();
       if (description != null && !description.isEmpty())
