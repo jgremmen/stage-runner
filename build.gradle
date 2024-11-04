@@ -15,7 +15,7 @@ description = 'Stage Runner Framework'
 layout.buildDirectory = '.build'
 
 
-def springVersion = '[5.3.+,6.0)'
+def springVersion = '[5.3,6.0)'
 def byteBuddyVersion = '[1.15,1.16)'
 
 
@@ -63,7 +63,7 @@ java {
 
 dependencies {
   // java
-  compileOnlyApi 'org.jetbrains:annotations:26.0.+'
+  compileOnlyApi 'org.jetbrains:annotations:[26.0,26.1)'
 
   optionalImplementation "org.springframework:spring-context:${springVersion}"
   optionalImplementation "net.bytebuddy:byte-buddy:${byteBuddyVersion}"
@@ -76,7 +76,6 @@ dependencies {
   testImplementation 'org.junit.jupiter:junit-jupiter:5.11.+'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-  // https://mvnrepository.com/artifact/org.springframework/spring-test
   testImplementation "org.springframework:spring-test:${springVersion}"
 }
 
@@ -156,6 +155,9 @@ publishing {
   publications {
 
     maven(MavenPublication) {
+      suppressPomMetadataWarningsFor 'optionalApiElements'
+      suppressPomMetadataWarningsFor 'optionalRuntimeElements'
+
       from components.java
 
       pom {
