@@ -19,6 +19,6 @@ public class DefaultStageRunnerFactory<S extends Enum<S>> extends AbstractStageR
 
   @Override
   public @NotNull StageRunner<S> createRunner() {
-    return new AbstractStageRunner<S>(DefaultStageRunnerFactory.this) {};
+    return new AbstractStageRunner<>(DefaultStageRunnerFactory.this) {};
   }
 }

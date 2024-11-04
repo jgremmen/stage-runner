@@ -71,7 +71,7 @@ class StageRunnerFactoryProcessorTest
 
 
     @StageDef(stage = TestStage.PROCESS, comment = "Process task")
-    public void task(String task, @Data(name = "count") int n) {
+    public void task(String task, @Data("count") int n) {
     }
   }
 }

@@ -102,7 +102,7 @@ public abstract class AbstractStageFunctionBuilder
     final Data dataAnnotation = parameter.getAnnotation(Data.class);
     if (dataAnnotation != null)
     {
-      final String dataName = dataAnnotation.name();
+      final String dataName = dataAnnotation.value();
       if (!hasLength(dataName))
         throw new StageRunnerConfigurationException("@Data name must not be empty for parameter " + parameter);
 

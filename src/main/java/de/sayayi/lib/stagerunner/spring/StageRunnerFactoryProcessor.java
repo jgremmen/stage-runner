@@ -183,7 +183,7 @@ public class StageRunnerFactoryProcessor<R>
               .intercept(new ProxyMethodImplementation(method))
               .annotateMethod(copyInterfaceMethodAnnotations ? method.getDeclaredAnnotations() : List.of())
           .method(isToString())
-              .intercept(FixedValue.value("Proxy for interface " + stageRunnerInterfaceType.getName()))
+              .intercept(FixedValue.value("Proxy implementation for interface " + stageRunnerInterfaceType.getName()))
           .make()
           .load(stageRunnerInterfaceType.getClassLoader())
           .getLoaded()
@@ -249,7 +249,7 @@ public class StageRunnerFactoryProcessor<R>
                                                   @Nullable String[] parameterNames,
                                                   int p)
   {
-    String parameterName = dataAnnotation != null ? dataAnnotation.name() : "";
+    String parameterName = dataAnnotation != null ? dataAnnotation.value() : "";
     if (parameterName.isEmpty() && parameterNames != null)
       parameterName = parameterNames[p];
 

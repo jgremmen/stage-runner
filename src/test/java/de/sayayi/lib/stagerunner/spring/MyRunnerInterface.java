@@ -9,5 +9,5 @@ import java.util.List;
 public interface MyRunnerInterface
 {
   @Transient
-  boolean run(String task, @Data(name = "map") List<Integer> params, int count);
+  boolean run(String task, @Data("map") List<Integer> params, int count);
 }
