@@ -185,8 +185,7 @@ public abstract class AbstractStageFunctionBuilder
     if (parameterResolvableType.isAssignableFrom(dataType))
       return TypeQualifier.ASSIGNABLE;
 
-    if (conversionService.canConvert(
-        new TypeDescriptor(dataType, null, null), parameterType))
+    if (conversionService.canConvert(new TypeDescriptor(dataType, null, null), parameterType))
       return CONVERTABLE;
 
     return null;

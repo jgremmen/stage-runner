@@ -1,6 +1,6 @@
 package de.sayayi.lib.stagerunner.spring;
 
-import de.sayayi.lib.stagerunner.exception.StageRunnerException;
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.spring.annotation.StageDefinition;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -129,10 +129,10 @@ public final class StageFunctionAnnotation
       if (method.isAnnotationPresent(StageDefinition.Name.class))
       {
         if (namePropertyName != null)
-          throw new StageRunnerException("Duplicate @Name annotation for " + method);
+          throw new StageRunnerConfigurationException("Duplicate @Name annotation for " + method);
 
         if (method.getReturnType() != String.class)
-          throw new StageRunnerException("Stage function name is not a String for " + method);
+          throw new StageRunnerConfigurationException("Stage function name is not a String for " + method);
 
         namePropertyName = propertyName;
       }
@@ -140,10 +140,10 @@ public final class StageFunctionAnnotation
       if (method.isAnnotationPresent(StageDefinition.Stage.class))
       {
         if (stagePropertyName != null)
-          throw new StageRunnerException("Duplicate @Stage annotation for " + method);
+          throw new StageRunnerConfigurationException("Duplicate @Stage annotation for " + method);
 
         if (!Enum.class.isAssignableFrom(stageType = method.getReturnType()) || stageType == Enum.class)
-          throw new StageRunnerException("Stage type is not an enum for " + method);
+          throw new StageRunnerConfigurationException("Stage type is not an enum for " + method);
 
         stagePropertyName = propertyName;
       }
@@ -151,11 +151,11 @@ public final class StageFunctionAnnotation
       if (method.isAnnotationPresent(StageDefinition.Order.class))
       {
         if (orderPropertyName != null)
-          throw new StageRunnerException("Duplicate @Order annotation for " + method);
+          throw new StageRunnerConfigurationException("Duplicate @Order annotation for " + method);
 
         final Class<?> orderType = method.getReturnType();
         if (orderType != int.class && orderType != short.class)
-          throw new StageRunnerException("Order type is not an int or short for " + method);
+          throw new StageRunnerConfigurationException("Order type is not an int or short for " + method);
 
         orderPropertyName = propertyName;
       }
@@ -163,18 +163,18 @@ public final class StageFunctionAnnotation
       if (method.isAnnotationPresent(StageDefinition.Description.class))
       {
         if (descriptionPropertyName != null)
-          throw new StageRunnerException("Duplicate @Description annotation for " + method);
+          throw new StageRunnerConfigurationException("Duplicate @Description annotation for " + method);
 
         final Class<?> descriptionType = method.getReturnType();
         if (descriptionType != String.class)
-          throw new StageRunnerException("Description type is not a String for " + method);
+          throw new StageRunnerConfigurationException("Description type is not a String for " + method);
 
         descriptionPropertyName = propertyName;
       }
     }
 
     if (stagePropertyName == null)
-      throw new StageRunnerException("No @Stage annotation found for " + stageFunctionAnnotation);
+      throw new StageRunnerConfigurationException("No @Stage annotation found for " + stageFunctionAnnotation);
 
     return new StageFunctionAnnotation(
         stageFunctionAnnotation,
