@@ -3,6 +3,7 @@ package de.sayayi.lib.stagerunner.spring;
 import de.sayayi.lib.stagerunner.*;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
+import de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.AbstractImplementation;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.NamingStrategy.SuffixingRandom;
@@ -10,9 +11,7 @@ import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.method.ParameterDescription;
 import net.bytebuddy.description.modifier.FieldManifestation;
 import net.bytebuddy.description.type.TypeDescription;
-import net.bytebuddy.dynamic.scaffold.InstrumentedType;
 import net.bytebuddy.implementation.FixedValue;
-import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.bytecode.*;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
 import net.bytebuddy.implementation.bytecode.assign.primitive.PrimitiveBoxingDelegate;
@@ -45,6 +44,8 @@ import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.stream.Stream;
 
+import static de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.parameterizedType;
+import static de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.typeDescription;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
@@ -164,9 +165,7 @@ public class StageRunnerFactoryProcessor<R>
   private @NotNull R createStageRunnerProxy()
   {
     final Class<?> stageType = stageFunctionAnnotation.getStageType();
-    final TypeDescription.Generic stageRunnerFactoryType = TypeDescription.Generic.Builder
-        .parameterizedType(StageRunnerFactory.class, stageType)
-        .build();
+    final TypeDescription.Generic stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
     final MethodDescription method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
 
     try {
@@ -302,8 +301,10 @@ public class StageRunnerFactoryProcessor<R>
   {
     try {
       return stageFunctionBuilder.buildFor(bean, stageFunction);
+    } catch(StageRunnerConfigurationException ex) {
+      throw ex;
     } catch(Exception ex) {
-      throw new RuntimeException(ex);
+      throw new StageRunnerConfigurationException(ex.getMessage(), ex);
     }
   }
 
@@ -325,22 +326,10 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  @Contract(pure = true)
-  private static TypeDescription typeDescription(@NotNull Class<?> type) {
-    return TypeDescription.ForLoadedType.of(type);
-  }
 
 
-
-
-  private static final class ProxyConstructorImplementation implements Implementation
+  private static final class ProxyConstructorImplementation extends AbstractImplementation
   {
-    @Override
-    public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {
-      return instrumentedType;
-    }
-
-
     @Override
     public @NotNull ByteCodeAppender appender(@NotNull Target target)
     {
@@ -369,19 +358,13 @@ public class StageRunnerFactoryProcessor<R>
 
 
 
-  private final class ProxyMethodImplementation implements Implementation
+  private final class ProxyMethodImplementation extends AbstractImplementation
   {
     private final MethodDescription method;
 
 
     private ProxyMethodImplementation(@NotNull MethodDescription method) {
       this.method = method;
-    }
-
-
-    @Override
-    public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {
-      return instrumentedType;
     }
 
 
