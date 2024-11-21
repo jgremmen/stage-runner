@@ -3,11 +3,11 @@ package de.sayayi.lib.stagerunner.spring.builder;
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
-import de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.AbstractImplementation;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.modifier.MethodManifestation;
 import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.dynamic.scaffold.InstrumentedType;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.bytecode.ByteCodeAppender;
@@ -22,6 +22,8 @@ import net.bytebuddy.implementation.bytecode.member.FieldAccess;
 import net.bytebuddy.implementation.bytecode.member.MethodInvocation;
 import net.bytebuddy.implementation.bytecode.member.MethodReturn;
 import net.bytebuddy.implementation.bytecode.member.MethodVariableAccess;
+import net.bytebuddy.jar.asm.MethodVisitor;
+import net.bytebuddy.jar.asm.Opcodes;
 import net.bytebuddy.utility.RandomString;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -50,7 +52,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
-public class StageFunctionBuilder extends AbstractStageFunctionBuilder
+public class StageFunctionBuilderImpl extends AbstractStageFunctionBuilder
 {
   private static final FieldAccess.Defined FIELD_ACCESS_BEAN = FieldAccess
       .forField(typeDescription(AbstractStageFunction.class)
@@ -80,9 +82,9 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
   private final RandomString randomString;
 
 
-  public StageFunctionBuilder(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
-                              @NotNull ConversionService conversionService,
-                              @NotNull Map<String,ResolvableType> dataTypeMap)
+  public StageFunctionBuilderImpl(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
+                                  @NotNull ConversionService conversionService,
+                                  @NotNull Map<String,ResolvableType> dataTypeMap)
   {
     super(stageFunctionAnnotationType, conversionService, dataTypeMap);
 
@@ -269,8 +271,17 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
 
 
 
-  private static final class ProcessMethodImplementation extends AbstractImplementation
+  private static final class ProcessMethodImplementation implements Implementation
   {
+    private static final @NotNull StackManipulation SWAP = new StackManipulation.AbstractBase() {
+      @Override
+      public @NotNull Size apply(@NotNull MethodVisitor methodVisitor, @NotNull Context context)
+      {
+        methodVisitor.visitInsn(Opcodes.SWAP);
+        return Size.ZERO;
+      }
+    };
+
     private final MethodDescription method;
     private final NameWithQualifier[] parameters;
 
@@ -279,6 +290,12 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
     {
       this.method = method;
       this.parameters = parameters;
+    }
+
+
+    @Override
+    public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {
+      return instrumentedType;
     }
 
 
@@ -345,7 +362,7 @@ public class StageFunctionBuilder extends AbstractStageFunctionBuilder
         // checkNotNull(<value>, dataName)
         stackManipulations.add(Duplication.SINGLE);
         stackManipulations.add(MethodVariableAccess.loadThis());
-        stackManipulations.add(ByteBuddyHelper.SWAP);
+        stackManipulations.add(SWAP);
         stackManipulations.add(new TextConstant(dataName));
         stackManipulations.add(MethodInvocation.invoke(METHOD_STAGE_FUNCTION_CHECK_NOT_NULL));
 
