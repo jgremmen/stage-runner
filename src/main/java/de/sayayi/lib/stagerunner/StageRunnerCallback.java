@@ -17,7 +17,7 @@ public interface StageRunnerCallback<S extends Enum<S>>
    * Default callback instance aborting stage runner execution in case of an exception.
    */
   @SuppressWarnings("rawtypes")
-  StageRunnerCallback<?> INSTANCE = new StageRunnerCallback() {};
+  StageRunnerCallback<?> DEFAULT = new StageRunnerCallback() {};
 
 
   /**

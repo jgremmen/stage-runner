@@ -113,7 +113,8 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    * @param nameFilter  name filter predicate. A stage function is added if and only if the predicate
    *                    ({@link Predicate#test(Object)}) returns {@code true}
    *
-   * @return  a set with the stage function names, which have been enabled, never {@code null}
+   * @return  a set with the stage function names, which have been enabled as a result of this invocation,
+   *          never {@code null}
    *
    * @since 0.3.0
    */

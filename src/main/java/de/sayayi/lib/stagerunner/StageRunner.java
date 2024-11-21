@@ -4,6 +4,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
+import static de.sayayi.lib.stagerunner.StageRunnerCallback.DEFAULT;
+
 
 /**
  * Interface representing a stage runner.
@@ -19,7 +21,7 @@ import java.util.Map;
 public interface StageRunner<S extends Enum<S>>
 {
   /**
-   * Start this stage runner instance with a default {@link StageRunnerCallback#INSTANCE callback}.
+   * Start this stage runner instance with a default {@link StageRunnerCallback#DEFAULT callback}.
    *
    * @param data  data, which can be accessed in stage functions, not {@code null}
    *
@@ -27,7 +29,7 @@ public interface StageRunner<S extends Enum<S>>
    */
   @SuppressWarnings("unchecked")
   default boolean run(@NotNull Map<String,Object> data) {
-    return run(data, (StageRunnerCallback<S>)StageRunnerCallback.INSTANCE);
+    return run(data, (StageRunnerCallback<S>)DEFAULT);
   }
 
 
