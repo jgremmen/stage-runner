@@ -1,8 +1,9 @@
-package de.sayayi.lib.stagerunner.spring;
+package de.sayayi.lib.stagerunner.spring.builder;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -15,11 +16,11 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
-import static de.sayayi.lib.stagerunner.spring.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
+import static de.sayayi.lib.stagerunner.spring.builder.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
+import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 import static org.springframework.util.StringUtils.hasLength;
 
 
@@ -49,14 +50,14 @@ public abstract class AbstractStageFunctionBuilder
   public @NotNull <S extends Enum<S>> StageFunction<S> buildFor(Object bean, @NotNull Method method)
       throws ReflectiveOperationException
   {
-    final Parameter[] methodParameters = method.getParameters();
-    final NameWithQualifierAndType[] parameters = new NameWithQualifierAndType[methodParameters.length];
-    final ResolvableType stageContextType = forClassWithGenerics(
+    var methodParameters = method.getParameters();
+    var parameters = new NameWithQualifierAndType[methodParameters.length];
+    var stageContextType = forClassWithGenerics(
         StageContext.class, stageFunctionAnnotation.getStageType());
 
     for(int p = 0; p < methodParameters.length; p++)
     {
-      final TypeDescriptor parameterType = new TypeDescriptor(new MethodParameter(method, p));
+      var parameterType = new TypeDescriptor(new MethodParameter(method, p));
 
       parameters[p] = new NameWithQualifierAndType(
           parameterType.getResolvableType().isAssignableFrom(stageContextType)
@@ -99,10 +100,10 @@ public abstract class AbstractStageFunctionBuilder
   {
     ResolvableType dataType;
 
-    final Data dataAnnotation = parameter.getAnnotation(Data.class);
+    var dataAnnotation = findMergedAnnotation(parameter, Data.class);
     if (dataAnnotation != null)
     {
-      final String dataName = dataAnnotation.value();
+      var dataName = dataAnnotation.name();
       if (!hasLength(dataName))
         throw new StageRunnerConfigurationException("@Data name must not be empty for parameter " + parameter);
 
@@ -112,7 +113,7 @@ public abstract class AbstractStageFunctionBuilder
       throw new StageRunnerConfigurationException("Unknown @Data name '" + dataName + "' for parameter " + parameter);
     }
 
-    final String parameterName = parameter.getName();
+    var parameterName = parameter.getName();
     if (hasLength(parameterName) && (dataType = dataNameTypeMap.get(parameterName)) != null)
       return new NameWithQualifier(parameterName, qualifyParameterTypeOrFail(parameterType, dataType));
 
@@ -124,7 +125,7 @@ public abstract class AbstractStageFunctionBuilder
   private NameWithQualifier findNameWithQualifierByParameterType(@NotNull Parameter parameter,
                                                                  @NotNull TypeDescriptor parameterType)
   {
-    final List<NameWithQualifier> nameQualifiers = new ArrayList<>();
+    var nameQualifiers = new ArrayList<NameWithQualifier>();
 
     dataNameTypeMap.forEach((name, type) -> {
       TypeQualifier q = qualifyParameterType(parameterType, type);
@@ -163,7 +164,7 @@ public abstract class AbstractStageFunctionBuilder
   private @NotNull TypeQualifier qualifyParameterTypeOrFail(@NotNull TypeDescriptor parameterType,
                                                             @NotNull ResolvableType dataType)
   {
-    final TypeQualifier qualifier = qualifyParameterType(parameterType, dataType);
+    var qualifier = qualifyParameterType(parameterType, dataType);
     if (qualifier == null)
       throw new IllegalStateException("Unsupported parameter type: " + parameterType);
 
@@ -174,7 +175,7 @@ public abstract class AbstractStageFunctionBuilder
   @Contract(pure = true)
   private TypeQualifier qualifyParameterType(@NotNull TypeDescriptor parameterType, @NotNull ResolvableType dataType)
   {
-    final ResolvableType parameterResolvableType = parameterType.getResolvableType();
+    var parameterResolvableType = parameterType.getResolvableType();
 
     if (parameterResolvableType.getType().equals(dataType.getType()))
       return TypeQualifier.IDENTICAL;
@@ -227,7 +228,7 @@ public abstract class AbstractStageFunctionBuilder
       if (!(o instanceof NameWithQualifierAndType))
         return false;
 
-      final NameWithQualifierAndType that = (NameWithQualifierAndType)o;
+      var that = (NameWithQualifierAndType)o;
 
       return qualifier == that.qualifier &&
              name.equals(that.name) &&
@@ -289,7 +290,7 @@ public abstract class AbstractStageFunctionBuilder
       if (!(o instanceof NameWithQualifier))
         return false;
 
-      final NameWithQualifier that = (NameWithQualifier)o;
+      var that = (NameWithQualifier)o;
 
       return qualifier == that.qualifier && name.equals(that.name);
     }

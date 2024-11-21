@@ -3,8 +3,10 @@ package de.sayayi.lib.stagerunner.spring;
 import de.sayayi.lib.stagerunner.*;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
-import de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.AbstractImplementation;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
+import de.sayayi.lib.stagerunner.spring.builder.AbstractStageFunctionBuilder;
+import de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.AbstractImplementation;
+import de.sayayi.lib.stagerunner.spring.builder.StageFunctionBuilder;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.NamingStrategy.SuffixingRandom;
 import net.bytebuddy.description.method.MethodDescription;
@@ -34,18 +36,16 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProce
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ResolvableType;
-import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.lang.reflect.Parameter;
 import java.util.*;
 import java.util.stream.Stream;
 
-import static de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.parameterizedType;
-import static de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.typeDescription;
+import static de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.parameterizedType;
+import static de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.typeDescription;
 import static java.util.Collections.emptyMap;
 import static java.util.Objects.requireNonNull;
 import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
@@ -55,6 +55,7 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
+import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotationAttributes;
 
 
@@ -120,11 +121,8 @@ public class StageRunnerFactoryProcessor<R>
 
     analyseStageRunnerInterfaceMethod();
 
-    if (stageFunctionBuilder == null)
-    {
-      setStageFunctionBuilder(new StageFunctionBuilder(
-          stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap));
-    }
+    stageFunctionBuilder = new StageFunctionBuilder(
+        stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap);
   }
 
 
@@ -150,8 +148,7 @@ public class StageRunnerFactoryProcessor<R>
   @Override
   public void postProcessBeanDefinitionRegistry(@NotNull BeanDefinitionRegistry beanDefinitionRegistry)
   {
-    final RootBeanDefinition bd =
-        new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
+    var bd = new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
 
     bd.setTargetType(ResolvableType.forClass(stageRunnerInterfaceType));
     bd.setLazyInit(false);
@@ -164,9 +161,9 @@ public class StageRunnerFactoryProcessor<R>
   @Contract(pure = true)
   private @NotNull R createStageRunnerProxy()
   {
-    final Class<?> stageType = stageFunctionAnnotation.getStageType();
-    final TypeDescription.Generic stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
-    final MethodDescription method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
+    var stageType = stageFunctionAnnotation.getStageType();
+    var stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
+    var method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
 
     try {
       //noinspection resource
@@ -201,10 +198,9 @@ public class StageRunnerFactoryProcessor<R>
     if (!interfaceType.isInterface())
       throw new StageRunnerConfigurationException(interfaceType.getName() + " is not an interface");
 
-    //noinspection ExtractMethodRecommender
     Method functionalInterfaceMethod = null;
 
-    for(final Method method: interfaceType.getMethods())
+    for(var method: interfaceType.getMethods())
       if (!method.isDefault())
       {
         if (functionalInterfaceMethod != null)
@@ -216,7 +212,7 @@ public class StageRunnerFactoryProcessor<R>
     if (functionalInterfaceMethod == null)
       throw new StageRunnerConfigurationException(interfaceType.getName() + " has no functional method");
 
-    final Class<?> returnType = functionalInterfaceMethod.getReturnType();
+    var returnType = functionalInterfaceMethod.getReturnType();
     if (returnType != boolean.class && returnType != void.class)
       throw new StageRunnerConfigurationException(functionalInterfaceMethod + " must return boolean or void");
 
@@ -226,18 +222,16 @@ public class StageRunnerFactoryProcessor<R>
 
   private void analyseStageRunnerInterfaceMethod()
   {
-    final String[] parameterNames = new DefaultParameterNameDiscoverer()
-        .getParameterNames(stageRunnerInterfaceMethod);
-    final ResolvableType callbackType = forClassWithGenerics(
-        StageRunnerCallback.class, stageFunctionAnnotation.getStageType());
-    final Parameter[] parameters = stageRunnerInterfaceMethod.getParameters();
+    var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
+    var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageFunctionAnnotation.getStageType());
+    var parameters = stageRunnerInterfaceMethod.getParameters();
     ResolvableType resolvableType;
 
     for(int p = 0; p < dataNames.length; p++)
       if (!callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
       {
         dataNameTypeMap.put(
-            dataNames[p] = getDataNameForParameter(parameters[p].getAnnotation(Data.class), parameterNames, p),
+            dataNames[p] = getDataNameForParameter(findMergedAnnotation(parameters[p], Data.class), parameterNames, p),
             resolvableType);
       }
   }
@@ -248,7 +242,7 @@ public class StageRunnerFactoryProcessor<R>
                                                   @Nullable String[] parameterNames,
                                                   int p)
   {
-    String parameterName = dataAnnotation != null ? dataAnnotation.value() : "";
+    var parameterName = dataAnnotation != null ? dataAnnotation.name() : "";
     if (parameterName.isEmpty() && parameterNames != null)
       parameterName = parameterNames[p];
 
@@ -271,22 +265,22 @@ public class StageRunnerFactoryProcessor<R>
   @SuppressWarnings("unchecked")
   private void analyseStageFunctions(@NotNull Object bean)
   {
-    final Class<?> beanType = bean.getClass();
-    final Class<? extends Annotation> annotationType = stageFunctionAnnotation.getAnnotationType();
+    var beanType = bean.getClass();
+    var annotationType = stageFunctionAnnotation.getAnnotationType();
 
-    for(final Method method: beanType.getMethods())
+    for(var method: beanType.getMethods())
     {
-      final AnnotationAttributes stageFunctionAnnotationAttributes =
+      var stageFunctionAnnotationAttributes =
           findMergedAnnotationAttributes(method, annotationType, false, false);
 
       if (stageFunctionAnnotationAttributes != null)
       {
-        final Enum<?> stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
-        final int order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
-        final String description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
-        final StageFunction<?> function = createStageFunction(bean, method);
-        final String name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
+        var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
+        var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
+        var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
+        var function = createStageFunction(bean, method);
 
+        var name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
         if (name != null)
           stageRunnerFactory.namedStageFunction(name, stageEnum, order, description, function);
         else
@@ -318,11 +312,6 @@ public class StageRunnerFactoryProcessor<R>
   @SuppressWarnings("unused")
   public void setConversionService(@NotNull ConversionService conversionService) {
     this.conversionService = requireNonNull(conversionService);
-  }
-
-
-  public void setStageFunctionBuilder(AbstractStageFunctionBuilder stageFunctionBuilder) {
-    this.stageFunctionBuilder = requireNonNull(stageFunctionBuilder);
   }
 
 
@@ -371,7 +360,7 @@ public class StageRunnerFactoryProcessor<R>
     @Override
     public @NotNull ByteCodeAppender appender(@NotNull Target target)
     {
-      final List<StackManipulation> stackManipulations = new ArrayList<>();
+      var stackManipulations = new ArrayList<StackManipulation>();
 
       // this.factory.createRunner() -> stack
       stackManipulations.add(MethodVariableAccess.loadThis());
@@ -394,7 +383,7 @@ public class StageRunnerFactoryProcessor<R>
           : buildMapNoDataNames());
 
       // param2 = callback (optional)
-      final ParameterDescription stageRunnerCallbackParameter = findCallbackParameter();
+      var stageRunnerCallbackParameter = findCallbackParameter();
       if (stageRunnerCallbackParameter != null)
         stackManipulations.add(MethodVariableAccess.load(stageRunnerCallbackParameter));
 
@@ -419,8 +408,8 @@ public class StageRunnerFactoryProcessor<R>
     @Contract(pure = true)
     private @NotNull List<StackManipulation> buildMapWithDataNames()
     {
-      final List<StackManipulation> stackManipulations = new ArrayList<>();
-      final TypeDescription hashMapType = typeDescription(HashMap.class);
+      var stackManipulations = new ArrayList<StackManipulation>();
+      var hashMapType = typeDescription(HashMap.class);
 
       // new HashMap() -> stack
       stackManipulations.add(TypeCreation.of(hashMapType));
@@ -430,20 +419,20 @@ public class StageRunnerFactoryProcessor<R>
           .filter(isDefaultConstructor())
           .getOnly()));
 
-      final MethodDescription mapPutMethod = typeDescription(Map.class)
+      var mapPutMethod = typeDescription(Map.class)
           .getDeclaredMethods()
           .filter(named("put").and(takesArguments(2)))
           .getOnly();
       String dataName;
 
-      for(final ParameterDescription parameter: method.getParameters())
+      for(var parameter: method.getParameters())
         if ((dataName = dataNames[parameter.getIndex()]) != null)
         {
           stackManipulations.add(Duplication.SINGLE);
           stackManipulations.add(new TextConstant(dataName));
           stackManipulations.add(MethodVariableAccess.load(parameter));
 
-          final TypeDescription parameterType = parameter.getType().asErasure();
+          var parameterType = parameter.getType().asErasure();
           if (parameterType.isPrimitive())
           {
             stackManipulations.add(PrimitiveBoxingDelegate
@@ -481,9 +470,9 @@ public class StageRunnerFactoryProcessor<R>
     @Contract(pure = true)
     private ParameterDescription findCallbackParameter()
     {
-      final TypeDescription stageRunnerCallbackType = typeDescription(StageRunnerCallback.class);
+      var stageRunnerCallbackType = typeDescription(StageRunnerCallback.class);
 
-      for(final ParameterDescription parameter: method.getParameters())
+      for(var parameter: method.getParameters())
         if (stageRunnerCallbackType.isAssignableFrom(parameter.getType().asErasure()))
           return parameter;
 
