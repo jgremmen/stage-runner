@@ -1,4 +1,4 @@
-package de.sayayi.lib.stagerunner.spring;
+package de.sayayi.lib.stagerunner.spring.builder;
 
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.scaffold.InstrumentedType;
@@ -13,11 +13,12 @@ import org.jetbrains.annotations.NotNull;
 import java.lang.reflect.Type;
 
 
-final class ByteBuddyHelper
+public final class ByteBuddyHelper
 {
   static final @NotNull StackManipulation SWAP = new StackManipulation.AbstractBase() {
     @Override
-    public @NotNull Size apply(@NotNull MethodVisitor methodVisitor, @NotNull Context context) {
+    public @NotNull Size apply(@NotNull MethodVisitor methodVisitor, @NotNull Context context)
+    {
       methodVisitor.visitInsn(Opcodes.SWAP);
       return Size.ZERO;
     }
@@ -25,20 +26,20 @@ final class ByteBuddyHelper
 
 
   @Contract(pure = true)
-  static @NotNull TypeDescription typeDescription(@NotNull Class<?> type) {
+  public static @NotNull TypeDescription typeDescription(@NotNull Class<?> type) {
     return TypeDescription.ForLoadedType.of(type);
   }
 
 
   @Contract(pure = true)
-  static @NotNull TypeDescription.Generic parameterizedType(@NotNull Class<?> rawType, Type... parameter) {
+  public static @NotNull TypeDescription.Generic parameterizedType(@NotNull Class<?> rawType, Type... parameter) {
     return TypeDescription.Generic.Builder.parameterizedType(rawType, parameter).build();
   }
 
 
 
 
-  abstract static class AbstractImplementation implements Implementation
+  public abstract static class AbstractImplementation implements Implementation
   {
     @Override
     public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {

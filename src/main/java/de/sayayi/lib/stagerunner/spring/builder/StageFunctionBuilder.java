@@ -1,15 +1,12 @@
-package de.sayayi.lib.stagerunner.spring;
+package de.sayayi.lib.stagerunner.spring.builder;
 
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
-import de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.AbstractImplementation;
+import de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.AbstractImplementation;
 import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.NamingStrategy;
-import net.bytebuddy.NamingStrategy.Suffixing.BaseNameResolver;
-import net.bytebuddy.NamingStrategy.SuffixingRandom;
 import net.bytebuddy.description.method.MethodDescription;
-import net.bytebuddy.description.method.ParameterList;
+import net.bytebuddy.description.modifier.MethodManifestation;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.Implementation;
@@ -25,6 +22,7 @@ import net.bytebuddy.implementation.bytecode.member.FieldAccess;
 import net.bytebuddy.implementation.bytecode.member.MethodInvocation;
 import net.bytebuddy.implementation.bytecode.member.MethodReturn;
 import net.bytebuddy.implementation.bytecode.member.MethodVariableAccess;
+import net.bytebuddy.utility.RandomString;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ResolvableType;
@@ -39,9 +37,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import static de.sayayi.lib.stagerunner.spring.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
-import static de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.parameterizedType;
-import static de.sayayi.lib.stagerunner.spring.ByteBuddyHelper.typeDescription;
+import static de.sayayi.lib.stagerunner.spring.builder.AbstractStageFunctionBuilder.TypeQualifier.CONVERTABLE;
+import static de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.parameterizedType;
+import static de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.typeDescription;
 import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
 import static net.bytebuddy.matcher.ElementMatchers.isToString;
@@ -52,7 +50,7 @@ import static net.bytebuddy.matcher.ElementMatchers.named;
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
-class StageFunctionBuilder extends AbstractStageFunctionBuilder
+public class StageFunctionBuilder extends AbstractStageFunctionBuilder
 {
   private static final FieldAccess.Defined FIELD_ACCESS_BEAN = FieldAccess
       .forField(typeDescription(AbstractStageFunction.class)
@@ -78,19 +76,18 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
           .filter(named("checkNotNull"))
           .getOnly();
 
-  private static final BaseNameResolver BASE_NAME_RESOLVER =
-      new BaseNameResolver.ForGivenType(typeDescription(StageFunction.class));
-
   private final Map<CacheKey,Class<? extends StageFunction<?>>> stageFunctionClassCache;
+  private final RandomString randomString;
 
 
-  StageFunctionBuilder(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
-                       @NotNull ConversionService conversionService,
-                       @NotNull Map<String,ResolvableType> dataTypeMap)
+  public StageFunctionBuilder(@NotNull Class<? extends Annotation> stageFunctionAnnotationType,
+                              @NotNull ConversionService conversionService,
+                              @NotNull Map<String,ResolvableType> dataTypeMap)
   {
     super(stageFunctionAnnotationType, conversionService, dataTypeMap);
 
     stageFunctionClassCache = new ConcurrentHashMap<>();
+    randomString = new RandomString(5);
   }
 
 
@@ -99,8 +96,7 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
       Object bean, @NotNull Method method, @NotNull NameWithQualifierAndType[] parameters)
       throws ReflectiveOperationException
   {
-    final MethodDescription methodDescription = new MethodDescription.ForLoadedMethod(method);
-
+    var methodDescription = new MethodDescription.ForLoadedMethod(method);
     if (methodDescription.isStatic())
       bean = null;
 
@@ -142,34 +138,43 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
   }
 
 
-  @SuppressWarnings({"unchecked", "resource"})
+  @SuppressWarnings("unchecked")
   protected @NotNull <S extends Enum<S>> Class<? extends StageFunction<S>> createStageFunctionType(
       @NotNull TypeDescription.Generic superType,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters)
   {
     return (Class<? extends StageFunction<S>>)stageFunctionClassCache
-        .computeIfAbsent(new CacheKey(method, parameters), ck -> (Class<? extends StageFunction<?>>)
-            new ByteBuddy()
-                .with(createNamingStrategy(method))
-                .subclass(superType)
-                .modifiers(PUBLIC, FINAL)
-                .method(named("process"))
-                    .intercept(new ProcessMethodImplementation(method, parameters))
-                .method(isToString())
-                    .intercept(implToString(method))
-                .make()
-                .load(stageFunctionAnnotation.getAnnotationType().getClassLoader())
-                .getLoaded());
+        .computeIfAbsent(
+            new CacheKey(method, parameters),
+            ck -> buildStageFunctionClass(superType, method, parameters));
   }
 
 
-  @Contract(pure = true)
-  protected @NotNull NamingStrategy createNamingStrategy(@NotNull MethodDescription method)
+  @SuppressWarnings({"unchecked", "resource"})
+  private @NotNull Class<? extends StageFunction<?>> buildStageFunctionClass(
+      @NotNull TypeDescription.Generic superType,
+      @NotNull MethodDescription method,
+      @NotNull NameWithQualifierAndType[] parameters)
   {
-    return new SuffixingRandom(
-        stageFunctionAnnotation.getStageType().getSimpleName() + '$' + method.getName(),
-        BASE_NAME_RESOLVER);
+    var className = StageFunction.class.getName() +
+        '$' + stageFunctionAnnotation.getStageType().getSimpleName() +
+        '$' + method.getName() +
+        '$' + randomString.nextString();
+
+    return (Class<? extends StageFunction<?>>)
+        new ByteBuddy()
+            .subclass(superType)
+            .name(className)
+            .modifiers(PUBLIC, FINAL)
+            .defineMethod("process", void.class, PUBLIC, MethodManifestation.FINAL)
+                .withParameter(typeDescription(StageContext.class), "stageContext")
+                .intercept(new ProcessMethodImplementation(method, parameters))
+            .method(isToString())
+                .intercept(implToString(method))
+            .make()
+            .load(stageFunctionAnnotation.getAnnotationType().getClassLoader())
+            .getLoaded();
   }
 
 
@@ -280,8 +285,8 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
     @Override
     public @NotNull ByteCodeAppender appender(@NotNull Target target)
     {
-      final List<StackManipulation> stackManipulations = new ArrayList<>();
-      final ParameterList<?> methodParameters = method.getParameters();
+      var stackManipulations = new ArrayList<StackManipulation>();
+      var methodParameters = method.getParameters();
 
       if (!method.isStatic())
       {
@@ -292,8 +297,8 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
 
       for(int p = 0; p < parameters.length; p++)
       {
-        final NameWithQualifier parameter = parameters[p];
-        final String dataName = parameter.getName();
+        var parameter = parameters[p];
+        var dataName = parameter.getName();
 
         if ("$context".equals(dataName))
           stackManipulations.add(MethodVariableAccess.REFERENCE.loadFrom(1));
@@ -333,7 +338,7 @@ class StageFunctionBuilder extends AbstractStageFunctionBuilder
     private @NotNull List<StackManipulation> castToParameterType(@NotNull TypeDescription.Generic methodParameterType,
                                                                  @NotNull String dataName)
     {
-      final List<StackManipulation> stackManipulations = new ArrayList<>();
+      var stackManipulations = new ArrayList<StackManipulation>();
 
       if (methodParameterType.isPrimitive())
       {

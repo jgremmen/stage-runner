@@ -1,6 +1,7 @@
 package de.sayayi.lib.stagerunner.spring.annotation;
 
 import de.sayayi.lib.stagerunner.StageRunner;
+import org.springframework.core.annotation.AliasFor;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.Target;
@@ -28,5 +29,13 @@ public @interface Data
   /**
    * Name of the data parameter.
    */
-  String value();
+  @AliasFor("name")
+  String value() default "";
+
+
+  /**
+   * Name of the data parameter.
+   */
+  @AliasFor("value")
+  String name() default "";
 }

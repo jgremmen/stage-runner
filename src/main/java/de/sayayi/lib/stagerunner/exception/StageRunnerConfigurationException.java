@@ -4,7 +4,7 @@ import org.jetbrains.annotations.NotNull;
 
 
 /**
- * Stage runner exception.
+ * Stage runner configuration exception.
  *
  * @author Jeroen Gremmen
  * @since 0.3.0
