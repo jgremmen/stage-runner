@@ -7,7 +7,6 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.core.annotation.AnnotationAttributes;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Method;
 import java.util.Objects;
 
 import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
@@ -106,7 +105,7 @@ public final class StageFunctionAnnotation
     if (nameProperty == null)
       return null;
 
-    final String name = annotationAttributes.getString(nameProperty);
+    var name = annotationAttributes.getString(nameProperty);
     return name.isEmpty() ? null : name;
   }
 
@@ -122,9 +121,9 @@ public final class StageFunctionAnnotation
     String descriptionPropertyName = null;
     String namePropertyName = null;
 
-    for(final Method method: stageFunctionAnnotation.getDeclaredMethods())
+    for(var method: stageFunctionAnnotation.getDeclaredMethods())
     {
-      final String propertyName = method.getName();
+      var propertyName = method.getName();
 
       if (method.isAnnotationPresent(StageDefinition.Name.class))
       {
@@ -153,7 +152,7 @@ public final class StageFunctionAnnotation
         if (orderPropertyName != null)
           throw new StageRunnerConfigurationException("Duplicate @Order annotation for " + method);
 
-        final Class<?> orderType = method.getReturnType();
+        var orderType = method.getReturnType();
         if (orderType != int.class && orderType != short.class)
           throw new StageRunnerConfigurationException("Order type is not an int or short for " + method);
 
@@ -165,7 +164,7 @@ public final class StageFunctionAnnotation
         if (descriptionPropertyName != null)
           throw new StageRunnerConfigurationException("Duplicate @Description annotation for " + method);
 
-        final Class<?> descriptionType = method.getReturnType();
+        var descriptionType = method.getReturnType();
         if (descriptionType != String.class)
           throw new StageRunnerConfigurationException("Description type is not a String for " + method);
 
@@ -227,7 +226,7 @@ public final class StageFunctionAnnotation
   @Override
   public String toString()
   {
-    final StringBuilder s = new StringBuilder(getClass().getSimpleName())
+    var s = new StringBuilder(getClass().getSimpleName())
         .append("(annotation=").append(annotationType.getSimpleName())
         .append(",stageType=").append(stageType.getSimpleName())
         .append(",stage=").append(stageProperty).append("()");

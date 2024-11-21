@@ -9,7 +9,6 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
-import java.util.Map.Entry;
 import java.util.function.Predicate;
 
 import static de.sayayi.lib.stagerunner.StageContext.FunctionState.*;
@@ -97,7 +96,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public @NotNull Set<S> getRemainingStages()
   {
-    final Set<S> remainingStages = EnumSet.noneOf(stageRunnerFactory.stageEnumType);
+    var remainingStages = EnumSet.noneOf(stageRunnerFactory.stageEnumType);
 
     if (!state.isTerminated())
     {
@@ -136,14 +135,14 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     if (state.isTerminated())
       throw new StageRunnerConfigurationException("stage runner has terminated");
 
-    final Set<String> enabledFunctions = new HashSet<>();
+    var enabledFunctions = new HashSet<String>();
     String name;
 
-    for(Entry<String,StageOrderFunction<S>> stageFunctionEntry: stageRunnerFactory.namedStageFunctions.entrySet())
+    for(var stageFunctionEntry: stageRunnerFactory.namedStageFunctions.entrySet())
       if (!enabledStageFunctionNames.contains(name = stageFunctionEntry.getKey()) && nameFilter.test(name))
       {
-        final StageOrderFunction<S> stageFunction = stageFunctionEntry.getValue();
-        final int index = functionArray.add(stageFunction);
+        var stageFunction = stageFunctionEntry.getValue();
+        var index = functionArray.add(stageFunction);
 
         if (state == RUNNING && index <= functionIndex)
         {
@@ -182,8 +181,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     try {
       while(!aborted && ++functionIndex < functionArray.size)
       {
-        final StageOrderFunction<S> stageFunctionEntry = functionArray.functions[functionIndex];
-        final S currentStage = stageFunctionEntry.stage;
+        var stageFunctionEntry = functionArray.functions[functionIndex];
+        var currentStage = stageFunctionEntry.stage;
 
         if (currentStage != lastStage)
         {
@@ -229,7 +228,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public @NotNull List<Function> getFunctions()
   {
-    final Function[] functions = new Function[functionArray.size];
+    var functions = new Function[functionArray.size];
 
     for(int n = 0; n < functionArray.size; n++)
       functions[n] = new FunctionAdapter(functionArray.executionState[n], functionArray.functions[n]);
@@ -298,7 +297,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     @Override
     public String toString()
     {
-      final StringBuilder s = new StringBuilder("Function(state=").append(getFunctionState())
+      var s = new StringBuilder("Function(state=").append(getFunctionState())
           .append(",stage=").append(getStage().name()).append('#').append(getOrder());
 
       final String description = getDescription();

@@ -42,7 +42,7 @@ final class StageOrderFunction<S extends Enum<S>>
     if (!(o instanceof StageOrderFunction))
       return false;
 
-    final StageOrderFunction<?> that = (StageOrderFunction<?>) o;
+    var that = (StageOrderFunction<?>) o;
 
     return order == that.order && stage == that.stage && function.equals(that.function);
   }
@@ -57,7 +57,7 @@ final class StageOrderFunction<S extends Enum<S>>
   @Override
   public String toString()
   {
-    final StringBuilder s = new StringBuilder(getClass().getSimpleName())
+    var s = new StringBuilder(getClass().getSimpleName())
         .append("(stage=").append(stage).append('@').append(order);
 
     if (description != null && !description.isEmpty())
