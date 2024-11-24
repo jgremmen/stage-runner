@@ -1,13 +1,11 @@
 package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.DefaultStageRunnerFactory;
-import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
-import de.sayayi.lib.stagerunner.spring.builder.AbstractStageFunctionBuilder;
 import de.sayayi.lib.stagerunner.spring.builder.StageFunctionBuilderImpl;
 import de.sayayi.lib.stagerunner.spring.builder.StageRunnerProxyBuilderImpl;
 import org.jetbrains.annotations.Contract;
@@ -32,8 +30,6 @@ import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
-import static java.util.Collections.emptyMap;
-import static java.util.Objects.requireNonNull;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
@@ -49,62 +45,99 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
 public class StageRunnerFactoryProcessor<R>
     implements BeanPostProcessor, BeanDefinitionRegistryPostProcessor, BeanFactoryAware, InitializingBean
 {
-  private final Class<R> stageRunnerInterfaceType;
-  private final StageFunctionAnnotation stageFunctionAnnotation;
-  private final DefaultStageRunnerFactory stageRunnerFactory;
-  private final Method stageRunnerInterfaceMethod;
+  protected final Class<R> stageRunnerInterfaceType;
+  protected final StageFunctionAnnotation stageFunctionAnnotation;
+  protected final DefaultStageRunnerFactory stageRunnerFactory;
+  protected final Method stageRunnerInterfaceMethod;
   private final String[] dataNames;
   private final Map<String,ResolvableType> dataNameTypeMap;
 
   private BeanFactory beanFactory;
-  private ConversionService conversionService;
-  private AbstractStageFunctionBuilder stageFunctionBuilder;
+
   private StageRunnerProxyBuilder stageRunnerProxyBuilder;
+  private StageFunctionBuilder stageFunctionBuilder;
 
 
+  /**
+   * Create a stage runner factory processor for the given stage runner interface and stage function annotation type.
+   *
+   * @param stageRunnerInterfaceType  stage runner interface type, not {@code null}
+   * @param stageFunctionAnnotationType   stage function annotation type, not {@code null}
+   */
   @SuppressWarnings("unchecked")
   public StageRunnerFactoryProcessor(@NotNull Class<R> stageRunnerInterfaceType,
-                                     @NotNull Class<? extends Annotation> stageFunctionAnnotation)
+                                     @NotNull Class<? extends Annotation> stageFunctionAnnotationType)
   {
+    var stageType =
+        (stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotationType)).getStageType();
+
+    this.stageRunnerFactory = new DefaultStageRunnerFactory(stageType);
     this.stageRunnerInterfaceType = stageRunnerInterfaceType;
-    this.stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotation);
-    this.stageRunnerFactory = new DefaultStageRunnerFactory(this.stageFunctionAnnotation.getStageType());
+    this.stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
 
-    stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
-
-    final int parameterCount = stageRunnerInterfaceMethod.getParameterCount();
+    var parameters = stageRunnerInterfaceMethod.getParameters();
+    var parameterCount = parameters.length;
 
     dataNames = new String[parameterCount];
-    dataNameTypeMap = parameterCount == 0
-        ? emptyMap()
-        : new HashMap<>((parameterCount * 4 + 2) / 3);
+    final Map<String,ResolvableType> tmpDataNameTypeMap = new HashMap<>();
+
+    var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageType);
+    var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
+    ResolvableType resolvableType;
+
+    for(int p = 0; p < parameterCount; p++)
+      if (!callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
+      {
+        var dataName = getDataNameForParameter(findMergedAnnotation(parameters[p], Data.class), parameterNames, p);
+
+        if (tmpDataNameTypeMap.put(dataNames[p] = dataName, resolvableType) != null)
+        {
+          throw new StageRunnerException("duplicate data name '" + dataName + "' for parameter" + (p + 1) +
+              " in stage runner function " + stageRunnerInterfaceMethod);
+        }
+      }
+
+    dataNameTypeMap = Map.copyOf(tmpDataNameTypeMap);
   }
 
 
-  public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder) {
-    this.stageRunnerProxyBuilder = stageRunnerProxyBuilder;
+  @Contract(pure = true)
+  private @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
+                                                  @Nullable String[] parameterNames,
+                                                  int p)
+  {
+    var parameterName = dataAnnotation != null ? dataAnnotation.name() : "";
+    if (parameterName.isEmpty() && parameterNames != null)
+      parameterName = parameterNames[p];
+
+    if (parameterName == null || parameterName.isEmpty())
+    {
+      throw new StageRunnerException("unable to detect data name for parameter " + (p + 1) +
+          " in stage runner function " + stageRunnerInterfaceMethod);
+    }
+
+    return parameterName;
   }
 
 
   @Override
   public void afterPropertiesSet()
   {
-    if (conversionService == null)
-    {
-      try {
-        conversionService = beanFactory.getBean(ConversionService.class);
-      } catch(NullPointerException | NoSuchBeanDefinitionException ex) {
-        conversionService = DefaultConversionService.getSharedInstance();
-      }
-    }
-
-    analyseStageRunnerInterfaceMethod();
-
     if (stageRunnerProxyBuilder == null)
       setStageRunnerProxyBuilder(new StageRunnerProxyBuilderImpl(false));
 
-    stageFunctionBuilder = new StageFunctionBuilderImpl(
-        stageFunctionAnnotation.getAnnotationType(), conversionService, dataNameTypeMap);
+    if (stageFunctionBuilder == null)
+    {
+      ConversionService conversionService;
+
+      try {
+        conversionService = beanFactory.getBean(ConversionService.class);
+      } catch(NoSuchBeanDefinitionException ex) {
+        conversionService = DefaultConversionService.getSharedInstance();
+      }
+
+      setStageFunctionBuilder(new StageFunctionBuilderImpl(conversionService));
+    }
   }
 
 
@@ -182,48 +215,6 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  private void analyseStageRunnerInterfaceMethod()
-  {
-    var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
-    var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageFunctionAnnotation.getStageType());
-    var parameters = stageRunnerInterfaceMethod.getParameters();
-    ResolvableType resolvableType;
-
-    for(int p = 0; p < dataNames.length; p++)
-      if (!callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
-      {
-        dataNameTypeMap.put(
-            dataNames[p] = getDataNameForParameter(findMergedAnnotation(parameters[p], Data.class), parameterNames, p),
-            resolvableType);
-      }
-  }
-
-
-  @Contract(pure = true)
-  private @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
-                                                  @Nullable String[] parameterNames,
-                                                  int p)
-  {
-    var parameterName = dataAnnotation != null ? dataAnnotation.name() : "";
-    if (parameterName.isEmpty() && parameterNames != null)
-      parameterName = parameterNames[p];
-
-    if (parameterName == null || parameterName.isEmpty())
-    {
-      throw new StageRunnerException("unable to detect data name for parameter " + (p + 1) +
-          " in stage runner function " + stageRunnerInterfaceMethod);
-    }
-
-    if (dataNameTypeMap.containsKey(parameterName))
-    {
-      throw new StageRunnerException("duplicate data name '" + parameterName +
-          "' for parameter" + (p + 1) + " in stage runner function " + stageRunnerInterfaceMethod);
-    }
-
-    return parameterName;
-  }
-
-
   @SuppressWarnings("unchecked")
   private void analyseStageFunctions(@NotNull Object bean)
   {
@@ -240,7 +231,8 @@ public class StageRunnerFactoryProcessor<R>
         var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
         var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
         var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
-        var function = createStageFunction(bean, method);
+        var function = stageFunctionBuilder
+            .createStageFunction(stageFunctionAnnotation, dataNameTypeMap, method, bean);
 
         var name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
         if (name != null)
@@ -252,27 +244,18 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  private <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(@NotNull Object bean,
-                                                                            @NotNull Method stageFunction)
-  {
-    try {
-      return stageFunctionBuilder.buildFor(bean, stageFunction);
-    } catch(StageRunnerConfigurationException ex) {
-      throw ex;
-    } catch(Exception ex) {
-      throw new StageRunnerConfigurationException(ex.getMessage(), ex);
-    }
-  }
-
-
   @Override
   public void setBeanFactory(@NotNull BeanFactory beanFactory) {
     this.beanFactory = beanFactory;
   }
 
 
-  @SuppressWarnings("unused")
-  public void setConversionService(@NotNull ConversionService conversionService) {
-    this.conversionService = requireNonNull(conversionService);
+  public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder) {
+    this.stageRunnerProxyBuilder = stageRunnerProxyBuilder;
+  }
+
+
+  public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder) {
+    this.stageFunctionBuilder = stageFunctionBuilder;
   }
 }

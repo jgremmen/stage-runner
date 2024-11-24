@@ -8,12 +8,11 @@ import de.sayayi.lib.stagerunner.spring.StageRunnerProxyBuilder;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.NamingStrategy;
 import net.bytebuddy.description.method.MethodDescription;
+import net.bytebuddy.description.method.MethodDescription.SignatureToken;
 import net.bytebuddy.description.method.ParameterDescription;
 import net.bytebuddy.description.modifier.FieldManifestation;
 import net.bytebuddy.description.type.TypeDescription;
-import net.bytebuddy.dynamic.scaffold.InstrumentedType;
 import net.bytebuddy.implementation.FixedValue;
-import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.bytecode.*;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
 import net.bytebuddy.implementation.bytecode.assign.primitive.PrimitiveBoxingDelegate;
@@ -29,8 +28,8 @@ import java.lang.reflect.Method;
 import java.util.*;
 import java.util.stream.Stream;
 
-import static de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.parameterizedType;
-import static de.sayayi.lib.stagerunner.spring.builder.ByteBuddyHelper.typeDescription;
+import static net.bytebuddy.description.method.MethodDescription.CONSTRUCTOR_INTERNAL_NAME;
+import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
@@ -41,7 +40,7 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
-public final class StageRunnerProxyBuilderImpl implements StageRunnerProxyBuilder
+public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implements StageRunnerProxyBuilder
 {
   private final boolean copyInterfaceMethodAnnotations;
 
@@ -66,7 +65,7 @@ public final class StageRunnerProxyBuilderImpl implements StageRunnerProxyBuilde
       return new ByteBuddy()
           .with(new NamingStrategy.SuffixingRandom(stageType.getSimpleName()))
           .subclass(stageRunnerInterfaceType, NO_CONSTRUCTORS)
-          .modifiers(PUBLIC)
+          .modifiers(copyInterfaceMethodAnnotations ? Set.of(PUBLIC) : Set.of(PUBLIC, FINAL))
           .defineField("factory", stageRunnerFactoryType, PRIVATE, FieldManifestation.FINAL)
           .defineConstructor(PUBLIC)
               .withParameters(stageRunnerFactoryType)
@@ -90,24 +89,15 @@ public final class StageRunnerProxyBuilderImpl implements StageRunnerProxyBuilde
 
 
 
-  private static final class ProxyConstructorImplementation implements Implementation
+  private static final class ProxyConstructorImplementation extends AbstractImplementation
   {
-    @Override
-    public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {
-      return instrumentedType;
-    }
-
-
     @Override
     public @NotNull ByteCodeAppender appender(@NotNull Target target)
     {
       return new ByteCodeAppender.Simple(
-          // super();
+          // super.<init>();
           MethodVariableAccess.loadThis(),
-          MethodInvocation.invoke(typeDescription(Object.class)
-              .getDeclaredMethods()
-              .filter(isConstructor())
-              .getOnly()),
+          target.invokeSuper(new SignatureToken(CONSTRUCTOR_INTERNAL_NAME, typeDescription(void.class))),
           // this.factory = factory(param 1)
           MethodVariableAccess.loadThis(),
           MethodVariableAccess.REFERENCE.loadFrom(1),
@@ -126,7 +116,7 @@ public final class StageRunnerProxyBuilderImpl implements StageRunnerProxyBuilde
 
 
 
-  private static final class ProxyMethodImplementation implements Implementation
+  private static final class ProxyMethodImplementation extends AbstractImplementation
   {
     private final MethodDescription method;
     private final String[] dataNames;
@@ -136,12 +126,6 @@ public final class StageRunnerProxyBuilderImpl implements StageRunnerProxyBuilde
     {
       this.method = method;
       this.dataNames = dataNames;
-    }
-
-
-    @Override
-    public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {
-      return instrumentedType;
     }
 
 
