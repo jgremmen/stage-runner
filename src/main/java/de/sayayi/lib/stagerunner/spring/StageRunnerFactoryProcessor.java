@@ -1,13 +1,30 @@
+/*
+ * Copyright 2024 Jeroen Gremmen
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package de.sayayi.lib.stagerunner.spring;
 
-import de.sayayi.lib.stagerunner.DefaultStageRunnerFactory;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
+import de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import de.sayayi.lib.stagerunner.spring.builder.StageFunctionBuilderImpl;
 import de.sayayi.lib.stagerunner.spring.builder.StageRunnerProxyBuilderImpl;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,6 +39,7 @@ import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProce
 import org.springframework.beans.factory.support.RootBeanDefinition;
 import org.springframework.core.DefaultParameterNameDiscoverer;
 import org.springframework.core.ResolvableType;
+import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
 
@@ -45,6 +63,8 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
 public class StageRunnerFactoryProcessor<R>
     implements BeanPostProcessor, BeanDefinitionRegistryPostProcessor, BeanFactoryAware, InitializingBean
 {
+  protected final Log logger = LogFactory.getLog(StageRunnerFactoryProcessor.class);
+
   protected final Class<R> stageRunnerInterfaceType;
   protected final StageFunctionAnnotation stageFunctionAnnotation;
   protected final DefaultStageRunnerFactory stageRunnerFactory;
@@ -70,17 +90,19 @@ public class StageRunnerFactoryProcessor<R>
   {
     var stageType =
         (stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotationType)).getStageType();
+    logger.debug("stage type = " + stageType);
 
     this.stageRunnerFactory = new DefaultStageRunnerFactory(stageType);
     this.stageRunnerInterfaceType = stageRunnerInterfaceType;
     this.stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
+    logger.debug("stage runner interface method = " + stageRunnerInterfaceMethod);
 
     var parameters = stageRunnerInterfaceMethod.getParameters();
     var parameterCount = parameters.length;
 
     dataNames = new String[parameterCount];
-    final Map<String,ResolvableType> tmpDataNameTypeMap = new HashMap<>();
 
+    var tmpDataNameTypeMap = new HashMap<String,ResolvableType>();
     var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageType);
     var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
     ResolvableType resolvableType;
@@ -88,16 +110,18 @@ public class StageRunnerFactoryProcessor<R>
     for(int p = 0; p < parameterCount; p++)
       if (!callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
       {
-        var dataName = getDataNameForParameter(findMergedAnnotation(parameters[p], Data.class), parameterNames, p);
+        var dataName =
+            getDataNameForParameter(findMergedAnnotation(parameters[p], Data.class), parameterNames, p);
 
         if (tmpDataNameTypeMap.put(dataNames[p] = dataName, resolvableType) != null)
         {
-          throw new StageRunnerException("duplicate data name '" + dataName + "' for parameter" + (p + 1) +
+          throw new StageRunnerException("duplicate data name '" + dataName + "' for parameter #" + (p + 1) +
               " in stage runner function " + stageRunnerInterfaceMethod);
         }
       }
 
     dataNameTypeMap = Map.copyOf(tmpDataNameTypeMap);
+    logger.debug("stage runner data = " + dataNameTypeMap);
   }
 
 
@@ -124,7 +148,10 @@ public class StageRunnerFactoryProcessor<R>
   public void afterPropertiesSet()
   {
     if (stageRunnerProxyBuilder == null)
+    {
+      logger.trace("set default stage runner proxy builder");
       setStageRunnerProxyBuilder(new StageRunnerProxyBuilderImpl(false));
+    }
 
     if (stageFunctionBuilder == null)
     {
@@ -133,9 +160,11 @@ public class StageRunnerFactoryProcessor<R>
       try {
         conversionService = beanFactory.getBean(ConversionService.class);
       } catch(NoSuchBeanDefinitionException ex) {
+        logger.trace("could not find ConversionService bean - use default conversion service", ex);
         conversionService = DefaultConversionService.getSharedInstance();
       }
 
+      logger.trace("set default stage function builder");
       setStageFunctionBuilder(new StageFunctionBuilderImpl(conversionService));
     }
   }
@@ -160,6 +189,47 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  private void analyseStageFunctions(@NotNull Object bean)
+  {
+    var annotationType = stageFunctionAnnotation.getAnnotationType();
+
+    for(var method: bean.getClass().getMethods())
+    {
+      var stageFunctionAnnotationAttributes =
+          findMergedAnnotationAttributes(method, annotationType, false, false);
+
+      if (stageFunctionAnnotationAttributes != null)
+        registerStageFunction(stageFunctionAnnotationAttributes, method, bean);
+    }
+  }
+
+
+  @SuppressWarnings("unchecked")
+  private void registerStageFunction(@NotNull AnnotationAttributes stageFunctionAnnotationAttributes,
+                                     @NotNull Method method,
+                                     @NotNull Object bean)
+  {
+    var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
+    var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
+    var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
+    var function = stageFunctionBuilder
+        .createStageFunction(stageFunctionAnnotation, dataNameTypeMap, method, bean);
+    var name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
+
+    if (logger.isDebugEnabled())
+    {
+      logger.debug("add stage function" + (name == null ? "" : " '" + name + "'") + ", stage " +
+          stageEnum + '#' + order + ((description == null) ? "" : ", description '" + description + "'") +
+          ": " + function);
+    }
+
+    if (name != null)
+      stageRunnerFactory.namedStageFunction(name, stageEnum, order, description, function);
+    else
+      stageRunnerFactory.addStageFunction(stageEnum, order, description, function);
+  }
+
+
   @Override
   public void postProcessBeanDefinitionRegistry(@NotNull BeanDefinitionRegistry beanDefinitionRegistry)
   {
@@ -169,6 +239,9 @@ public class StageRunnerFactoryProcessor<R>
     bd.setLazyInit(false);
     bd.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.getStageType().getName());
 
+    if (logger.isDebugEnabled())
+      logger.trace("register singleton bean: " + stageRunnerInterfaceType.getName());
+
     beanDefinitionRegistry.registerBeanDefinition(stageRunnerInterfaceType.getName(), bd);
   }
 
@@ -177,6 +250,8 @@ public class StageRunnerFactoryProcessor<R>
   @SuppressWarnings("unchecked")
   private <S extends Enum<S>> @NotNull R createStageRunnerProxy()
   {
+    logger.trace("create singleton stage runner proxy bean");
+
     return stageRunnerProxyBuilder.createProxy(
         (Class<S>)stageFunctionAnnotation.getStageType(),
         stageRunnerInterfaceType,
@@ -212,35 +287,6 @@ public class StageRunnerFactoryProcessor<R>
       throw new StageRunnerConfigurationException(functionalInterfaceMethod + " must return boolean or void");
 
     return functionalInterfaceMethod;
-  }
-
-
-  @SuppressWarnings("unchecked")
-  private void analyseStageFunctions(@NotNull Object bean)
-  {
-    var beanType = bean.getClass();
-    var annotationType = stageFunctionAnnotation.getAnnotationType();
-
-    for(var method: beanType.getMethods())
-    {
-      var stageFunctionAnnotationAttributes =
-          findMergedAnnotationAttributes(method, annotationType, false, false);
-
-      if (stageFunctionAnnotationAttributes != null)
-      {
-        var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
-        var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
-        var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
-        var function = stageFunctionBuilder
-            .createStageFunction(stageFunctionAnnotation, dataNameTypeMap, method, bean);
-
-        var name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
-        if (name != null)
-          stageRunnerFactory.namedStageFunction(name, stageEnum, order, description, function);
-        else
-          stageRunnerFactory.addStageFunction(stageEnum, order, description, function);
-      }
-    }
   }
 
 
