@@ -86,10 +86,10 @@ dependencies {
 
 
   // test
-  testAnnotationProcessor 'org.projectlombok:lombok:1.18.+'
-  testCompileOnly 'org.projectlombok:lombok:1.18.+'
+  testAnnotationProcessor 'org.projectlombok:lombok:[1.18,1.19)'
+  testCompileOnly 'org.projectlombok:lombok:[1.18,1.19)'
 
-  testImplementation 'org.junit.jupiter:junit-jupiter:5.11.+'
+  testImplementation 'org.junit.jupiter:junit-jupiter:[5.11,5.12)'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
   testImplementation "org.springframework:spring-test:${springVersion}"
