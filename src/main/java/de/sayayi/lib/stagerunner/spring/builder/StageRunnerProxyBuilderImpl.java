@@ -47,6 +47,7 @@ import static net.bytebuddy.description.method.MethodDescription.CONSTRUCTOR_INT
 import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
+import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.Default.INJECTION;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
@@ -91,7 +92,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           .method(isToString())
               .intercept(FixedValue.value("Proxy implementation for interface " + stageRunnerInterfaceType.getName()))
           .make()
-          .load(stageRunnerInterfaceType.getClassLoader())
+          .load(stageRunnerInterfaceType.getClassLoader(), INJECTION)
           .getLoaded()
           .getDeclaredConstructor(StageRunnerFactory.class)
           .newInstance(stageRunnerFactory);

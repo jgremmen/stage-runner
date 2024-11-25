@@ -59,6 +59,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
+import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.Default.INJECTION;
 import static net.bytebuddy.matcher.ElementMatchers.isToString;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
@@ -194,7 +195,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
             .method(isToString())
                 .intercept(FixedValue.value(StageFunction.class.getSimpleName() + " adapter for " + method))
             .make()
-            .load(stageFunctionAnnotation.getAnnotationType().getClassLoader())
+            .load(stageFunctionAnnotation.getAnnotationType().getClassLoader(), INJECTION)
             .getLoaded();
   }
 
