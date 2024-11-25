@@ -2,6 +2,7 @@ module de.sayayi.lib.stagerunner {
 
   // optional requirement for Spring
   requires static net.bytebuddy;
+  requires static spring.aop;
   requires static spring.core;
   requires static spring.beans;
   requires static spring.jcl;

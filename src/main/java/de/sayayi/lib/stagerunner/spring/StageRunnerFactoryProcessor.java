@@ -48,7 +48,9 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiFunction;
 
+import static org.springframework.aop.framework.AopProxyUtils.ultimateTargetClass;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
@@ -79,6 +81,7 @@ public class StageRunnerFactoryProcessor<R>
   protected StageRunnerProxyBuilder stageRunnerProxyBuilder;
   protected StageFunctionBuilder stageFunctionBuilder;
   protected boolean copyInterfaceMethodAnnotations;
+  protected BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator;
 
   protected StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
     @Override
@@ -132,6 +135,9 @@ public class StageRunnerFactoryProcessor<R>
 
     dataNameTypeMap = Map.copyOf(tmpDataNameTypeMap);
     logger.debug("stage runner data = " + dataNameTypeMap);
+
+    stageFunctionNameGenerator = (stageFunctionAnnotationAttributes,method) ->
+        stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
   }
 
 
@@ -204,7 +210,7 @@ public class StageRunnerFactoryProcessor<R>
   {
     var annotationType = stageFunctionAnnotation.getAnnotationType();
 
-    for(var method: bean.getClass().getMethods())
+    for(var method: ultimateTargetClass(bean).getMethods())
     {
       var stageFunctionAnnotationAttributes =
           findMergedAnnotationAttributes(method, annotationType, false, false);
@@ -222,7 +228,7 @@ public class StageRunnerFactoryProcessor<R>
   {
     var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
     var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
-    var name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
+    var name = stageFunctionNameGenerator.apply(stageFunctionAnnotationAttributes, method);
 
     if (stageFunctionFilter.filter(bean, (Enum)stageEnum, order, name))
     {
@@ -342,5 +348,13 @@ public class StageRunnerFactoryProcessor<R>
 
   public void setCopyInterfaceMethodAnnotations(boolean copyInterfaceMethodAnnotations) {
     this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
+  }
+
+
+  public void setStageFunctionNameGenerator(
+      @NotNull BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator)
+  {
+    Assert.notNull(stageFunctionNameGenerator, "stageFunctionNameGenerator must not be null");
+    this.stageFunctionNameGenerator = stageFunctionNameGenerator;
   }
 }
