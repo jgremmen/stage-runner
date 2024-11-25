@@ -41,7 +41,6 @@ import net.bytebuddy.implementation.bytecode.member.MethodReturn;
 import net.bytebuddy.implementation.bytecode.member.MethodVariableAccess;
 import net.bytebuddy.jar.asm.MethodVisitor;
 import net.bytebuddy.jar.asm.Opcodes;
-import net.bytebuddy.utility.RandomString;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.MethodParameter;
@@ -75,7 +74,6 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 {
   private final ConversionService conversionService;
   private final Map<CacheKey,Class<? extends StageFunction<?>>> stageFunctionClassCache;
-  private final RandomString randomString;
 
 
   public StageFunctionBuilderImpl(@NotNull ConversionService conversionService)
@@ -83,7 +81,6 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     this.conversionService = conversionService;
 
     stageFunctionClassCache = new ConcurrentHashMap<>();
-    randomString = new RandomString(5);
   }
 
 

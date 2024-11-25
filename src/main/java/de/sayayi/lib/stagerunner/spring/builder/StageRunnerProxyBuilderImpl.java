@@ -22,11 +22,9 @@ import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.spring.FactoryAccessor;
 import de.sayayi.lib.stagerunner.spring.StageRunnerProxyBuilder;
 import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.NamingStrategy;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.method.MethodDescription.SignatureToken;
 import net.bytebuddy.description.method.ParameterDescription;
-import net.bytebuddy.description.modifier.FieldManifestation;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.FixedValue;
@@ -46,7 +44,7 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static net.bytebuddy.description.method.MethodDescription.CONSTRUCTOR_INTERNAL_NAME;
-import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
+import static net.bytebuddy.description.modifier.FieldManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
 import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.Default.INJECTION;
@@ -77,15 +75,18 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
   {
     var stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
     var method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
+    var proxyClassName = stageRunnerInterfaceType.getName() +
+        '$' + stageType.getSimpleName() +
+        '$' + randomString.nextString();
 
     try {
       //noinspection resource
       return new ByteBuddy()
-          .with(new NamingStrategy.SuffixingRandom(stageType.getSimpleName()))
           .subclass(stageRunnerInterfaceType, NO_CONSTRUCTORS)
           .implement(parameterizedType(FactoryAccessor.class, stageType))
-          .modifiers(copyInterfaceMethodAnnotations ? Set.of(PUBLIC) : Set.of(PUBLIC, FINAL))
-          .defineField("factory", stageRunnerFactoryType, PRIVATE, FieldManifestation.FINAL)
+          .name(proxyClassName)
+          .modifiers(PUBLIC)
+          .defineField("factory", stageRunnerFactoryType, PRIVATE, FINAL)
           .defineConstructor(PUBLIC)
               .withParameters(stageRunnerFactoryType)
               .intercept(new ProxyConstructorImplementation())
