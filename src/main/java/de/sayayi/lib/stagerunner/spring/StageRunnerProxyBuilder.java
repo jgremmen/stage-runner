@@ -16,6 +16,7 @@
 package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -53,5 +54,6 @@ public interface StageRunnerProxyBuilder
                                                @NotNull Class<R> stageRunnerInterfaceType,
                                                @NotNull Method stageRunnerInterfaceMethod,
                                                @NotNull String[] dataNames,
-                                               @NotNull StageRunnerFactory<S> stageRunnerFactory);
+                                               @NotNull StageRunnerFactory<S> stageRunnerFactory)
+      throws StageRunnerConfigurationException;
 }

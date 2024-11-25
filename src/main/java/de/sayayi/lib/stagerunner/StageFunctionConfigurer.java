@@ -21,9 +21,10 @@ import org.jetbrains.annotations.NotNull;
 /**
  * The stage configurer provides methods to add new stage functions.
  *
- * @author Jeroen Gremmen
- *
  * @param <S>  Stage enum type
+ *
+ * @author Jeroen Gremmen
+ * @since 0.3.0 (renamed from StageConfigurer)
  */
 @FunctionalInterface
 public interface StageFunctionConfigurer<S extends Enum<S>>
@@ -167,6 +168,8 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
      * @param function     stage function, not {@code null}
      *
      * @see StageRunnerCallback#preStageFunctionCallback(StageContext, String)
+     *
+     * @since 0.3.0
      */
     void namedStageFunction(@NotNull String name, @NotNull S stage, int order, String description,
                             @NotNull StageFunction<S> function);

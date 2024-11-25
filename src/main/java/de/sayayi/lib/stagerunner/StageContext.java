@@ -35,9 +35,9 @@ import java.util.function.Predicate;
  *   <li>{@link #abort() Abort} function</li>
  * </ul>
  *
- * @author Jeroen Gremmen
- *
  * @param <S>  Stage enum type
+ *
+ * @author Jeroen Gremmen
  */
 public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer<S>
 {

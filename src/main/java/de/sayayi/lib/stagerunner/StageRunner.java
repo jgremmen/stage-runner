@@ -28,9 +28,9 @@ import static de.sayayi.lib.stagerunner.StageRunnerCallback.DEFAULT;
  * A new instance can be {@link StageRunnerFactory#createRunner() created} by the stage runner factory and can
  * be run only once.
  *
- * @author Jeroen Gremmen
- *
  * @param <S>  Stage enum type
+ *
+ * @author Jeroen Gremmen
  */
 @FunctionalInterface
 public interface StageRunner<S extends Enum<S>>

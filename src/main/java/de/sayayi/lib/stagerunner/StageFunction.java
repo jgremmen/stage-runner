@@ -21,9 +21,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Interface representing a processable stage function.
  *
- * @author Jeroen Gremmen
- *
  * @param <S>  Stage enum type
+ *
+ * @author Jeroen Gremmen
  */
 @FunctionalInterface
 public interface StageFunction<S extends Enum<S>>

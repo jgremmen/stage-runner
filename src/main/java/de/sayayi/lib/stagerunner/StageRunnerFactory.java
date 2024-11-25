@@ -22,9 +22,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Factory for creating stage runner instances.
  *
- * @author Jeroen Gremmen
- *
  * @param <S>  Stage enum type
+ *
+ * @author Jeroen Gremmen
  */
 @FunctionalInterface
 public interface StageRunnerFactory<S extends Enum<S>>

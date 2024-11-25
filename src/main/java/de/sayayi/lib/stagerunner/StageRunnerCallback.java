@@ -22,9 +22,9 @@ import org.jetbrains.annotations.NotNull;
 /**
  * Interface providing callback functions and exception handler which are invoked during stage running.
  *
- * @author Jeroen Gremmen
- *
  * @param <S>  Stage enum type
+ *
+ * @author Jeroen Gremmen
  */
 public interface StageRunnerCallback<S extends Enum<S>>
 {
