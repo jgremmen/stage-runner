@@ -74,9 +74,11 @@ public class StageRunnerFactoryProcessor<R>
   protected final Map<String,ResolvableType> dataNameTypeMap;
 
   protected BeanFactory beanFactory;
+  protected ConversionService conversionService;
 
   protected StageRunnerProxyBuilder stageRunnerProxyBuilder;
   protected StageFunctionBuilder stageFunctionBuilder;
+  protected boolean copyInterfaceMethodAnnotations;
 
   protected StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
     @Override
@@ -158,18 +160,19 @@ public class StageRunnerFactoryProcessor<R>
     if (stageRunnerProxyBuilder == null)
     {
       logger.trace("set default stage runner proxy builder");
-      setStageRunnerProxyBuilder(new StageRunnerProxyBuilderImpl(false));
+      setStageRunnerProxyBuilder(new StageRunnerProxyBuilderImpl(copyInterfaceMethodAnnotations));
     }
 
     if (stageFunctionBuilder == null)
     {
-      ConversionService conversionService;
-
-      try {
-        conversionService = beanFactory.getBean(ConversionService.class);
-      } catch(NoSuchBeanDefinitionException ex) {
-        logger.trace("could not find ConversionService bean - use default conversion service", ex);
-        conversionService = DefaultConversionService.getSharedInstance();
+      if (conversionService == null)
+      {
+        try {
+          conversionService = beanFactory.getBean(ConversionService.class);
+        } catch(NoSuchBeanDefinitionException ex) {
+          logger.trace("could not find ConversionService bean - use default conversion service", ex);
+          conversionService = DefaultConversionService.getSharedInstance();
+        }
       }
 
       logger.trace("set default stage function builder");
@@ -309,6 +312,13 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  public void setConversionService(ConversionService conversionService)
+  {
+    Assert.notNull(conversionService, "conversionService must not be null");
+    this.conversionService = conversionService;
+  }
+
+
   public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder)
   {
     Assert.notNull(stageRunnerProxyBuilder, "stageRunnerProxyBuilder must not be null");
@@ -327,5 +337,10 @@ public class StageRunnerFactoryProcessor<R>
   {
     Assert.notNull(stageFunctionFilter, "stageFunctionFilter must not be null");
     this.stageFunctionFilter = stageFunctionFilter;
+  }
+
+
+  public void setCopyInterfaceMethodAnnotations(boolean copyInterfaceMethodAnnotations) {
+    this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
   }
 }
