@@ -19,6 +19,7 @@ import de.sayayi.lib.stagerunner.StageRunner;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.spring.FactoryAccessor;
 import de.sayayi.lib.stagerunner.spring.StageRunnerProxyBuilder;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.NamingStrategy;
@@ -27,6 +28,7 @@ import net.bytebuddy.description.method.MethodDescription.SignatureToken;
 import net.bytebuddy.description.method.ParameterDescription;
 import net.bytebuddy.description.modifier.FieldManifestation;
 import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.bytecode.*;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
@@ -81,6 +83,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
       return new ByteBuddy()
           .with(new NamingStrategy.SuffixingRandom(stageType.getSimpleName()))
           .subclass(stageRunnerInterfaceType, NO_CONSTRUCTORS)
+          .implement(parameterizedType(FactoryAccessor.class, stageType))
           .modifiers(copyInterfaceMethodAnnotations ? Set.of(PUBLIC) : Set.of(PUBLIC, FINAL))
           .defineField("factory", stageRunnerFactoryType, PRIVATE, FieldManifestation.FINAL)
           .defineConstructor(PUBLIC)
@@ -89,6 +92,8 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           .define(stageRunnerInterfaceMethod)
               .intercept(new ProxyMethodImplementation(method, dataNames))
               .annotateMethod(copyInterfaceMethodAnnotations ? method.getDeclaredAnnotations() : List.of())
+          .method(named("getStageRunnerFactory"))
+              .intercept(FieldAccessor.ofField("factory"))
           .method(isToString())
               .intercept(FixedValue.value("Proxy implementation for interface " + stageRunnerInterfaceType.getName()))
           .make()
