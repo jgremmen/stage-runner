@@ -42,6 +42,7 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.util.Assert;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -76,6 +77,14 @@ public class StageRunnerFactoryProcessor<R>
 
   private StageRunnerProxyBuilder stageRunnerProxyBuilder;
   private StageFunctionBuilder stageFunctionBuilder;
+
+  private StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
+    @Override
+    @Contract(pure = true)
+    public <B,S extends Enum<S>> boolean filter(@NotNull B bean, @NotNull S stage, int order, String name) {
+      return true;
+    }
+  };
 
 
   /**
@@ -211,38 +220,43 @@ public class StageRunnerFactoryProcessor<R>
   {
     var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
     var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
-    var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
-    var function = stageFunctionBuilder
-        .createStageFunction(stageFunctionAnnotation, dataNameTypeMap, method, bean);
     var name = stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
 
-    if (logger.isDebugEnabled())
+    if (stageFunctionFilter.filter(bean, (Enum)stageEnum, order, name))
     {
-      logger.debug("add stage function" + (name == null ? "" : " '" + name + "'") + ", stage " +
-          stageEnum + '#' + order + ((description == null) ? "" : ", description '" + description + "'") +
-          ": " + function);
-    }
+      var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
+      var function = stageFunctionBuilder
+          .createStageFunction(stageFunctionAnnotation, dataNameTypeMap, method, bean);
 
-    if (name != null)
-      stageRunnerFactory.namedStageFunction(name, stageEnum, order, description, function);
-    else
-      stageRunnerFactory.addStageFunction(stageEnum, order, description, function);
+      if (logger.isDebugEnabled())
+      {
+        logger.debug("add stage function" + (name == null ? "" : " '" + name + "'") + ", stage " +
+            stageEnum + '#' + order + ((description == null) ? "" : ", description '" + description + "'") +
+            ": " + function);
+      }
+
+      if (name != null)
+        stageRunnerFactory.namedStageFunction(name, stageEnum, order, description, function);
+      else
+        stageRunnerFactory.addStageFunction(stageEnum, order, description, function);
+    }
   }
 
 
   @Override
   public void postProcessBeanDefinitionRegistry(@NotNull BeanDefinitionRegistry beanDefinitionRegistry)
   {
-    var bd = new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
+    var bean = new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
 
-    bd.setTargetType(ResolvableType.forClass(stageRunnerInterfaceType));
-    bd.setLazyInit(false);
-    bd.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.getStageType().getName());
+    bean.setTargetType(ResolvableType.forClass(stageRunnerInterfaceType));
+    bean.setLazyInit(true);
+    bean.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.getStageType().getName());
+    bean.setPrimary(true);
 
     if (logger.isDebugEnabled())
       logger.trace("register singleton bean: " + stageRunnerInterfaceType.getName());
 
-    beanDefinitionRegistry.registerBeanDefinition(stageRunnerInterfaceType.getName(), bd);
+    beanDefinitionRegistry.registerBeanDefinition(stageRunnerInterfaceType.getName(), bean);
   }
 
 
@@ -296,12 +310,19 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder) {
+  public void setStageRunnerProxyBuilder(StageRunnerProxyBuilder stageRunnerProxyBuilder) {
     this.stageRunnerProxyBuilder = stageRunnerProxyBuilder;
   }
 
 
-  public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder) {
+  public void setStageFunctionBuilder(StageFunctionBuilder stageFunctionBuilder) {
     this.stageFunctionBuilder = stageFunctionBuilder;
+  }
+
+
+  public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter)
+  {
+    Assert.notNull(stageFunctionFilter, "stageFunctionFilter must not be null");
+    this.stageFunctionFilter = stageFunctionFilter;
   }
 }
