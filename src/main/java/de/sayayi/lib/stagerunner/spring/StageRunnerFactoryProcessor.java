@@ -70,17 +70,16 @@ public class StageRunnerFactoryProcessor<R>
   protected final StageFunctionAnnotation stageFunctionAnnotation;
   protected final DefaultStageRunnerFactory stageRunnerFactory;
   protected final Method stageRunnerInterfaceMethod;
-  private final String[] dataNames;
-  private final Map<String,ResolvableType> dataNameTypeMap;
+  protected final String[] dataNames;
+  protected final Map<String,ResolvableType> dataNameTypeMap;
 
-  private BeanFactory beanFactory;
+  protected BeanFactory beanFactory;
 
-  private StageRunnerProxyBuilder stageRunnerProxyBuilder;
-  private StageFunctionBuilder stageFunctionBuilder;
+  protected StageRunnerProxyBuilder stageRunnerProxyBuilder;
+  protected StageFunctionBuilder stageFunctionBuilder;
 
-  private StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
+  protected StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
     @Override
-    @Contract(pure = true)
     public <B,S extends Enum<S>> boolean filter(@NotNull B bean, @NotNull S stage, int order, String name) {
       return true;
     }
@@ -135,9 +134,9 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @Contract(pure = true)
-  private @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
-                                                  @Nullable String[] parameterNames,
-                                                  int p)
+  protected @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
+                                                    @Nullable String[] parameterNames,
+                                                    int p)
   {
     var parameterName = dataAnnotation != null ? dataAnnotation.name() : "";
     if (parameterName.isEmpty() && parameterNames != null)
@@ -146,7 +145,7 @@ public class StageRunnerFactoryProcessor<R>
     if (parameterName == null || parameterName.isEmpty())
     {
       throw new StageRunnerException("unable to detect data name for parameter " + (p + 1) +
-          " in stage runner function " + stageRunnerInterfaceMethod);
+          " in stage runner function " + stageRunnerInterfaceMethod + "; please specify @Data");
     }
 
     return parameterName;
@@ -198,7 +197,7 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  private void analyseStageFunctions(@NotNull Object bean)
+  protected void analyseStageFunctions(@NotNull Object bean)
   {
     var annotationType = stageFunctionAnnotation.getAnnotationType();
 
@@ -214,9 +213,9 @@ public class StageRunnerFactoryProcessor<R>
 
 
   @SuppressWarnings("unchecked")
-  private void registerStageFunction(@NotNull AnnotationAttributes stageFunctionAnnotationAttributes,
-                                     @NotNull Method method,
-                                     @NotNull Object bean)
+  protected void registerStageFunction(@NotNull AnnotationAttributes stageFunctionAnnotationAttributes,
+                                       @NotNull Method method,
+                                       @NotNull Object bean)
   {
     var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
     var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
@@ -262,7 +261,7 @@ public class StageRunnerFactoryProcessor<R>
 
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
-  private <S extends Enum<S>> @NotNull R createStageRunnerProxy()
+  protected <S extends Enum<S>> @NotNull R createStageRunnerProxy()
   {
     logger.trace("create singleton stage runner proxy bean");
 
@@ -310,12 +309,16 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
-  public void setStageRunnerProxyBuilder(StageRunnerProxyBuilder stageRunnerProxyBuilder) {
+  public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder)
+  {
+    Assert.notNull(stageRunnerProxyBuilder, "stageRunnerProxyBuilder must not be null");
     this.stageRunnerProxyBuilder = stageRunnerProxyBuilder;
   }
 
 
-  public void setStageFunctionBuilder(StageFunctionBuilder stageFunctionBuilder) {
+  public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder)
+  {
+    Assert.notNull(stageFunctionBuilder, "stageFunctionBuilder must not be null");
     this.stageFunctionBuilder = stageFunctionBuilder;
   }
 
