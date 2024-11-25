@@ -16,4 +16,7 @@ module de.sayayi.lib.stagerunner {
   exports de.sayayi.lib.stagerunner.spi;
   exports de.sayayi.lib.stagerunner.spring;
   exports de.sayayi.lib.stagerunner.spring.annotation;
+
+  // provide access to Spring
+  opens de.sayayi.lib.stagerunner.spring to spring.core;
 }
