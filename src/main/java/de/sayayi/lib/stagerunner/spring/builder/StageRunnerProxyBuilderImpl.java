@@ -58,6 +58,8 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
  */
 public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implements StageRunnerProxyBuilder
 {
+  private static final String FACTORY_FIELD_NAME = "factory";
+
   private final boolean copyInterfaceMethodAnnotations;
 
 
@@ -85,8 +87,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           .subclass(stageRunnerInterfaceType, NO_CONSTRUCTORS)
           .implement(parameterizedType(FactoryAccessor.class, stageType))
           .name(proxyClassName)
-          .modifiers(PUBLIC)
-          .defineField("factory", stageRunnerFactoryType, PRIVATE, FINAL)
+          .defineField(FACTORY_FIELD_NAME, stageRunnerFactoryType, PRIVATE, FINAL)
           .defineConstructor(PUBLIC)
               .withParameters(stageRunnerFactoryType)
               .intercept(new ProxyConstructorImplementation())
@@ -94,7 +95,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
               .intercept(new ProxyMethodImplementation(method, dataNames))
               .annotateMethod(copyInterfaceMethodAnnotations ? method.getDeclaredAnnotations() : List.of())
           .method(named("getStageRunnerFactory"))
-              .intercept(FieldAccessor.ofField("factory"))
+              .intercept(FieldAccessor.ofField(FACTORY_FIELD_NAME))
           .method(isToString())
               .intercept(FixedValue.value("Proxy implementation for interface " + stageRunnerInterfaceType.getName()))
           .make()
@@ -127,7 +128,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
               .forField(target
                   .getInstrumentedType()
                   .getDeclaredFields()
-                  .filter(named("factory"))
+                  .filter(named(FACTORY_FIELD_NAME))
                   .getOnly())
               .write(),
           // return
@@ -162,7 +163,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           .forField(target
               .getInstrumentedType()
               .getDeclaredFields()
-              .filter(named("factory"))
+              .filter(named(FACTORY_FIELD_NAME))
               .getOnly())
           .read());
       stackManipulations.add(MethodInvocation.invoke(
