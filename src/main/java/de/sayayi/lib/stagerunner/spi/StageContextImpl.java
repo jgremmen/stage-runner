@@ -166,7 +166,6 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
               " and order " + stageFunction.order + " for stage function '" + name + '\'');
         }
 
-        stageFunctionEntry.setValue(null);
         enabledFunctions.add(name);
         enabledStageFunctionNames.add(name);
       }
