@@ -18,6 +18,7 @@ package de.sayayi.lib.stagerunner.spring.builder;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.scaffold.InstrumentedType;
 import net.bytebuddy.implementation.Implementation;
+import net.bytebuddy.utility.RandomString;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -30,6 +31,9 @@ import java.lang.reflect.Type;
  */
 abstract class AbstractBuilder
 {
+  protected final RandomString randomString = new RandomString(5);
+
+
   @Contract(pure = true)
   protected static @NotNull TypeDescription typeDescription(@NotNull Class<?> type) {
     return TypeDescription.ForLoadedType.of(type);

@@ -19,14 +19,14 @@ import de.sayayi.lib.stagerunner.StageRunner;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.spring.FactoryAccessor;
 import de.sayayi.lib.stagerunner.spring.StageRunnerProxyBuilder;
 import net.bytebuddy.ByteBuddy;
-import net.bytebuddy.NamingStrategy;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.method.MethodDescription.SignatureToken;
 import net.bytebuddy.description.method.ParameterDescription;
-import net.bytebuddy.description.modifier.FieldManifestation;
 import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.bytecode.*;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
@@ -44,9 +44,10 @@ import java.util.*;
 import java.util.stream.Stream;
 
 import static net.bytebuddy.description.method.MethodDescription.CONSTRUCTOR_INTERNAL_NAME;
-import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
+import static net.bytebuddy.description.modifier.FieldManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
+import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.Default.INJECTION;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
@@ -57,6 +58,8 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
  */
 public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implements StageRunnerProxyBuilder
 {
+  private static final String FACTORY_FIELD_NAME = "factory";
+
   private final boolean copyInterfaceMethodAnnotations;
 
 
@@ -74,24 +77,29 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
   {
     var stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
     var method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
+    var proxyClassName = stageRunnerInterfaceType.getName() +
+        '$' + stageType.getSimpleName() +
+        '$' + randomString.nextString();
 
     try {
       //noinspection resource
       return new ByteBuddy()
-          .with(new NamingStrategy.SuffixingRandom(stageType.getSimpleName()))
           .subclass(stageRunnerInterfaceType, NO_CONSTRUCTORS)
-          .modifiers(copyInterfaceMethodAnnotations ? Set.of(PUBLIC) : Set.of(PUBLIC, FINAL))
-          .defineField("factory", stageRunnerFactoryType, PRIVATE, FieldManifestation.FINAL)
+          .implement(parameterizedType(FactoryAccessor.class, stageType))
+          .name(proxyClassName)
+          .defineField(FACTORY_FIELD_NAME, stageRunnerFactoryType, PRIVATE, FINAL)
           .defineConstructor(PUBLIC)
               .withParameters(stageRunnerFactoryType)
               .intercept(new ProxyConstructorImplementation())
           .define(stageRunnerInterfaceMethod)
               .intercept(new ProxyMethodImplementation(method, dataNames))
               .annotateMethod(copyInterfaceMethodAnnotations ? method.getDeclaredAnnotations() : List.of())
+          .method(named("getStageRunnerFactory"))
+              .intercept(FieldAccessor.ofField(FACTORY_FIELD_NAME))
           .method(isToString())
               .intercept(FixedValue.value("Proxy implementation for interface " + stageRunnerInterfaceType.getName()))
           .make()
-          .load(stageRunnerInterfaceType.getClassLoader())
+          .load(stageRunnerInterfaceType.getClassLoader(), INJECTION)
           .getLoaded()
           .getDeclaredConstructor(StageRunnerFactory.class)
           .newInstance(stageRunnerFactory);
@@ -120,7 +128,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
               .forField(target
                   .getInstrumentedType()
                   .getDeclaredFields()
-                  .filter(named("factory"))
+                  .filter(named(FACTORY_FIELD_NAME))
                   .getOnly())
               .write(),
           // return
@@ -155,7 +163,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           .forField(target
               .getInstrumentedType()
               .getDeclaredFields()
-              .filter(named("factory"))
+              .filter(named(FACTORY_FIELD_NAME))
               .getOnly())
           .read());
       stackManipulations.add(MethodInvocation.invoke(
