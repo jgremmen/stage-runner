@@ -351,6 +351,18 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * By default the stage function name is provided by the
+   * &#x40;{@link de.sayayi.lib.stagerunner.spring.annotation.StageDefinition.Name Name} annotation. Using a stage
+   * function name generator the name can be calculated dynamically.
+   * <p>
+   * If the name generator returns {@code null} the stage function will be added immediately to the stage runner
+   * factory.
+   *
+   * @param stageFunctionNameGenerator  stage function name generator, not {@code null}
+   *
+   * @since 0.3.2
+   */
   public void setStageFunctionNameGenerator(
       @NotNull BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator)
   {
