@@ -44,6 +44,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   private final Map<String,Object> data;
   private final Set<String> enabledStageFunctionNames;
 
+  private StageRunnerCallback<S> callback;
   private State state;
   private int functionIndex;
   private boolean aborted;
@@ -141,6 +142,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       abort();
       throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage + " and order " + order);
     }
+
+    if (callback != null)
+      callback.addStageFunctionCallback(stage, order, description);
   }
 
 
@@ -193,6 +197,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     state = RUNNING;
 
     try {
+      this.callback = callback;
+
       while(!aborted && ++functionIndex < functionArray.size)
       {
         var stageFunctionEntry = functionArray.functions[functionIndex];
@@ -226,7 +232,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         }
       }
     } finally {
-      state = aborted ? State.ABORTED : FINISHED;
+      this.callback = null;
+
+      state = aborted ? ABORTED : FINISHED;
 
       if (!aborted && lastStage != null)
       {

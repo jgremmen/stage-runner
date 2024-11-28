@@ -77,6 +77,19 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
 
   /**
+   * Callback method which is invoked when a new stage function is added during stage running.
+   *
+   * @param stage        current or future stage the function was added to, never {@code null}
+   * @param order        order of the stage function within {@code stage}, never {@code null}
+   * @param description  optional description of the function
+   *
+   * @since 0.3.4
+   */
+  default void addStageFunctionCallback(@NotNull S stage, int order, String description) {
+  }
+
+
+  /**
    * Exception handler which is invoked if the stage function currently being processed throws an exception.
    * <p>
    * The default implementation throws the exception wrapped inside a {@link StageRunnerException}.
