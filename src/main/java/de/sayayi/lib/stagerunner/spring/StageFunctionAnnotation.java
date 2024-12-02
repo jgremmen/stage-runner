@@ -208,7 +208,7 @@ public final class StageFunctionAnnotation
     if (!(o instanceof StageFunctionAnnotation))
       return false;
 
-    final StageFunctionAnnotation that = (StageFunctionAnnotation)o;
+    var that = (StageFunctionAnnotation)o;
 
     return
         annotationType == that.annotationType &&
@@ -223,7 +223,7 @@ public final class StageFunctionAnnotation
   @Override
   public int hashCode()
   {
-    int hash = (annotationType.hashCode() * 29 + stageType.hashCode()) * 29 + stageProperty.hashCode();
+    var hash = (annotationType.hashCode() * 29 + stageType.hashCode()) * 29 + stageProperty.hashCode();
 
     if (orderProperty != null)
       hash = hash * 29 + orderProperty.hashCode();
