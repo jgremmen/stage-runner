@@ -32,7 +32,7 @@ layout.buildDirectory = '.build'
 
 
 def springVersion = '[5.3,6.0)'
-def byteBuddyVersion = '[1.15,1.16)'
+def byteBuddyVersion = '[1.15,1.18)'
 
 
 tasks.withType(JavaCompile).configureEach {
@@ -89,7 +89,7 @@ dependencies {
   testAnnotationProcessor 'org.projectlombok:lombok:[1.18,1.19)'
   testCompileOnly 'org.projectlombok:lombok:[1.18,1.19)'
 
-  testImplementation 'org.junit.jupiter:junit-jupiter:[5.11,5.12)'
+  testImplementation 'org.junit.jupiter:junit-jupiter:[5.11,5.13)'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
   testImplementation "org.springframework:spring-test:${springVersion}"
@@ -137,8 +137,8 @@ javadoc.options.addStringOption('Xdoclint:none', '-quiet')
 
 
 testlogger {
-  theme 'mocha'
-  slowThreshold 2500
+  theme = 'mocha'
+  slowThreshold = 2500
 }
 
 
@@ -211,4 +211,9 @@ publishing {
 
 signing {
   sign publishing.publications.maven
+}
+
+
+wrapper {
+  distributionType = Wrapper.DistributionType.BIN
 }
