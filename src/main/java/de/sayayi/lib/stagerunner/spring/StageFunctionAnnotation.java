@@ -88,11 +88,8 @@ public final class StageFunctionAnnotation
 
 
   @Contract(pure = true)
-  public int getOrder(@NotNull AnnotationAttributes annotationAttributes)
-  {
-    return orderProperty == null
-        ? DEFAULT_ORDER
-        : annotationAttributes.getNumber(orderProperty).intValue();
+  public int getOrder(@NotNull AnnotationAttributes annotationAttributes) {
+    return orderProperty == null ? DEFAULT_ORDER : annotationAttributes.getNumber(orderProperty).intValue();
   }
 
 
@@ -127,8 +124,7 @@ public final class StageFunctionAnnotation
 
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
-  public static @NotNull StageFunctionAnnotation buildFrom(
-      @NotNull Class<? extends Annotation> stageFunctionAnnotation)
+  public static @NotNull StageFunctionAnnotation buildFrom(@NotNull Class<? extends Annotation> stageFunctionAnnotation)
   {
     Class<?> stageType = null;
     String stagePropertyName = null;
@@ -139,13 +135,14 @@ public final class StageFunctionAnnotation
     for(var method: stageFunctionAnnotation.getDeclaredMethods())
     {
       var propertyName = method.getName();
+      var returnType = method.getReturnType();
 
       if (method.isAnnotationPresent(StageDefinition.Name.class))
       {
         if (namePropertyName != null)
           throw new StageRunnerConfigurationException("Duplicate @Name annotation for " + method);
 
-        if (method.getReturnType() != String.class)
+        if (returnType != String.class)
           throw new StageRunnerConfigurationException("Stage function name is not a String for " + method);
 
         namePropertyName = propertyName;
@@ -156,7 +153,7 @@ public final class StageFunctionAnnotation
         if (stagePropertyName != null)
           throw new StageRunnerConfigurationException("Duplicate @Stage annotation for " + method);
 
-        if (!Enum.class.isAssignableFrom(stageType = method.getReturnType()) || stageType == Enum.class)
+        if (!Enum.class.isAssignableFrom(stageType = returnType) || stageType == Enum.class)
           throw new StageRunnerConfigurationException("Stage type is not an enum for " + method);
 
         stagePropertyName = propertyName;
@@ -167,9 +164,8 @@ public final class StageFunctionAnnotation
         if (orderPropertyName != null)
           throw new StageRunnerConfigurationException("Duplicate @Order annotation for " + method);
 
-        var orderType = method.getReturnType();
-        if (orderType != int.class && orderType != short.class)
-          throw new StageRunnerConfigurationException("Order type is not an int or short for " + method);
+        if (returnType != int.class)
+          throw new StageRunnerConfigurationException("Order type is not an int for " + method);
 
         orderPropertyName = propertyName;
       }
@@ -179,8 +175,7 @@ public final class StageFunctionAnnotation
         if (descriptionPropertyName != null)
           throw new StageRunnerConfigurationException("Duplicate @Description annotation for " + method);
 
-        var descriptionType = method.getReturnType();
-        if (descriptionType != String.class)
+        if (returnType != String.class)
           throw new StageRunnerConfigurationException("Description type is not a String for " + method);
 
         descriptionPropertyName = propertyName;

@@ -33,6 +33,7 @@ module de.sayayi.lib.stagerunner {
   exports de.sayayi.lib.stagerunner.spring;
   exports de.sayayi.lib.stagerunner.spring.annotation;
 
-  // provide access to Spring
+  // provide access
   opens de.sayayi.lib.stagerunner.spring to spring.core;
+  opens de.sayayi.lib.stagerunner.spring.builder to net.bytebuddy;
 }

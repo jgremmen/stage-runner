@@ -176,7 +176,7 @@ public class StageRunnerFactoryProcessor<R>
         try {
           conversionService = beanFactory.getBean(ConversionService.class);
         } catch(NoSuchBeanDefinitionException ex) {
-          logger.trace("could not find ConversionService bean - use default conversion service", ex);
+          logger.warn("could not find ConversionService bean - use default conversion service", ex);
           conversionService = DefaultConversionService.getSharedInstance();
         }
       }
@@ -238,9 +238,21 @@ public class StageRunnerFactoryProcessor<R>
 
       if (logger.isDebugEnabled())
       {
-        logger.debug("add stage function" + (name == null ? "" : " '" + name + "'") + ", stage " +
-            stageEnum + '#' + order + ((description == null) ? "" : ", description '" + description + "'") +
-            ": " + function);
+        var msg = new StringBuilder();
+
+        if (name == null)
+          msg.append("add stage function");
+        else
+          msg.append("register named stage function '").append(name).append("'");
+
+        msg.append(", stage {}").append(stageEnum).append('#').append(order);
+
+        if (description != null)
+          msg.append(", description '").append(description).append('\'');
+
+        msg.append(": ").append(function);
+
+        logger.debug(msg.toString());
       }
 
       if (name != null)
@@ -261,10 +273,11 @@ public class StageRunnerFactoryProcessor<R>
     bean.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.getStageType().getName());
     bean.setPrimary(true);
 
-    if (logger.isDebugEnabled())
-      logger.trace("register singleton bean: " + stageRunnerInterfaceType.getName());
+    var name = stageRunnerInterfaceType.getName();
 
-    beanDefinitionRegistry.registerBeanDefinition(stageRunnerInterfaceType.getName(), bean);
+    logger.trace("register singleton bean: " + name);
+
+    beanDefinitionRegistry.registerBeanDefinition(name, bean);
   }
 
 
@@ -352,7 +365,7 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * By default the stage function name is provided by the
+   * By default, the stage function name is provided by the
    * &#x40;{@link de.sayayi.lib.stagerunner.spring.annotation.StageDefinition.Name Name} annotation. Using a stage
    * function name generator the name can be calculated dynamically.
    * <p>

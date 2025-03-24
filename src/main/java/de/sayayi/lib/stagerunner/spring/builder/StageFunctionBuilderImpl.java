@@ -617,25 +617,20 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     private @NotNull List<StackManipulation> castToParameterType(@NotNull TypeDescription.Generic methodParameterType,
                                                                  @NotNull String dataName)
     {
-      var stackManipulations = new ArrayList<StackManipulation>();
+      if (!methodParameterType.isPrimitive())
+        return List.of(TypeCasting.to(methodParameterType));
 
-      if (methodParameterType.isPrimitive())
-      {
-        // checkNotNull(<value>, dataName)
-        stackManipulations.add(Duplication.SINGLE);
-        stackManipulations.add(MethodVariableAccess.loadThis());
-        stackManipulations.add(SWAP);
-        stackManipulations.add(new TextConstant(dataName));
-        stackManipulations.add(MethodInvocation.invoke(METHOD_STAGE_FUNCTION_CHECK_NOT_NULL));
+      return List.of(
+          // checkNotNull(<value>, dataName)
+          Duplication.SINGLE,
+          MethodVariableAccess.loadThis(),
+          SWAP,
+          new TextConstant(dataName),
+          MethodInvocation.invoke(METHOD_STAGE_FUNCTION_CHECK_NOT_NULL),
 
-        // cast -> primitive
-        stackManipulations.add(TypeCasting.to(methodParameterType.asErasure().asBoxed()));
-        stackManipulations.add(PrimitiveUnboxingDelegate.forPrimitive(methodParameterType));
-      }
-      else
-        stackManipulations.add(TypeCasting.to(methodParameterType));
-
-      return stackManipulations;
+          // cast -> primitive
+          TypeCasting.to(methodParameterType.asErasure().asBoxed()),
+          PrimitiveUnboxingDelegate.forPrimitive(methodParameterType));
     }
   }
 }
