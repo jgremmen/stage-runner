@@ -37,7 +37,7 @@ public @interface StageDef
   TestStage stage();
 
   @StageDefinition.Order
-  short priority() default StageContext.DEFAULT_ORDER;
+  int priority() default StageContext.DEFAULT_ORDER;
 
   @StageDefinition.Description
   String comment();
