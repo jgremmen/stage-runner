@@ -16,29 +16,26 @@
 
 plugins {
   id 'java-library'
-  id 'maven-publish'
-  id 'signing'
+  alias(libs.plugins.publish.on.central)
+  alias(libs.plugins.test.logger)
 }
-
-apply plugin: 'com.adarshr.test-logger'
-
-
-group = 'de.sayayi.lib'
-version = '0.3.4-SNAPSHOT'
-description = 'Stage Runner Framework'
 
 
 layout.buildDirectory = '.build'
 
 
-def springVersion = '[5.3,6.0)'
-def byteBuddyVersion = '[1.15,1.18)'
+group = 'de.sayayi.lib'
+version = libs.versions.stage.runner.get()
+description = 'Stage Runner Framework'
 
 
 tasks.withType(JavaCompile).configureEach {
   javaCompiler = javaToolchains.compilerFor {
-    languageVersion = JavaLanguageVersion.of(11)
+    languageVersion = JavaLanguageVersion.of(21)
   }
+
+  sourceCompatibility = 21
+  targetCompatibility = 21
 
   options.encoding = 'UTF-8'
 }
@@ -46,53 +43,38 @@ tasks.withType(JavaCompile).configureEach {
 
 tasks.withType(Test).configureEach {
   javaLauncher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(11)
+    languageVersion = JavaLanguageVersion.of(21)
   }
 
   defaultCharacterEncoding = 'UTF-8'
 }
 
 
-compileJava {
-  sourceCompatibility = 11
-  targetCompatibility = 11
+compileTestJava {
+  options.compilerArgs.add '-parameters'
+}
+
+
+repositories {
+  maven {
+    url = 'https://central.sonatype.com/repository/maven-snapshots/'
+    mavenContent {
+      includeGroup 'de.sayayi.lib'
+      snapshotsOnly()
+    }
+  }
+
+  mavenCentral()
 }
 
 
 java {
   withJavadocJar()
   withSourcesJar()
-}
 
-
-repositories {
-  mavenCentral()
-}
-
-
-java {
   registerFeature('optional') {
     usingSourceSet sourceSets.main
   }
-}
-
-
-dependencies {
-  // java
-  compileOnlyApi 'org.jetbrains:annotations:[26.0,26.1)'
-
-  optionalImplementation "org.springframework:spring-context:${springVersion}"
-  optionalImplementation "net.bytebuddy:byte-buddy:${byteBuddyVersion}"
-
-
-  // test
-  testAnnotationProcessor 'org.projectlombok:lombok:[1.18,1.19)'
-  testCompileOnly 'org.projectlombok:lombok:[1.18,1.19)'
-
-  testImplementation 'org.junit.jupiter:junit-jupiter:[5.11,5.13)'
-  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-  testImplementation "org.springframework:spring-test:${springVersion}"
 }
 
 
@@ -101,10 +83,23 @@ test {
 }
 
 
-compileTestJava.options.compilerArgs.add '-parameters'
+dependencies {
+  // java
+  compileOnlyApi libs.jetbrains.annotations
+
+  optionalImplementation libs.spring.context
+  optionalImplementation libs.byte.buddy
 
 
-jar.dependsOn test
+  // test
+  testAnnotationProcessor libs.lombok
+  testCompileOnly libs.lombok
+
+  testImplementation libs.junit.jupiter
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+  testImplementation libs.spring.test
+}
 
 
 tasks.withType(Jar).configureEach {
@@ -130,6 +125,8 @@ tasks.withType(Jar).configureEach {
         copyright: new Date().format('yyyy'),
         version: project.version)
   }
+
+  dependsOn test
 }
 
 
@@ -143,52 +140,49 @@ testlogger {
 
 
 def snapshot = version.toString().endsWith('-SNAPSHOT')
-def tmpRepositoryDirectory = rootProject.layout.buildDirectory
-    .dir('repository').get()
-    .dir(snapshot ? 'snapshot' : 'release')
-    .asFile
+if (snapshot)
+{
+  publishing {
+    repositories {
+      maven {
+        name = 'mavenCentralSnapshot'
+        url = 'https://central.sonatype.com/repository/maven-snapshots/'
 
-publishing {
-  repositories {
-    maven {
-      name = 'mavenTemp'
-      url = tmpRepositoryDirectory
-    }
+        mavenContent {
+          snapshotsOnly()
+        }
 
-    maven {
-      name = 'mavenCentral'
-      url = snapshot
-          ? 'https://oss.sonatype.org/content/repositories/snapshots'
-          : 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
-
-      credentials {
-        username = rootProject.findProperty('mavenCentral.username')
-        password = rootProject.findProperty('mavenCentral.password')
+        credentials {
+          username = rootProject.findProperty('mavenCentralPortalUsername')
+          password = rootProject.findProperty('mavenCentralPortalPassword')
+        }
       }
     }
   }
+}
 
+
+publishOnCentral {
+  repoOwner = 'jgremmen'
+
+  afterEvaluate {
+    projectLongName = "${project.description}"
+  }
+  projectDescription = 'Stage Runner Framework'
+
+  licenseName = 'Apache License, Version 2.0'
+  licenseUrl = 'https://www.apache.org/licenses/LICENSE-2.0'
+}
+
+
+publishing {
   publications {
-
-    maven(MavenPublication) {
+    withType(MavenPublication).configureEach {
       suppressPomMetadataWarningsFor 'optionalApiElements'
       suppressPomMetadataWarningsFor 'optionalRuntimeElements'
 
-      from components.java
-
       pom {
-        name = 'Stage Runner Library'
-        description = 'Stage Runner'
-        url = 'https://github.com/jgremmen/stage-runner'
         inceptionYear = '2024'
-
-        licenses {
-          license {
-            name = 'Apache License, Version 2.0'
-            url = 'https://www.apache.org/licenses/LICENSE-2.0'
-            distribution = 'repo'
-          }
-        }
 
         developers {
           developer {
@@ -197,20 +191,32 @@ publishing {
             email = 'jeroen.gremmen@sayayi.de'
           }
         }
-
-        scm {
-          connection = 'scm:git:git://github.com/jgremmen/stage-runner.git'
-          developerConnection = 'scm:git:git://github.com/jgremmen/stage-runner.git'
-          url = 'https://github.com/jgremmen/stage-runner'
-        }
       }
     }
   }
 }
 
 
-signing {
-  sign publishing.publications.maven
+tasks.register('release') {
+  group = 'release'
+  description = "Release ${project.name} ${snapshot ? 'snapshot ' : ''}artifacts to Maven Central Repository."
+
+  inputs.property('snapshot', snapshot)
+
+  if (snapshot)
+    dependsOn ':message-format:publishOSSRHPublicationToMavenCentralSnapshotRepository'
+  else
+  {
+    dependsOn 'publishOSSRHPublicationToProjectLocalRepository'
+    dependsOn 'zipMavenCentralPortalPublication'
+    dependsOn 'validateMavenCentralPortalPublication'
+    dependsOn 'releaseMavenCentralPortalPublication'
+  }
+}
+
+
+clean {
+  delete layout.projectDirectory.dir('build')
 }
 
 
