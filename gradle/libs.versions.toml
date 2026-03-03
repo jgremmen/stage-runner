@@ -3,7 +3,7 @@
 stage-runner = '0.3.4-SNAPSHOT'
 
 byte-buddy = '[1.15,1.19)'
-jetbrains-annotations = '[26.0,26.1)'
+jetbrains-annotations = '[26.0,26.2)'
 junit = '[5.13,6.1)'
 lombok =  '[1.18,1.19)'
 spring = '[5.3,6.3)'
