@@ -200,10 +200,9 @@ public final class StageFunctionAnnotation
   {
     if (this == o)
       return true;
-    if (!(o instanceof StageFunctionAnnotation))
-      return false;
 
-    var that = (StageFunctionAnnotation)o;
+    if (!(o instanceof StageFunctionAnnotation that))
+      return false;
 
     return
         annotationType == that.annotationType &&

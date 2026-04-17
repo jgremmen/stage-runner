@@ -344,10 +344,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     {
       if (this == o)
         return true;
-      if (!(o instanceof NameWithQualifierAndType))
-        return false;
 
-      var that = (NameWithQualifierAndType)o;
+      if (!(o instanceof NameWithQualifierAndType that))
+        return false;
 
       return
           qualifier == that.qualifier &&
@@ -397,10 +396,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     {
       if (this == o)
         return true;
-      if (!(o instanceof NameWithQualifier))
-        return false;
 
-      var that = (NameWithQualifier)o;
+      if (!(o instanceof NameWithQualifier that))
+        return false;
 
       return qualifier == that.qualifier && name.equals(that.name);
     }
@@ -430,39 +428,30 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  private record CacheKey(MethodDescription method, @NotNull NameWithQualifierAndType[] parameters) {
+      private CacheKey(@NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters) {
+        this.method = method;
+        this.parameters = parameters;
+      }
 
 
-  private static final class CacheKey
-  {
-    private final @NotNull MethodDescription method;
-    private final @NotNull NameWithQualifierAndType[] parameters;
+      @Override
+      @SuppressWarnings({"EqualsWhichDoesntCheckParameterClass", "EqualsDoesntCheckParameterClass"})
+      public boolean equals(Object o) {
+        if (this == o)
+          return true;
+
+        var that = (CacheKey) o;
+
+        return method.equals(that.method) && Arrays.equals(parameters, that.parameters);
+      }
 
 
-    private CacheKey(@NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters)
-    {
-      this.method = method;
-      this.parameters = parameters;
+      @Override
+      public int hashCode() {
+        return method.hashCode() * 31 + Arrays.hashCode(parameters);
+      }
     }
-
-
-    @Override
-    @SuppressWarnings({"EqualsWhichDoesntCheckParameterClass", "EqualsDoesntCheckParameterClass"})
-    public boolean equals(Object o)
-    {
-      if (this == o)
-        return true;
-
-      var that = (CacheKey)o;
-
-      return method.equals(that.method) && Arrays.equals(parameters, that.parameters);
-    }
-
-
-    @Override
-    public int hashCode() {
-      return method.hashCode() * 31 + Arrays.hashCode(parameters);
-    }
-  }
 
 
 

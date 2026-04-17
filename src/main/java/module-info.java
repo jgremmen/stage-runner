@@ -36,4 +36,5 @@ module de.sayayi.lib.stagerunner {
   // provide access
   opens de.sayayi.lib.stagerunner.spring to spring.core;
   opens de.sayayi.lib.stagerunner.spring.builder to net.bytebuddy;
+
 }
