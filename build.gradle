@@ -71,10 +71,19 @@ repositories {
 java {
   withJavadocJar()
   withSourcesJar()
+}
 
-  registerFeature('optional') {
-    usingSourceSet sourceSets.main
+
+configurations {
+  optionalImplementation {
+    canBeConsumed = false
+    canBeResolved = false
   }
+
+  compileClasspath.extendsFrom optionalImplementation
+  runtimeClasspath.extendsFrom optionalImplementation
+  testCompileClasspath.extendsFrom optionalImplementation
+  testRuntimeClasspath.extendsFrom optionalImplementation
 }
 
 
@@ -178,9 +187,6 @@ publishOnCentral {
 publishing {
   publications {
     withType(MavenPublication).configureEach {
-      suppressPomMetadataWarningsFor 'optionalApiElements'
-      suppressPomMetadataWarningsFor 'optionalRuntimeElements'
-
       pom {
         inceptionYear = '2024'
 
@@ -189,6 +195,19 @@ publishing {
             id = 'jgremmen'
             name = 'Jeroen Gremmen'
             email = 'jeroen.gremmen@sayayi.de'
+          }
+        }
+
+        withXml {
+          def dependenciesNode = asNode()['dependencies'][0]
+
+          configurations.optionalImplementation.allDependencies.each { dep ->
+            def node = dependenciesNode.appendNode('dependency')
+
+            node.appendNode('groupId', dep.group)
+            node.appendNode('artifactId', dep.name)
+            node.appendNode('version', dep.version)
+            node.appendNode('optional', 'true')
           }
         }
       }
