@@ -206,18 +206,18 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  @SuppressWarnings("DataFlowIssue")
   protected void analyseStageFunctions(@NotNull Object bean)
   {
     var annotationType = stageFunctionAnnotation.getAnnotationType();
 
     for(var method: ultimateTargetClass(bean).getMethods())
-    {
-      var stageFunctionAnnotationAttributes =
-          findMergedAnnotationAttributes(method, annotationType, false, false);
-
-      if (stageFunctionAnnotationAttributes != null)
-        registerStageFunction(stageFunctionAnnotationAttributes, method, bean);
-    }
+      if (method.isAnnotationPresent(annotationType))
+      {
+        registerStageFunction(
+            findMergedAnnotationAttributes(method, annotationType, false, false),
+            method, bean);
+      }
   }
 
 
