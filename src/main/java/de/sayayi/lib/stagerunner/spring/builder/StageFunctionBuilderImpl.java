@@ -27,6 +27,7 @@ import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.modifier.MethodManifestation;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.implementation.FixedValue;
+import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.bytecode.ByteCodeAppender;
 import net.bytebuddy.implementation.bytecode.Duplication;
 import net.bytebuddy.implementation.bytecode.Removal;
@@ -67,6 +68,15 @@ import static org.springframework.util.StringUtils.hasLength;
 
 
 /**
+ * Default {@link StageFunctionBuilder} implementation that adapts a Spring managed bean method annotated with a
+ * stage function annotation into an executable {@link StageFunction}.
+ * <p>
+ * For every unique combination of target method and parameter binding a dedicated {@link StageFunction} class is
+ * generated at runtime using ByteBuddy and cached. Method parameters are matched to entries of the stage runner
+ * data map by name (either through a {@link Data @Data} annotation or the parameter name) or by type. Parameters
+ * that require type conversion are handled by an {@link AbstractStageFunctionWithConversion} subclass and a
+ * configurable {@link ConversionService}.
+ *
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
@@ -76,6 +86,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   private final Map<CacheKey,Class<? extends StageFunction<?>>> stageFunctionClassCache;
 
 
+  /**
+   * Creates a new stage function builder.
+   *
+   * @param conversionService  conversion service used to convert data map values into method parameter types,
+   *                           not {@code null}
+   */
   public StageFunctionBuilderImpl(@NotNull ConversionService conversionService)
   {
     this.conversionService = conversionService;
@@ -122,6 +138,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Builds a stage function instance for a method whose parameters do not require any value conversion. The
+   * generated class extends {@link AbstractStageFunction}.
+   */
   private @NotNull <S extends Enum<S>> StageFunction<S> buildForNoConversion(
       Object bean, @NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters,
       @NotNull StageFunctionAnnotation stageFunctionAnnotation) throws ReflectiveOperationException
@@ -136,6 +156,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Builds a stage function instance for a method that has at least one parameter which requires value conversion
+   * through the configured {@link ConversionService}. The generated class extends
+   * {@link AbstractStageFunctionWithConversion}.
+   */
   private @NotNull <S extends Enum<S>> StageFunction<S> buildForWithConversion(
       Object bean,
       @NotNull MethodDescription method,
@@ -155,6 +180,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Returns the generated stage function class for the given method and parameter binding, either from the cache or
+   * by building a fresh class through {@link #buildStageFunctionClass}.
+   */
   @SuppressWarnings("unchecked")
   private @NotNull <S extends Enum<S>> Class<? extends StageFunction<S>> createStageFunctionType(
       @NotNull TypeDescription.Generic superType,
@@ -169,6 +198,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Generates a new {@link StageFunction} class as a subclass of {@code superType} that invokes {@code method} on
+   * its bean with the values obtained from the stage context data map.
+   */
   @SuppressWarnings({"unchecked", "resource"})
   private @NotNull Class<? extends StageFunction<?>> buildStageFunctionClass(
       @NotNull TypeDescription.Generic superType,
@@ -197,6 +230,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Resolves the data name and type qualifier for {@code parameter}. Resolution is first attempted by name (through
+   * {@link Data @Data} or the parameter name) and falls back to matching by type.
+   *
+   * @throws StageRunnerConfigurationException  if no matching data map entry can be determined
+   */
   @Contract(pure = true)
   private @NotNull NameWithQualifier findNameWithQualifier(@NotNull Parameter parameter,
                                                            @NotNull TypeDescriptor parameterType,
@@ -216,6 +255,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Resolves the data name and type qualifier for {@code parameter} by matching a {@link Data @Data} annotation or
+   * the parameter name against {@code dataNameTypeMap}. Returns {@code null} when no name based match exists.
+   */
   @Contract(pure = true)
   private NameWithQualifier findNameWithQualifierByParameterName(@NotNull Parameter parameter,
                                                                  @NotNull TypeDescriptor parameterType,
@@ -244,6 +287,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Resolves the data name and type qualifier for {@code parameter} by matching all data map entries against the
+   * parameter type. When multiple equally strong matches exist the resolution is considered ambiguous.
+   *
+   * @throws StageRunnerConfigurationException  if more than one data map entry qualifies with the same qualifier
+   */
   @Contract(pure = true)
   private NameWithQualifier findNameWithQualifierByParameterType(@NotNull Parameter parameter,
                                                                  @NotNull TypeDescriptor parameterType,
@@ -284,6 +333,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Determines how a data map value of type {@code dataType} can be supplied for a method parameter of
+   * {@code parameterType}. Returns {@code null} when the value cannot be assigned or converted.
+   *
+   * @return  the {@link TypeQualifier} describing the match strength, or {@code null} when there is no match
+   */
   @Contract(pure = true)
   private TypeQualifier qualifyParameterType(@NotNull TypeDescriptor parameterType,
                                              @NotNull ResolvableType dataType)
@@ -306,6 +361,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   }
 
 
+  /**
+   * Variant of {@link #qualifyParameterType} that throws an {@link IllegalStateException} instead of returning
+   * {@code null} when the parameter type cannot be supplied from a value of {@code dataType}.
+   */
   @Contract(pure = true)
   private @NotNull TypeQualifier qualifyParameterTypeOrFail(@NotNull TypeDescriptor parameterType,
                                                             @NotNull ResolvableType dataType)
@@ -320,6 +379,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
 
+  /**
+   * A {@link NameWithQualifier} enriched with the resolved Spring {@link TypeDescriptor} of the associated method
+   * parameter. The type descriptor is used when a conversion is required at invocation time.
+   */
   private static class NameWithQualifierAndType extends NameWithQualifier
   {
     final @NotNull TypeDescriptor type;
@@ -333,6 +396,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     }
 
 
+    /**
+     * Indicates whether the value bound to this parameter needs to be converted through the
+     * {@link ConversionService} before it can be passed to the target method.
+     */
     @Contract(pure = true)
     public boolean isConvertableQualifier() {
       return qualifier == TypeQualifier.CONVERTABLE;
@@ -370,6 +437,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
 
+  /**
+   * Pairing of a data map key ({@code name}) with the {@link TypeQualifier} describing how the associated data
+   * value can be supplied to a method parameter. Instances have a natural order that favours stronger qualifiers
+   * so that the best match can be picked when several candidates exist.
+   */
   private static class NameWithQualifier implements Comparable<NameWithQualifier>
   {
     final @NotNull String name;
@@ -419,45 +491,46 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
 
+  /**
+   * Describes how a data map value fits a method parameter. The declaration order also reflects the match strength:
+   * an earlier constant is a stronger match than a later one.
+   */
   public enum TypeQualifier
   {
+    /** The parameter type and the data value type are identical. */
     IDENTICAL,
+    /** The data value type is assignable to the parameter type without conversion. */
     ASSIGNABLE,
+    /** The data value can be converted into the parameter type through the {@link ConversionService}. */
     CONVERTABLE,
+    /** The parameter is declared as {@link Object} and therefore accepts any data value. */
     ANYTHING
   }
 
 
-  private record CacheKey(MethodDescription method, @NotNull NameWithQualifierAndType[] parameters) {
-      private CacheKey(@NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters) {
-        this.method = method;
-        this.parameters = parameters;
-      }
 
 
-      @Override
-      @SuppressWarnings({"EqualsWhichDoesntCheckParameterClass", "EqualsDoesntCheckParameterClass"})
-      public boolean equals(Object o) {
-        if (this == o)
-          return true;
-
-        var that = (CacheKey) o;
-
-        return method.equals(that.method) && Arrays.equals(parameters, that.parameters);
-      }
-
-
-      @Override
-      public int hashCode() {
-        return method.hashCode() * 31 + Arrays.hashCode(parameters);
-      }
-    }
+  /**
+   * Cache key that identifies a generated stage function class by the target method and its parameter binding.
+   *
+   * @param method      the target method
+   * @param parameters  the resolved parameter bindings, not {@code null}
+   */
+  private record CacheKey(@NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters) {
+  }
 
 
 
 
+  /**
+   * Base class for generated {@link StageFunction} implementations. It holds the target bean instance on which the
+   * annotated method is invoked and provides a small helper for runtime null checks on primitive parameters.
+   *
+   * @param <S>  stage enumeration type
+   */
   public static abstract class AbstractStageFunction<S extends Enum<S>> implements StageFunction<S>
   {
+    /** Target bean on which the annotated method is invoked, or {@code null} for static methods. */
     protected final Object bean;
 
 
@@ -466,6 +539,15 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     }
 
 
+    /**
+     * Ensures that {@code value} is not {@code null}. Used by the generated bytecode before unboxing a primitive
+     * method parameter.
+     *
+     * @param value     the data value to check
+     * @param dataName  the data map key, used for the error message
+     *
+     * @throws StageRunnerException  if {@code value} is {@code null}
+     */
     @Contract("null, _ -> fail")
     @SuppressWarnings("unused")
     protected void checkNotNull(Object value, @NotNull String dataName)
@@ -478,6 +560,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
 
+  /**
+   * Base class for generated {@link StageFunction} implementations whose target method has one or more parameters
+   * that require value conversion. It carries the {@link ConversionService} and the per parameter target types.
+   *
+   * @param <S>  stage enumeration type
+   */
   public static abstract class AbstractStageFunctionWithConversion<S extends Enum<S>> extends AbstractStageFunction<S>
   {
     private final @NotNull ConversionService conversionService;
@@ -495,6 +583,14 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     }
 
 
+    /**
+     * Converts {@code value} to the target type registered for parameter index {@code p}.
+     *
+     * @param value  the data value to convert, may be {@code null}
+     * @param p      the parameter index
+     *
+     * @return  the converted value
+     */
     @SuppressWarnings("unused")
     protected Object convert(Object value, int p) {
       return conversionService.convert(value, TypeDescriptor.forObject(value), targetTypes[p]);
@@ -504,6 +600,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
 
+  /**
+   * ByteBuddy {@link Implementation} for the generated {@code process(StageContext)} method. It loads each parameter
+   * value from the stage context data map (or the context itself for the special {@code $context} binding), applies
+   * a conversion where needed and finally invokes the target method on the stored bean.
+   */
   private static final class ProcessMethodImplementation extends AbstractImplementation
   {
     private static final FieldAccess.Defined FIELD_ACCESS_BEAN = FieldAccess
@@ -553,8 +654,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     @Override
     public @NotNull ByteCodeAppender appender(@NotNull Target target)
     {
-      var stackManipulations = new ArrayList<StackManipulation>();
-      var methodParameters = method.getParameters();
+      final var stackManipulations = new ArrayList<StackManipulation>();
+      final var methodParameters = method.getParameters();
 
       if (!method.isStatic())
       {
@@ -565,8 +666,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
       for(int p = 0; p < parameters.length; p++)
       {
-        var parameter = parameters[p];
-        var dataName = parameter.name;
+        final var parameter = parameters[p];
+        final var dataName = parameter.name;
 
         if ("$context".equals(dataName))
           stackManipulations.add(MethodVariableAccess.REFERENCE.loadFrom(1));
@@ -602,6 +703,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     }
 
 
+    /**
+     * Returns the stack manipulations required to load a value onto the operand stack that matches
+     * {@code methodParameterType}. For primitive parameters the value is null-checked and unboxed.
+     */
     @Contract(pure = true)
     private @NotNull List<StackManipulation> castToParameterType(@NotNull TypeDescription.Generic methodParameterType,
                                                                  @NotNull String dataName)

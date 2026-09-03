@@ -26,20 +26,40 @@ import java.lang.reflect.Type;
 
 
 /**
+ * Common base class for the ByteBuddy based builders in this package. It provides a shared random string generator
+ * for producing unique generated class names as well as small helpers for describing loaded and parameterized types.
+ *
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
 abstract class AbstractBuilder
 {
+  /** Random string generator used to make generated class names unique. */
   protected final RandomString randomString = new RandomString(5);
 
 
+  /**
+   * Returns a {@link TypeDescription} for the given loaded {@code type}.
+   *
+   * @param type  the class to describe, not {@code null}
+   *
+   * @return  a type description for {@code type}, never {@code null}
+   */
   @Contract(pure = true)
   protected static @NotNull TypeDescription typeDescription(@NotNull Class<?> type) {
     return TypeDescription.ForLoadedType.of(type);
   }
 
 
+  /**
+   * Returns a generic {@link TypeDescription.Generic} that represents {@code rawType} parameterized with the given
+   * type arguments.
+   *
+   * @param rawType    the raw type to parameterize, not {@code null}
+   * @param parameter  the type arguments to apply
+   *
+   * @return  a parameterized generic type description, never {@code null}
+   */
   @Contract(pure = true)
   protected static @NotNull TypeDescription.Generic parameterizedType(@NotNull Class<?> rawType, Type... parameter) {
     return TypeDescription.Generic.Builder.parameterizedType(rawType, parameter).build();
@@ -48,6 +68,10 @@ abstract class AbstractBuilder
 
 
 
+  /**
+   * Base class for ByteBuddy {@link Implementation} instances used by the builders in this package that do not need
+   * to contribute anything to the instrumented type during preparation.
+   */
   protected static abstract class AbstractImplementation implements Implementation
   {
     @Override

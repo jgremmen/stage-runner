@@ -59,6 +59,18 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
 
 
 /**
+ * Spring post processor that binds a user defined stage runner interface to the beans in the application context.
+ * <p>
+ * On startup this processor registers a singleton bean implementing the stage runner interface and inspects every
+ * other singleton bean for methods carrying the configured stage function annotation. Matching methods are turned
+ * into stage functions and registered with an internal {@link StageRunnerFactory} which the proxy delegates to.
+ * <p>
+ * The behavior can be customized by supplying a {@link StageFunctionFilter}, a {@link StageFunctionBuilder}, a
+ * {@link StageRunnerProxyBuilder}, a {@link ConversionService} or a stage function name generator through the
+ * various setter methods.
+ *
+ * @param <R>  stage runner interface type
+ *
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
@@ -94,7 +106,7 @@ public class StageRunnerFactoryProcessor<R>
   /**
    * Create a stage runner factory processor for the given stage runner interface and stage function annotation type.
    *
-   * @param stageRunnerInterfaceType  stage runner interface type, not {@code null}
+   * @param stageRunnerInterfaceType      stage runner interface type, not {@code null}
    * @param stageFunctionAnnotationType   stage function annotation type, not {@code null}
    */
   @SuppressWarnings("unchecked")
@@ -141,6 +153,18 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Resolves the data name for a parameter of the stage runner interface method. The name is taken from the
+   * {@link Data @Data} annotation when present, otherwise the reflected parameter name is used.
+   *
+   * @param dataAnnotation  optional {@link Data @Data} annotation on the parameter, may be {@code null}
+   * @param parameterNames  reflected parameter names of the stage runner interface method, may be {@code null}
+   * @param p               index of the parameter to resolve
+   *
+   * @return  the resolved data name, never {@code null}
+   *
+   * @throws StageRunnerException  if no name can be derived for the parameter
+   */
   @Contract(pure = true)
   protected @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
                                                     @Nullable String[] parameterNames,
@@ -160,6 +184,11 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Initializes the processor after all properties have been set. Missing collaborators are supplied with default
+   * implementations: a default {@link StageRunnerProxyBuilder} and, if needed, a default {@link StageFunctionBuilder}
+   * backed by the configured or discovered {@link ConversionService}.
+   */
   @Override
   public void afterPropertiesSet()
   {
@@ -187,12 +216,27 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * {@inheritDoc}
+   * <p>
+   * This processor does not modify the bean factory itself; bean definition registration is done in
+   * {@link #postProcessBeanDefinitionRegistry(BeanDefinitionRegistry)}.
+   */
   @Override
   public void postProcessBeanFactory(@NotNull ConfigurableListableBeanFactory beanFactory) {
     // not interested in doing anything here
   }
 
 
+  /**
+   * Analyses singleton beans after initialization and registers any methods carrying the stage function annotation
+   * with the internal stage runner factory. Non singleton beans and beans without a known definition are skipped.
+   *
+   * @param bean      the initialized bean, not {@code null}
+   * @param beanName  the bean name, not {@code null}
+   *
+   * @return  the bean instance unchanged, never {@code null}
+   */
   @Override
   public @NotNull Object postProcessAfterInitialization(@NotNull Object bean, @NotNull String beanName)
   {
@@ -206,6 +250,11 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Scans the given bean for methods carrying the configured stage function annotation and registers each match.
+   *
+   * @param bean  the bean to inspect, not {@code null}
+   */
   @SuppressWarnings("DataFlowIssue")
   protected void analyseStageFunctions(@NotNull Object bean)
   {
@@ -221,6 +270,15 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Registers a single annotated method as a stage function on the internal stage runner factory. Registration is
+   * skipped when the configured {@link StageFunctionFilter} rejects the function. If a name is provided by the name
+   * generator the function is registered as a named function, otherwise it is added anonymously.
+   *
+   * @param stageFunctionAnnotationAttributes  merged attributes of the stage function annotation, not {@code null}
+   * @param method                             the annotated method, not {@code null}
+   * @param bean                               the bean the method belongs to, not {@code null}
+   */
   @SuppressWarnings("unchecked")
   protected void registerStageFunction(@NotNull AnnotationAttributes stageFunctionAnnotationAttributes,
                                        @NotNull Method method,
@@ -263,6 +321,12 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Registers a lazily initialized singleton bean definition for the stage runner interface. The bean is created
+   * through {@link #createStageRunnerProxy()} on first access.
+   *
+   * @param beanDefinitionRegistry  the target bean definition registry, not {@code null}
+   */
   @Override
   public void postProcessBeanDefinitionRegistry(@NotNull BeanDefinitionRegistry beanDefinitionRegistry)
   {
@@ -281,6 +345,13 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Factory method used by the singleton bean definition to lazily create the stage runner proxy.
+   *
+   * @param <S>  stage enumeration type
+   *
+   * @return  the stage runner proxy instance, never {@code null}
+   */
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
   protected <S extends Enum<S>> @NotNull R createStageRunnerProxy()
@@ -296,6 +367,17 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Locates the single abstract (non default) method of the given functional interface and validates its return
+   * type. The return type must be either {@code boolean} or {@code void}.
+   *
+   * @param interfaceType  the candidate functional interface type, not {@code null}
+   *
+   * @return  the functional interface method, never {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the given type is not an interface, is not a functional interface,
+   *                                            has no functional method or the method has an unsupported return type
+   */
   @Contract(pure = true)
   @SuppressWarnings("ExtractMethodRecommender")
   @NotNull Method findFunctionalInterfaceMethod(@NotNull Class<?> interfaceType)
@@ -325,12 +407,24 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Stores the bean factory that owns this processor. It is used to inspect bean scopes and to look up optional
+   * collaborators such as the {@link ConversionService}.
+   *
+   * @param beanFactory  the owning bean factory, not {@code null}
+   */
   @Override
   public void setBeanFactory(@NotNull BeanFactory beanFactory) {
     this.beanFactory = beanFactory;
   }
 
 
+  /**
+   * Sets the conversion service used to convert data map values to method parameter types. When no service is set
+   * explicitly, one is looked up in the bean factory or the shared default conversion service is used as fallback.
+   *
+   * @param conversionService  conversion service, not {@code null}
+   */
   public void setConversionService(ConversionService conversionService)
   {
     Assert.notNull(conversionService, "conversionService must not be null");
@@ -338,6 +432,12 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Sets the builder used to create the stage runner proxy. When no builder is set explicitly, a default
+   * implementation is used.
+   *
+   * @param stageRunnerProxyBuilder  stage runner proxy builder, not {@code null}
+   */
   public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder)
   {
     Assert.notNull(stageRunnerProxyBuilder, "stageRunnerProxyBuilder must not be null");
@@ -345,6 +445,12 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Sets the builder used to turn annotated bean methods into stage functions. When no builder is set explicitly,
+   * a default implementation is used.
+   *
+   * @param stageFunctionBuilder  stage function builder, not {@code null}
+   */
   public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder)
   {
     Assert.notNull(stageFunctionBuilder, "stageFunctionBuilder must not be null");
@@ -352,6 +458,12 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Sets the filter that decides which discovered stage functions are registered with the stage runner factory. By
+   * default all discovered functions are accepted.
+   *
+   * @param stageFunctionFilter  stage function filter, not {@code null}
+   */
   public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter)
   {
     Assert.notNull(stageFunctionFilter, "stageFunctionFilter must not be null");
@@ -359,6 +471,13 @@ public class StageRunnerFactoryProcessor<R>
   }
 
 
+  /**
+   * Controls whether annotations declared on the stage runner interface method are copied to the generated proxy
+   * method.
+   *
+   * @param copyInterfaceMethodAnnotations  {@code true} to copy interface method annotations, {@code false}
+   *                                        otherwise
+   */
   public void setCopyInterfaceMethodAnnotations(boolean copyInterfaceMethodAnnotations) {
     this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
   }

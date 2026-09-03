@@ -26,12 +26,36 @@ import java.util.Map;
 
 
 /**
+ * Strategy for turning a Spring managed bean method annotated with a stage function annotation into an executable
+ * {@link StageFunction}.
+ * <p>
+ * Implementations are responsible for binding the method parameters to values from the stage runner data map and for
+ * invoking the target method on the given bean when the resulting stage function is executed.
+ *
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
 @FunctionalInterface
 public interface StageFunctionBuilder
 {
+  /**
+   * Creates a stage function that, when executed, invokes {@code stageFunction} on {@code bean} using the values
+   * provided by the stage runner data map.
+   *
+   * @param stageFunctionAnnotation  descriptor of the stage function annotation carried by the method, not
+   *                                 {@code null}
+   * @param dataNameTypeMap          mapping of data names to their resolvable types as expected by the method
+   *                                 parameters, not {@code null}
+   * @param stageFunction            the annotated method to invoke, not {@code null}
+   * @param bean                     the bean instance on which the method is invoked, not {@code null}
+   *
+   * @return  the executable stage function, never {@code null}
+   *
+   * @param <S>  stage enumeration type
+   *
+   * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function, for example when
+   *                                            a parameter cannot be matched against the data name/type map
+   */
   @Contract(pure = true)
   <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(
       @NotNull StageFunctionAnnotation stageFunctionAnnotation,
