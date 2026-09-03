@@ -414,6 +414,7 @@ public class StageRunnerFactoryProcessor<R>
    * @param beanFactory  the owning bean factory, not {@code null}
    */
   @Override
+  @Contract(mutates = "this")
   public void setBeanFactory(@NotNull BeanFactory beanFactory) {
     this.beanFactory = beanFactory;
   }
@@ -425,6 +426,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param conversionService  conversion service, not {@code null}
    */
+  @Contract(mutates = "this")
   public void setConversionService(ConversionService conversionService)
   {
     Assert.notNull(conversionService, "conversionService must not be null");
@@ -438,6 +440,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageRunnerProxyBuilder  stage runner proxy builder, not {@code null}
    */
+  @Contract(mutates = "this")
   public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder)
   {
     Assert.notNull(stageRunnerProxyBuilder, "stageRunnerProxyBuilder must not be null");
@@ -451,6 +454,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionBuilder  stage function builder, not {@code null}
    */
+  @Contract(mutates = "this")
   public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder)
   {
     Assert.notNull(stageFunctionBuilder, "stageFunctionBuilder must not be null");
@@ -464,6 +468,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionFilter  stage function filter, not {@code null}
    */
+  @Contract(mutates = "this")
   public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter)
   {
     Assert.notNull(stageFunctionFilter, "stageFunctionFilter must not be null");
@@ -478,6 +483,7 @@ public class StageRunnerFactoryProcessor<R>
    * @param copyInterfaceMethodAnnotations  {@code true} to copy interface method annotations, {@code false}
    *                                        otherwise
    */
+  @Contract(mutates = "this")
   public void setCopyInterfaceMethodAnnotations(boolean copyInterfaceMethodAnnotations) {
     this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
   }
@@ -495,6 +501,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @since 0.3.2
    */
+  @Contract(mutates = "this")
   public void setStageFunctionNameGenerator(
       @NotNull BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator)
   {
