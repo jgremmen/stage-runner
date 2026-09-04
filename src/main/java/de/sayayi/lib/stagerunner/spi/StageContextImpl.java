@@ -278,6 +278,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
 
 
+  @SuppressWarnings("ClassCanBeRecord")
   private static final class FunctionAdapter implements Function
   {
     private final FunctionState functionState;

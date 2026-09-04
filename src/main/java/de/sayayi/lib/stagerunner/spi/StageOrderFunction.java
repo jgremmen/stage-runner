@@ -26,6 +26,7 @@ import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
  *
  * @author Jeroen Gremmen
  */
+@SuppressWarnings("ClassCanBeRecord")
 final class StageOrderFunction<S extends Enum<S>>
 {
   final @NotNull S stage;
@@ -54,10 +55,8 @@ final class StageOrderFunction<S extends Enum<S>>
   {
     if (this == o)
       return true;
-    if (!(o instanceof StageOrderFunction))
+    if (!(o instanceof StageOrderFunction<?> that))
       return false;
-
-    var that = (StageOrderFunction<?>) o;
 
     return order == that.order && stage == that.stage && function.equals(that.function);
   }
