@@ -28,6 +28,15 @@ import static java.util.Objects.requireNonNull;
 
 
 /**
+ * Abstract base class for stage runner factories.
+ * <p>
+ * It maintains the shared configuration used by every runner produced by this factory: the ordered set of
+ * stage functions that run for every invocation and the pool of named stage functions that individual runners
+ * can selectively enable at runtime.
+ * <p>
+ * Subclasses only need to implement {@link #createRunner()} in order to produce runner instances that operate
+ * on this shared configuration.
+ *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
@@ -41,6 +50,11 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
   final Map<String,StageOrderFunction<S>> namedStageFunctions;
 
 
+  /**
+   * Create a new stage runner factory for the given stage enum type.
+   *
+   * @param stageEnumType  stage enum class, not {@code null}
+   */
   protected AbstractStageRunnerFactory(@NotNull Class<S> stageEnumType)
   {
     this.stageEnumType = stageEnumType;
