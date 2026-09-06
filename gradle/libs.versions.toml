@@ -1,6 +1,6 @@
 [versions]
 # stage runner version
-stage-runner = '0.3.4-SNAPSHOT'
+stage-runner = '0.3.4'
 
 byte-buddy = '[1.15,1.19)'
 jetbrains-annotations = '[26.0,26.2)'
