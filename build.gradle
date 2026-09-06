@@ -16,37 +16,45 @@
 
 plugins {
   id 'java-library'
-  alias(libs.plugins.publish.on.central)
+
   alias(libs.plugins.test.logger)
 }
+
+
+description = 'Stage Runner Framework'
+group = 'de.sayayi.lib'
+version = libs.versions.stage.runner.get()
 
 
 layout.buildDirectory = '.build'
 
 
-group = 'de.sayayi.lib'
-version = libs.versions.stage.runner.get()
-description = 'Stage Runner Framework'
+configurations {
+  optionalApi
 
-
-tasks.withType(JavaCompile).configureEach {
-  javaCompiler = javaToolchains.compilerFor {
-    languageVersion = JavaLanguageVersion.of(21)
-  }
-
-  sourceCompatibility = 21
-  targetCompatibility = 21
-
-  options.encoding = 'UTF-8'
+  compileClasspath.extendsFrom optionalApi
+  runtimeClasspath.extendsFrom optionalApi
+  testCompileClasspath.extendsFrom optionalApi
+  testRuntimeClasspath.extendsFrom optionalApi
 }
 
 
-tasks.withType(Test).configureEach {
-  javaLauncher = javaToolchains.launcherFor {
+java {
+  toolchain {
     languageVersion = JavaLanguageVersion.of(21)
   }
 
-  defaultCharacterEncoding = 'UTF-8'
+  withJavadocJar()
+  withSourcesJar()
+}
+
+
+test {
+  useJUnitPlatform()
+
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
 }
 
 
@@ -69,36 +77,12 @@ repositories {
 }
 
 
-java {
-  withJavadocJar()
-  withSourcesJar()
-}
-
-
-configurations {
-  optionalImplementation {
-    canBeConsumed = false
-    canBeResolved = false
-  }
-
-  compileClasspath.extendsFrom optionalImplementation
-  runtimeClasspath.extendsFrom optionalImplementation
-  testCompileClasspath.extendsFrom optionalImplementation
-  testRuntimeClasspath.extendsFrom optionalImplementation
-}
-
-
-test {
-  useJUnitPlatform()
-}
-
-
 dependencies {
   // java
   compileOnlyApi libs.jetbrains.annotations
 
-  optionalImplementation libs.spring.context
-  optionalImplementation libs.byte.buddy
+  optionalApi libs.spring.context
+  optionalApi libs.byte.buddy
 
 
   // test
@@ -128,17 +112,16 @@ tasks.withType(Jar).configureEach {
     )
   }
 
-  from(rootDir) {
-    include 'LICENSE'
-    into 'META-INF'
+  metaInf {
+    from files('LICENSE')
     expand(
         copyright: new Date().format('yyyy'),
         version: project.version)
   }
-
-  dependsOn test
 }
 
+
+jar.dependsOn test
 
 javadoc.options.addStringOption('Xdoclint:none', '-quiet')
 
@@ -149,90 +132,10 @@ testlogger {
 }
 
 
+apply from: file('gradle/publish.gradle')
+
+
 def snapshot = version.toString().endsWith('-SNAPSHOT')
-if (snapshot)
-{
-  publishing {
-    repositories {
-      maven {
-        name = 'mavenCentralSnapshot'
-        url = 'https://central.sonatype.com/repository/maven-snapshots/'
-
-        mavenContent {
-          snapshotsOnly()
-        }
-
-        credentials {
-          username = rootProject.findProperty('mavenCentralPortalUsername')
-          password = rootProject.findProperty('mavenCentralPortalPassword')
-        }
-      }
-    }
-  }
-}
-
-
-publishOnCentral {
-  repoOwner = 'jgremmen'
-
-  afterEvaluate {
-    projectLongName = "${project.description}"
-  }
-  projectDescription = 'Stage Runner Framework'
-
-  licenseName = 'Apache License, Version 2.0'
-  licenseUrl = 'https://www.apache.org/licenses/LICENSE-2.0'
-}
-
-
-publishing {
-  publications {
-    withType(MavenPublication).configureEach {
-      pom {
-        inceptionYear = '2024'
-
-        developers {
-          developer {
-            id = 'jgremmen'
-            name = 'Jeroen Gremmen'
-            email = 'jeroen.gremmen@sayayi.de'
-          }
-        }
-
-        withXml {
-          def dependenciesNode = asNode()['dependencies'][0]
-
-          configurations.optionalImplementation.allDependencies.each { dep ->
-            def node = dependenciesNode.appendNode('dependency')
-
-            node.appendNode('groupId', dep.group)
-            node.appendNode('artifactId', dep.name)
-            node.appendNode('version', dep.version)
-            node.appendNode('optional', 'true')
-          }
-        }
-      }
-    }
-  }
-}
-
-
-tasks.register('release') {
-  group = 'release'
-  description = "Release ${project.name} ${snapshot ? 'snapshot ' : ''}artifacts to Maven Central Repository."
-
-  inputs.property('snapshot', snapshot)
-
-  if (snapshot)
-    dependsOn ':message-format:publishOSSRHPublicationToMavenCentralSnapshotRepository'
-  else
-  {
-    dependsOn 'publishOSSRHPublicationToProjectLocalRepository'
-    dependsOn 'zipMavenCentralPortalPublication'
-    dependsOn 'validateMavenCentralPortalPublication'
-    dependsOn 'releaseMavenCentralPortalPublication'
-  }
-}
 
 
 clean {

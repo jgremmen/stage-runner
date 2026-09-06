@@ -1,1 +1,13 @@
 rootProject.name = 'stage-runner'
+
+
+buildscript {
+  repositories {
+    gradlePluginPortal()
+    mavenCentral()
+  }
+
+  dependencies {
+    classpath 'org.danilopianini.publish-on-central:org.danilopianini.publish-on-central.gradle.plugin:9.2.10'
+  }
+}
