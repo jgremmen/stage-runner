@@ -32,6 +32,13 @@ import static java.util.Collections.emptySet;
 
 
 /**
+ * Default {@link StageContext} implementation used by {@link AbstractStageRunner}.
+ * <p>
+ * Each instance represents a single execution of a stage runner. It holds the working copy of the factory's
+ * stage function configuration, tracks which stages have already been processed and drives the callback
+ * notifications while iterating through the stage functions. Once the context has finished or has been
+ * aborted, it cannot be reused.
+ *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
@@ -44,11 +51,19 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   private final Map<String,Object> data;
   private final Set<String> enabledStageFunctionNames;
 
+  private StageRunnerCallback<S> callback;
   private State state;
   private int functionIndex;
   private boolean aborted;
 
 
+  /**
+   * Create a new stage context for a single run.
+   *
+   * @param stageRunnerFactory  factory providing the shared stage function configuration, not {@code null}
+   * @param data                data map accessible from stage functions through {@link #getData(String)},
+   *                            not {@code null}
+   */
   StageContextImpl(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory, @NotNull Map<String,Object> data)
   {
     this.stageRunnerFactory = stageRunnerFactory;
@@ -141,6 +156,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       abort();
       throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage + " and order " + order);
     }
+
+    if (callback != null)
+      callback.addStageFunctionCallback(stage, order, description);
   }
 
 
@@ -180,6 +198,17 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * Run all configured stage functions in order, notifying the given callback about stage and function
+   * transitions as well as failures.
+   * <p>
+   * The context must be in {@link State#IDLE idle} state. When the method returns, the context is either
+   * {@link State#FINISHED finished} or {@link State#ABORTED aborted} and cannot be run again.
+   *
+   * @param callback  stage runner callback, not {@code null}
+   *
+   * @return  {@code true} if the run completed without being aborted, {@code false} otherwise
+   */
   boolean run(@NotNull StageRunnerCallback<S> callback)
   {
     if (state.isTerminated())
@@ -193,6 +222,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     state = RUNNING;
 
     try {
+      this.callback = callback;
+
       while(!aborted && ++functionIndex < functionArray.size)
       {
         var stageFunctionEntry = functionArray.functions[functionIndex];
@@ -226,7 +257,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         }
       }
     } finally {
-      state = aborted ? State.ABORTED : FINISHED;
+      this.callback = null;
+
+      state = aborted ? ABORTED : FINISHED;
 
       if (!aborted && lastStage != null)
       {
@@ -253,14 +286,32 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
 
 
+  /**
+   * Lifecycle state of a {@link StageContextImpl}.
+   */
   enum State
   {
+    /** Context has been created but has not started running yet. */
     IDLE,
+
+    /** Context is currently executing stage functions. */
     RUNNING,
+
+    /** Context has finished executing all stage functions successfully. */
     FINISHED,
+
+    /**
+     * Context execution has been aborted, either by {@link StageContext#abort()} or by a configuration error
+     * occurring during the run.
+     */
     ABORTED;
 
 
+    /**
+     * Tell whether this state represents a terminated context that can no longer run.
+     *
+     * @return  {@code true} if the state is {@link #FINISHED} or {@link #ABORTED}, {@code false} otherwise
+     */
     @Contract(pure = true)
     boolean isTerminated() {
       return this == FINISHED || this == ABORTED;
@@ -270,6 +321,11 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
 
 
+  /**
+   * Adapter exposing a {@link StageOrderFunction} together with its current execution state through the
+   * public {@link Function} view returned by {@link StageContext#getFunctions()}.
+   */
+  @SuppressWarnings("ClassCanBeRecord")
   private static final class FunctionAdapter implements Function
   {
     private final FunctionState functionState;
@@ -314,7 +370,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       var s = new StringBuilder("Function(state=").append(getFunctionState())
           .append(",stage=").append(getStage().name()).append('#').append(getOrder());
 
-      final String description = getDescription();
+      final var description = getDescription();
       if (description != null && !description.isEmpty())
         s.append(",description=").append(getDescription());
 

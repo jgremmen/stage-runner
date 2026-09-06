@@ -22,10 +22,15 @@ import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
 
 
 /**
+ * Internal descriptor bundling a stage function with its stage, ordering value and optional description.
+ * <p>
+ * Instances are immutable and are used as the element type of {@link StageOrderFunctionArray}.
+ *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
  */
+@SuppressWarnings("ClassCanBeRecord")
 final class StageOrderFunction<S extends Enum<S>>
 {
   final @NotNull S stage;
@@ -34,11 +39,26 @@ final class StageOrderFunction<S extends Enum<S>>
   final @NotNull StageFunction<S> function;
 
 
+  /**
+   * Create a new stage function descriptor with a {@code null} description and the
+   * {@link de.sayayi.lib.stagerunner.StageFunctionConfigurer#DEFAULT_ORDER default order}.
+   *
+   * @param stage     stage the function belongs to, not {@code null}
+   * @param function  stage function to execute, not {@code null}
+   */
   StageOrderFunction(@NotNull S stage, @NotNull StageFunction<S> function) {
     this(stage, null, DEFAULT_ORDER, function);
   }
 
 
+  /**
+   * Create a new stage function descriptor.
+   *
+   * @param stage        stage the function belongs to, not {@code null}
+   * @param description  optional stage function description, may be {@code null}
+   * @param order        ordering value for the function within its stage
+   * @param function     stage function to execute, not {@code null}
+   */
   StageOrderFunction(@NotNull S stage, String description, int order,
                      @NotNull StageFunction<S> function)
   {
@@ -54,10 +74,8 @@ final class StageOrderFunction<S extends Enum<S>>
   {
     if (this == o)
       return true;
-    if (!(o instanceof StageOrderFunction))
+    if (!(o instanceof StageOrderFunction<?> that))
       return false;
-
-    var that = (StageOrderFunction<?>) o;
 
     return order == that.order && stage == that.stage && function.equals(that.function);
   }

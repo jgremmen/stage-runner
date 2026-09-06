@@ -23,7 +23,12 @@ import java.util.Map;
 
 
 /**
- * Abstract implementation of {@link StageRunner}.
+ * Abstract base implementation of {@link StageRunner}.
+ * <p>
+ * Each invocation of {@link #run(Map, StageRunnerCallback)} creates a fresh stage context that iterates
+ * through the stage functions configured on the associated {@link AbstractStageRunnerFactory factory}.
+ * Subclasses may extend this class in order to expose an application specific runner API on top of the
+ * standard runner contract.
  *
  * @param <S>  Stage enum type
  *
@@ -34,6 +39,11 @@ public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRun
   private final AbstractStageRunnerFactory<S> stageRunnerFactory;
 
 
+  /**
+   * Create a new stage runner bound to the given factory.
+   *
+   * @param stageRunnerFactory  factory providing the shared stage function configuration, not {@code null}
+   */
   protected AbstractStageRunner(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory) {
     this.stageRunnerFactory = stageRunnerFactory;
   }

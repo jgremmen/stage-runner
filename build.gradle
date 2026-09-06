@@ -16,95 +16,84 @@
 
 plugins {
   id 'java-library'
-  id 'maven-publish'
-  id 'signing'
+
+  alias(libs.plugins.test.logger)
 }
 
-apply plugin: 'com.adarshr.test-logger'
 
-
-group = 'de.sayayi.lib'
-version = '0.3.3'
 description = 'Stage Runner Framework'
+group = 'de.sayayi.lib'
+version = libs.versions.stage.runner.get()
 
 
 layout.buildDirectory = '.build'
 
 
-def springVersion = '[5.3,6.0)'
-def byteBuddyVersion = '[1.15,1.16)'
+configurations {
+  optionalApi
 
-
-tasks.withType(JavaCompile).configureEach {
-  javaCompiler = javaToolchains.compilerFor {
-    languageVersion = JavaLanguageVersion.of(11)
-  }
-
-  options.encoding = 'UTF-8'
-}
-
-
-tasks.withType(Test).configureEach {
-  javaLauncher = javaToolchains.launcherFor {
-    languageVersion = JavaLanguageVersion.of(11)
-  }
-
-  defaultCharacterEncoding = 'UTF-8'
-}
-
-
-compileJava {
-  sourceCompatibility = 11
-  targetCompatibility = 11
+  compileClasspath.extendsFrom optionalApi
+  runtimeClasspath.extendsFrom optionalApi
+  testCompileClasspath.extendsFrom optionalApi
+  testRuntimeClasspath.extendsFrom optionalApi
 }
 
 
 java {
+  toolchain {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
+
   withJavadocJar()
   withSourcesJar()
 }
 
 
-repositories {
-  mavenCentral()
+test {
+  useJUnitPlatform()
+
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
 }
 
 
-java {
-  registerFeature('optional') {
-    usingSourceSet sourceSets.main
+compileTestJava {
+  options.compilerArgs.add '-parameters'
+}
+
+
+repositories {
+  maven {
+    url = 'https://central.sonatype.com/repository/maven-snapshots/'
+
+    mavenContent {
+      includeGroup 'de.sayayi.lib'
+      snapshotsOnly()
+    }
   }
+
+  mavenCentral()
 }
 
 
 dependencies {
   // java
-  compileOnlyApi 'org.jetbrains:annotations:[26.0,26.1)'
+  compileOnlyApi libs.jetbrains.annotations
 
-  optionalImplementation "org.springframework:spring-context:${springVersion}"
-  optionalImplementation "net.bytebuddy:byte-buddy:${byteBuddyVersion}"
+  optionalApi libs.spring.context
+  optionalApi libs.byte.buddy
 
 
   // test
-  testAnnotationProcessor 'org.projectlombok:lombok:[1.18,1.19)'
-  testCompileOnly 'org.projectlombok:lombok:[1.18,1.19)'
+  testAnnotationProcessor libs.lombok
+  testCompileOnly libs.lombok
 
-  testImplementation 'org.junit.jupiter:junit-jupiter:[5.11,5.12)'
+  testImplementation libs.junit.jupiter
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
-  testImplementation "org.springframework:spring-test:${springVersion}"
+  testImplementation libs.spring.test
 }
-
-
-test {
-  useJUnitPlatform()
-}
-
-
-compileTestJava.options.compilerArgs.add '-parameters'
-
-
-jar.dependsOn test
 
 
 tasks.withType(Jar).configureEach {
@@ -123,9 +112,8 @@ tasks.withType(Jar).configureEach {
     )
   }
 
-  from(rootDir) {
-    include 'LICENSE'
-    into 'META-INF'
+  metaInf {
+    from files('LICENSE')
     expand(
         copyright: new Date().format('yyyy'),
         version: project.version)
@@ -133,82 +121,28 @@ tasks.withType(Jar).configureEach {
 }
 
 
+jar.dependsOn test
+
 javadoc.options.addStringOption('Xdoclint:none', '-quiet')
 
 
 testlogger {
-  theme 'mocha'
-  slowThreshold 2500
+  theme = 'mocha'
+  slowThreshold = 2500
 }
+
+
+apply from: file('gradle/publish.gradle')
 
 
 def snapshot = version.toString().endsWith('-SNAPSHOT')
-def tmpRepositoryDirectory = rootProject.layout.buildDirectory
-    .dir('repository').get()
-    .dir(snapshot ? 'snapshot' : 'release')
-    .asFile
 
-publishing {
-  repositories {
-    maven {
-      name = 'mavenTemp'
-      url = tmpRepositoryDirectory
-    }
 
-    maven {
-      name = 'mavenCentral'
-      url = snapshot
-          ? 'https://oss.sonatype.org/content/repositories/snapshots'
-          : 'https://oss.sonatype.org/service/local/staging/deploy/maven2'
-
-      credentials {
-        username = rootProject.findProperty('mavenCentral.username')
-        password = rootProject.findProperty('mavenCentral.password')
-      }
-    }
-  }
-
-  publications {
-
-    maven(MavenPublication) {
-      suppressPomMetadataWarningsFor 'optionalApiElements'
-      suppressPomMetadataWarningsFor 'optionalRuntimeElements'
-
-      from components.java
-
-      pom {
-        name = 'Stage Runner Library'
-        description = 'Stage Runner'
-        url = 'https://github.com/jgremmen/stage-runner'
-        inceptionYear = '2024'
-
-        licenses {
-          license {
-            name = 'Apache License, Version 2.0'
-            url = 'https://www.apache.org/licenses/LICENSE-2.0'
-            distribution = 'repo'
-          }
-        }
-
-        developers {
-          developer {
-            id = 'jgremmen'
-            name = 'Jeroen Gremmen'
-            email = 'jeroen.gremmen@sayayi.de'
-          }
-        }
-
-        scm {
-          connection = 'scm:git:git://github.com/jgremmen/stage-runner.git'
-          developerConnection = 'scm:git:git://github.com/jgremmen/stage-runner.git'
-          url = 'https://github.com/jgremmen/stage-runner'
-        }
-      }
-    }
-  }
+clean {
+  delete layout.projectDirectory.dir('build')
 }
 
 
-signing {
-  sign publishing.publications.maven
+wrapper {
+  distributionType = Wrapper.DistributionType.BIN
 }

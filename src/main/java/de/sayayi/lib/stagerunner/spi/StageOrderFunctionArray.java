@@ -27,6 +27,14 @@ import static java.util.Arrays.fill;
 
 
 /**
+ * Internal ordered array of {@link StageOrderFunction stage functions}.
+ * <p>
+ * Entries are kept sorted by stage and, within each stage, by order value. New entries are inserted at the
+ * position that keeps this ordering while preserving insertion order between functions sharing the same
+ * stage and order. Alongside each function the array also tracks its current
+ * {@link de.sayayi.lib.stagerunner.StageContext.FunctionState execution state} so that a stage runner can
+ * report progress.
+ *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
@@ -38,6 +46,9 @@ final class StageOrderFunctionArray<S extends Enum<S>>
   int size;
 
 
+  /**
+   * Create a new empty stage order function array.
+   */
   StageOrderFunctionArray()
   {
     functions = null;
@@ -46,6 +57,13 @@ final class StageOrderFunctionArray<S extends Enum<S>>
   }
 
 
+  /**
+   * Create a copy of the given stage order function array. The copy shares the {@link StageOrderFunction}
+   * instances with the source but starts with all execution states reset to
+   * {@link FunctionState#WAITING WAITING}.
+   *
+   * @param array  source array, not {@code null}
+   */
   StageOrderFunctionArray(@NotNull StageOrderFunctionArray<S> array)
   {
     if (array.functions == null)
@@ -62,6 +80,16 @@ final class StageOrderFunctionArray<S extends Enum<S>>
   }
 
 
+  /**
+   * Insert the given stage function at the position that keeps the array sorted by stage and order.
+   * <p>
+   * Functions sharing the same stage and order are appended after previously inserted ones so insertion
+   * order is retained. The backing array grows on demand.
+   *
+   * @param function  stage function to add, not {@code null}
+   *
+   * @return  the index at which the function has been inserted
+   */
   @SuppressWarnings("unchecked")
   int add(@NotNull StageOrderFunction<S> function)
   {

@@ -27,7 +27,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
-import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,7 +52,7 @@ class StageRunnerFactoryProcessorTest
 
   @Test
   void testInterface() {
-    myRunnerInterface.run("important-task", Arrays.asList(1, 67, -4), 56);
+    myRunnerInterface.run("important-task", List.of(1, 67, -4), 56);
   }
 
 

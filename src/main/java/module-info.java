@@ -14,8 +14,27 @@
  * limitations under the License.
  */
 
-module de.sayayi.lib.stagerunner {
-
+/**
+ * Stage runner library for executing an ordered sequence of stage functions.
+ * <p>
+ * A stage runner processes a user defined enum whose constants represent the stages of a workflow. For each stage
+ * one or more {@link de.sayayi.lib.stagerunner.StageFunction stage functions} can be registered. When the runner
+ * is executed, the functions are invoked in stage order, allowing callers to inspect progress and share data
+ * through the {@link de.sayayi.lib.stagerunner.StageContext stage context}.
+ * <p>
+ * Runner instances are obtained from a {@link de.sayayi.lib.stagerunner.StageRunnerFactory} and are intended to be
+ * used once. A {@link de.sayayi.lib.stagerunner.StageRunnerCallback} may be supplied to observe or influence the
+ * execution flow. The {@code spi} package offers reusable base implementations that simplify building a custom
+ * factory.
+ * <p>
+ * The {@code spring} package provides optional integration with the Spring Framework. It discovers annotated
+ * methods on Spring managed beans and wires them into a stage runner factory, so applications can declare stage
+ * functions using the annotations in the {@code spring.annotation} package instead of registering them manually.
+ *
+ * @author Jeroen Gremmen
+ */
+module de.sayayi.lib.stagerunner
+{
   // optional requirement for Spring
   requires static net.bytebuddy;
   requires static spring.aop;
@@ -33,6 +52,7 @@ module de.sayayi.lib.stagerunner {
   exports de.sayayi.lib.stagerunner.spring;
   exports de.sayayi.lib.stagerunner.spring.annotation;
 
-  // provide access to Spring
+  // provide access
   opens de.sayayi.lib.stagerunner.spring to spring.core;
+  opens de.sayayi.lib.stagerunner.spring.builder to net.bytebuddy;
 }

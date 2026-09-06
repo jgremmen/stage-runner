@@ -24,6 +24,11 @@ import java.lang.reflect.Method;
 
 
 /**
+ * Strategy for creating the proxy that implements a user defined stage runner interface.
+ * <p>
+ * The proxy exposes the single functional method of the stage runner interface and delegates its invocation to a
+ * {@link StageRunnerFactory} for the configured stage enumeration.
+ *
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
@@ -40,7 +45,8 @@ public interface StageRunnerProxyBuilder
    *
    * @param stageType                   stage enumeration type, not {@code null}
    * @param stageRunnerInterfaceType    stage runner interface type, not {@code null}
-   * @param stageRunnerInterfaceMethod  functional interface method of {@code stageRunnerInterfaceType}, not {@code null}
+   * @param stageRunnerInterfaceMethod  functional interface method of {@code stageRunnerInterfaceType}, not
+   *                                    {@code null}
    * @param dataNames                   data names array, not {@code null}
    * @param stageRunnerFactory          stage runner factory instance, not {@code null}
    *
@@ -48,6 +54,8 @@ public interface StageRunnerProxyBuilder
    *
    * @param <R>  stage runner interface type, not {@code null}
    * @param <S>  stage enumeration type, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the proxy cannot be built for the given interface
    */
   @Contract(pure = true)
   <R,S extends Enum<S>> @NotNull R createProxy(@NotNull Class<S> stageType,

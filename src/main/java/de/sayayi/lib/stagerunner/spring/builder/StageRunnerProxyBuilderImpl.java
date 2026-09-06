@@ -28,6 +28,7 @@ import net.bytebuddy.description.method.ParameterDescription;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.FixedValue;
+import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.bytecode.*;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
 import net.bytebuddy.implementation.bytecode.assign.primitive.PrimitiveBoxingDelegate;
@@ -53,6 +54,14 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
 
 
 /**
+ * Default {@link StageRunnerProxyBuilder} implementation that generates the stage runner proxy class at runtime
+ * using ByteBuddy.
+ * <p>
+ * The generated proxy subclasses the user defined stage runner interface, keeps a reference to a
+ * {@link StageRunnerFactory} and implements {@link FactoryAccessor} to expose it. Each invocation of the interface
+ * method obtains a new runner from the factory, collects the method arguments into a data map and runs it,
+ * optionally forwarding a {@link StageRunnerCallback} parameter when present.
+ *
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
@@ -63,6 +72,12 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
   private final boolean copyInterfaceMethodAnnotations;
 
 
+  /**
+   * Creates a new proxy builder.
+   *
+   * @param copyInterfaceMethodAnnotations  if {@code true}, the annotations declared on the stage runner interface
+   *                                        method are copied onto the generated proxy method
+   */
   public StageRunnerProxyBuilderImpl(boolean copyInterfaceMethodAnnotations) {
     this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
   }
@@ -112,6 +127,10 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
 
 
 
+  /**
+   * ByteBuddy {@link Implementation} for the generated proxy constructor. It calls the super constructor and stores
+   * the {@link StageRunnerFactory} parameter into the private {@code factory} field.
+   */
   private static final class ProxyConstructorImplementation extends AbstractImplementation
   {
     @Override
@@ -139,6 +158,12 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
 
 
 
+  /**
+   * ByteBuddy {@link Implementation} for the generated stage runner interface method. It creates a new stage runner
+   * via the factory, assembles the data map from the method parameters and invokes
+   * {@link de.sayayi.lib.stagerunner.StageRunner#run run} on it. A trailing {@link StageRunnerCallback} parameter,
+   * if declared on the interface method, is forwarded to the runner.
+   */
   private static final class ProxyMethodImplementation extends AbstractImplementation
   {
     private final MethodDescription method;
@@ -200,6 +225,12 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
     }
 
 
+    /**
+     * Builds a data map instance from the interface method parameters that have an associated data name. Parameters
+     * with primitive types are boxed. The resulting map is an immutable copy.
+     *
+     * @return  the stack manipulations that leave the data map on the operand stack, never {@code null}
+     */
     @Contract(pure = true)
     private @NotNull List<StackManipulation> buildMapWithDataNames()
     {
@@ -251,6 +282,12 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
     }
 
 
+    /**
+     * Returns the stack manipulations that push an empty data map onto the operand stack. Used when none of the
+     * interface method parameters carries a data name.
+     *
+     * @return  the stack manipulations that push an empty map, never {@code null}
+     */
     @Contract(pure = true)
     private @NotNull List<StackManipulation> buildMapNoDataNames()
     {
@@ -262,6 +299,12 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
     }
 
 
+    /**
+     * Returns the first parameter of the interface method whose type is assignable to {@link StageRunnerCallback},
+     * or {@code null} when the interface method does not accept a callback.
+     *
+     * @return  the callback parameter, or {@code null} if none is present
+     */
     @Contract(pure = true)
     private ParameterDescription findCallbackParameter()
     {
