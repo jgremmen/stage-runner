@@ -62,17 +62,17 @@ dependencies {
 
 ## Core concepts
 
-| Type | Purpose |
-| ---- | ------- |
-| `StageFunction<S>` | Functional interface implemented by each unit of work. Receives a `StageContext`. |
-| `StageFunctionConfigurer<S>` | API for registering stage functions with a stage, order, and optional description. |
-| `StageFunctionConfigurer.Named<S>` | Extension for registering *named* stage functions that can be enabled at runtime. |
-| `StageRunnerFactory<S>` | Creates fresh, single-use `StageRunner` instances. |
-| `StageRunner<S>` | Executes the configured stage functions once, using an input data map. |
-| `StageContext<S>` | Runtime view: current stage, processed/remaining stages, shared data, abort, dynamic registration. |
-| `StageRunnerCallback<S>` | Optional hook interface with pre/post callbacks and an exception handler. |
-| `DefaultStageRunnerFactory<S>` | Ready-to-use factory backed by `AbstractStageRunner`. |
-| `AbstractStageRunnerFactory<S>` / `AbstractStageRunner<S>` | Base classes for custom factories/runners. |
+| Type                                                       | Purpose                                                                                            |
+|------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
+| `StageFunction<S>`                                         | Functional interface implemented by each unit of work. Receives a `StageContext`.                  |
+| `StageFunctionConfigurer<S>`                               | API for registering stage functions with a stage, order, and optional description.                 |
+| `StageFunctionConfigurer.Named<S>`                         | Extension for registering *named* stage functions that can be enabled at runtime.                  |
+| `StageRunnerFactory<S>`                                    | Creates fresh, single-use `StageRunner` instances.                                                 |
+| `StageRunner<S>`                                           | Executes the configured stage functions once, using an input data map.                             |
+| `StageContext<S>`                                          | Runtime view: current stage, processed/remaining stages, shared data, abort, dynamic registration. |
+| `StageRunnerCallback<S>`                                   | Optional hook interface with pre/post callbacks and an exception handler.                          |
+| `DefaultStageRunnerFactory<S>`                             | Ready-to-use factory backed by `AbstractStageRunner`.                                              |
+| `AbstractStageRunnerFactory<S>` / `AbstractStageRunner<S>` | Base classes for custom factories/runners.                                                         |
 
 Runner instances are **single-use** — obtain a new one from the factory for every execution.
 
