@@ -8,6 +8,6 @@ buildscript {
   }
 
   dependencies {
-    classpath 'org.danilopianini.publish-on-central:org.danilopianini.publish-on-central.gradle.plugin:9.2.10'
+    classpath 'org.danilopianini.publish-on-central:org.danilopianini.publish-on-central.gradle.plugin:9.2.11'
   }
 }
