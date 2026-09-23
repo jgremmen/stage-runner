@@ -80,7 +80,7 @@ public interface StageDefinition
 
   /**
    * Marks the annotation method which returns the stage function order.
-   * The return value must be either an {@code int} or {@code short}.
+   * The return value must be an {@code int}.
    */
   @Target(METHOD)
   @Retention(RUNTIME)
