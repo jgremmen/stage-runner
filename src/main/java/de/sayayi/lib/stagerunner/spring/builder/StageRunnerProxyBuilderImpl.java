@@ -273,9 +273,9 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
         }
 
       stackManipulations.add(MethodInvocation.invoke(
-          typeDescription(Map.class)
+          typeDescription(Collections.class)
               .getDeclaredMethods()
-              .filter(named("copyOf"))
+              .filter(named("unmodifiableMap"))
               .getOnly()));
 
       return stackManipulations;

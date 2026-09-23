@@ -56,6 +56,13 @@ class StageRunnerFactoryProcessorTest
   }
 
 
+  @Test
+  @DisplayName("Null data value must not throw NullPointerException")
+  void testInterfaceWithNullDataValue() {
+    myRunnerInterface.run("important-task", null, 56);
+  }
+
+
 
 
   @Configuration(proxyBeanMethods = false)
