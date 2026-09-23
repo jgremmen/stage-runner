@@ -186,6 +186,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
         enabledFunctions.add(name);
         enabledStageFunctionNames.add(name);
+
+        if (callback != null)
+          callback.addStageFunctionCallback(stageFunction.stage, stageFunction.order, stageFunction.description);
       }
 
     return enabledFunctions;
