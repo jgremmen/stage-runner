@@ -19,10 +19,12 @@ import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageFunctionConfigurer;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 import static java.util.Objects.requireNonNull;
 
@@ -46,8 +48,9 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
 {
   protected final Class<S> stageEnumType;
 
-  final StageOrderFunctionArray<S> functionArray;
-  final Map<String,StageOrderFunction<S>> namedStageFunctions;
+  private final StageOrderFunctionArray<S> functionArray;
+  private final Map<String,StageOrderFunction<S>> namedStageFunctions;
+  private final ReentrantReadWriteLock configurationLock = new ReentrantReadWriteLock();
 
 
   /**
@@ -65,8 +68,16 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
 
 
   @Override
-  public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function) {
-    functionArray.add(new StageOrderFunction<>(stage, description, order, function));
+  public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
+  {
+    final var writeLock = configurationLock.writeLock();
+
+    writeLock.lock();
+    try {
+      functionArray.add(new StageOrderFunction<>(stage, description, order, function));
+    } finally {
+      writeLock.unlock();
+    }
   }
 
 
@@ -74,12 +85,61 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
   public void namedStageFunction(@NotNull String name, @NotNull S stage, int order, String description,
                                  @NotNull StageFunction<S> function)
   {
-    if (requireNonNull(name, "name must not be null").isEmpty() )
+    if (requireNonNull(name, "name must not be null").isEmpty())
       throw new StageRunnerConfigurationException("name must not be empty");
 
-    if (namedStageFunctions.containsKey(name))
-      throw new StageRunnerConfigurationException("name '" + name + "' must be unique for this stage runner factory");
+    final var writeLock = configurationLock.writeLock();
 
-    namedStageFunctions.put(name, new StageOrderFunction<>(stage, description, order, function));
+    writeLock.lock();
+    try {
+      if (namedStageFunctions.containsKey(name))
+        throw new StageRunnerConfigurationException("name '" + name + "' must be unique for this stage runner factory");
+
+      namedStageFunctions.put(name, new StageOrderFunction<>(stage, description, order, function));
+    } finally {
+      writeLock.unlock();
+    }
+  }
+
+
+  /**
+   * Create a consistent copy of the current stage function array, safe to hand to a new stage runner even if
+   * {@link #addStageFunction} is invoked concurrently on another thread.
+   *
+   * @return  copy of the current stage function array, never {@code null}
+   */
+  @Contract(pure = true)
+  @NotNull StageOrderFunctionArray<S> functionArray()
+  {
+    final var readLock = configurationLock.readLock();
+
+    readLock.lock();
+    try {
+      return functionArray.size == 0
+          ? new StageOrderFunctionArray<>()
+          : new StageOrderFunctionArray<>(functionArray);
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+
+  /**
+   * Create a consistent copy of the current named stage functions, safe to iterate even if
+   * {@link #namedStageFunction} is invoked concurrently on another thread.
+   *
+   * @return  copy of the current named stage functions, never {@code null}
+   */
+  @Contract(pure = true)
+  @NotNull Map<String,StageOrderFunction<S>> namedStageFunctions()
+  {
+    final var readLock = configurationLock.readLock();
+
+    readLock.lock();
+    try {
+      return new HashMap<>(namedStageFunctions);
+    } finally {
+      readLock.unlock();
+    }
   }
 }

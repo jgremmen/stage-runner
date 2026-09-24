@@ -69,15 +69,15 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     this.stageRunnerFactory = stageRunnerFactory;
     this.data = data;
 
-    if (stageRunnerFactory.functionArray.size == 0)
+    functionArray = stageRunnerFactory.functionArray();
+
+    if (functionArray.size == 0)
     {
-      functionArray = new StageOrderFunctionArray<>();
       processedStages = emptySet();
       state = FINISHED;
     }
     else
     {
-      functionArray = new StageOrderFunctionArray<>(stageRunnerFactory.functionArray);
       processedStages = EnumSet.noneOf(stageRunnerFactory.stageEnumType);
       state = IDLE;
     }
@@ -171,7 +171,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     var enabledFunctions = new HashSet<String>();
     String name;
 
-    for(var stageFunctionEntry: stageRunnerFactory.namedStageFunctions.entrySet())
+    for(var stageFunctionEntry: stageRunnerFactory.namedStageFunctions().entrySet())
       if (!enabledStageFunctionNames.contains(name = stageFunctionEntry.getKey()) && nameFilter.test(name))
       {
         var stageFunction = stageFunctionEntry.getValue();
