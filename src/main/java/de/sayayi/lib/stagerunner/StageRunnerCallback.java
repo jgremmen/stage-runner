@@ -15,6 +15,7 @@
  */
 package de.sayayi.lib.stagerunner;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.NotNull;
 
@@ -106,5 +107,14 @@ public interface StageRunnerCallback<S extends Enum<S>>
       throw (StageRunnerException)exception;
     else
       throw new StageRunnerException(exception.getMessage(), exception);
+  }
+
+
+  /**
+   * @since 0.4.0
+   */
+  default void stageConfigurationExceptionHandler(@NotNull StageContext<S> stageContext,
+                                                  @NotNull StageRunnerConfigurationException configurationException) {
+    throw configurationException;
   }
 }

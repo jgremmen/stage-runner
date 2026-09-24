@@ -251,7 +251,10 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
           stageFunctionEntry.function.process(this);
         } catch(Throwable ex) {
           functionArray.executionState[functionIndex] = FAILED;
-          callback.stageExceptionHandler(this, ex);
+          if (ex instanceof StageRunnerConfigurationException stageRunnerConfigurationException)
+            callback.stageConfigurationExceptionHandler(this, stageRunnerConfigurationException);
+          else
+            callback.stageExceptionHandler(this, ex);
         } finally {
           if (functionArray.executionState[functionIndex] == EXECUTING)
             functionArray.executionState[functionIndex] = PROCESSED;
