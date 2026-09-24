@@ -25,6 +25,7 @@ import java.lang.annotation.Annotation;
 import java.util.Objects;
 
 import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
+import static org.springframework.util.StringUtils.hasLength;
 
 
 /**
@@ -191,7 +192,7 @@ public final class StageFunctionAnnotation
       return null;
 
     var name = annotationAttributes.getString(nameProperty);
-    return name.isEmpty() ? null : name;
+    return hasLength(name) ? name : null;
   }
 
 
