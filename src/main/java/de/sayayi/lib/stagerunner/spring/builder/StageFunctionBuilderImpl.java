@@ -314,11 +314,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
     if (!nameQualifiers.isEmpty())
     {
+      nameQualifiers.sort(null);
       nameWithQualifier = nameQualifiers.get(0);
+
       if (nameQualifiers.size() > 1)
       {
-        nameQualifiers.sort(null);
-
         var nwq2 = nameQualifiers.get(1);
 
         if (nameWithQualifier.qualifier == nwq2.qualifier && !nameWithQualifier.name.equals(nwq2.name))
