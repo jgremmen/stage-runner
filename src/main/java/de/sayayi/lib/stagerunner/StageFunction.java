@@ -19,17 +19,24 @@ import org.jetbrains.annotations.NotNull;
 
 
 /**
- * Interface representing a processable stage function.
+ * Unit of work executed by a stage runner as part of a specific stage.
+ * <p>
+ * Stage functions are registered with a {@link StageFunctionConfigurer}, either on the factory (applying to every
+ * execution) or on the {@link StageContext} (applying to the current execution only).
  *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 @FunctionalInterface
 public interface StageFunction<S extends Enum<S>>
 {
   /**
-   * Process the stage function, providing the stage context.
+   * Executes this stage function.
+   * <p>
+   * Any exception thrown by this method is passed to the exception handlers of the {@link StageRunnerCallback} used for
+   * the current execution.
    *
    * @param stageContext  stage runner context, never {@code null}
    */

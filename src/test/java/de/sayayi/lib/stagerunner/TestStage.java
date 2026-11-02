@@ -17,7 +17,10 @@ package de.sayayi.lib.stagerunner;
 
 
 /**
+ * Stage enum shared by the tests of the stage runner library.
+ *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 public enum TestStage
 {

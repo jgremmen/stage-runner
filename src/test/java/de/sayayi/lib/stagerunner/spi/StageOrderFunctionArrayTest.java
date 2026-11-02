@@ -25,7 +25,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
 /**
+ * Tests the ordering of {@link StageOrderFunctionArray}.
+ * <p>
+ * Covered aspects are the insertion position of stage functions sorted by stage, by default order and by explicit
+ * order, including insertion into a copied array.
+ *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 @DisplayName("Stage order function array")
 class StageOrderFunctionArrayTest

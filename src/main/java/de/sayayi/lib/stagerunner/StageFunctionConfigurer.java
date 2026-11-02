@@ -15,11 +15,18 @@
  */
 package de.sayayi.lib.stagerunner;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import org.jetbrains.annotations.NotNull;
 
 
 /**
- * The stage configurer provides methods to add new stage functions.
+ * Configuration interface for adding stage functions to a stage runner.
+ * <p>
+ * It is implemented by stage runner factories, where added functions apply to every subsequently created runner, and by
+ * {@link StageContext}, where added functions only apply to the current execution.
+ * <p>
+ * Stage functions are executed in stage order. Within the same stage, functions with a lower order are executed first;
+ * functions with identical stage and order are executed in the order they have been added.
  *
  * @param <S>  Stage enum type
  *
@@ -29,17 +36,19 @@ import org.jetbrains.annotations.NotNull;
 @FunctionalInterface
 public interface StageFunctionConfigurer<S extends Enum<S>>
 {
-  /** Default stage order if no specific order is supplied. */
+  /** Order used for a stage function if no specific order is supplied. */
   int DEFAULT_ORDER = 1000;
 
 
   /**
-   * Add a stage function to {@code stage}. The function will be inserted appropriately using the {@link #DEFAULT_ORDER}.
+   * Adds a stage function to {@code stage} using the {@link #DEFAULT_ORDER default order} and no description.
    *
    * @param stage     stage, not {@code null}
    * @param function  stage function, not {@code null}
    *
-   * @see StageRunnerCallback#preStageFunctionCallback(StageContext, String)
+   * @throws StageRunnerConfigurationException  if the stage function cannot be added
+   *
+   * @see #addStageFunction(Enum, int, String, StageFunction)
    */
   default void addStageFunction(@NotNull S stage, @NotNull StageFunction<S> function) {
     addStageFunction(stage, DEFAULT_ORDER, null, function);
@@ -47,7 +56,7 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
 
 
   /**
-   * Add a stage function to {@code stage}. The function will be inserted appropriately using the {@link #DEFAULT_ORDER}.
+   * Adds a stage function with a description to {@code stage} using the {@link #DEFAULT_ORDER default order}.
    * <p>
    * The description is optional and will be passed to the
    * {@link StageRunnerCallback#preStageFunctionCallback(StageContext, String) preStageFunctionCallback} callback
@@ -56,6 +65,9 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
    * @param stage        stage, not {@code null}
    * @param description  stage function description or {@code null} for no description
    * @param function     stage function, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the stage function cannot
+   *         be added
    *
    * @see StageRunnerCallback#preStageFunctionCallback(StageContext, String)
    */
@@ -65,11 +77,13 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
 
 
   /**
-   * Add a stage function to {@code stage}. The function will be inserted appropriately using the given {@code order}.
+   * Adds a stage function to {@code stage} using the given {@code order} and no description.
    *
    * @param stage        stage, not {@code null}
    * @param order        function order within the given {@code stage}
    * @param function     stage function, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the stage function cannot be added
    */
   default void addStageFunction(@NotNull S stage, int order, @NotNull StageFunction<S> function) {
     addStageFunction(stage, order, null, function);
@@ -77,7 +91,7 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
 
 
   /**
-   * Add a stage function to {@code stage}. The function will be inserted appropriately using the given {@code order}.
+   * Adds a stage function with a description to {@code stage} using the given {@code order}.
    * <p>
    * The description is optional and will be passed to the
    * {@link StageRunnerCallback#preStageFunctionCallback(StageContext, String) preStageFunctionCallback} callback
@@ -87,8 +101,12 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
    * @param order        function order within the given {@code stage}
    * @param description  stage function description or {@code null} for no description
    * @param function     stage function, not {@code null}
-   *                     
-   * @see StageRunnerCallback#preStageFunctionCallback(StageContext, String) 
+   *
+   * @throws StageRunnerConfigurationException  if the stage function cannot be added, for example because a stage
+   *                                            runner execution has already terminated or passed beyond the given
+   *                                            {@code stage} and {@code order}
+   *
+   * @see StageRunnerCallback#preStageFunctionCallback(StageContext, String)
    */
   void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function);
 
@@ -96,7 +114,11 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
 
 
   /**
-   * The named stage configurer provides methods to add new stage functions, which can be enabled by name.
+   * Configuration interface for registering named stage functions.
+   * <p>
+   * Unlike regular stage functions, a named stage function is not executed by default. It must be enabled for a
+   * specific execution, using {@link StageContext#enableNamedStageFunction(String)} or
+   * {@link StageContext#enableNamedStageFunctions(java.util.function.Predicate)}.
    *
    * @param <S>  Stage enum type
    *
@@ -107,12 +129,14 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
   interface Named<S extends Enum<S>>
   {
     /**
-     * Add a named stage function to {@code stage}. The function will be inserted appropriately using the
-     * {@link StageFunctionConfigurer#DEFAULT_ORDER}.
+     * Registers a named stage function for {@code stage} using the
+     * {@link StageFunctionConfigurer#DEFAULT_ORDER default order} and no description.
      *
      * @param name      stage function name, not empty or {@code null}
      * @param stage     stage, not {@code null}
      * @param function  stage function, not {@code null}
+     *
+     * @throws StageRunnerConfigurationException  if {@code name} is empty or not unique
      */
     default void namedStageFunction(@NotNull String name, @NotNull S stage, @NotNull StageFunction<S> function) {
       namedStageFunction(name, stage, DEFAULT_ORDER, null, function);
@@ -120,8 +144,8 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
 
 
     /**
-     * Add a named stage function to {@code stage}. The function will be inserted appropriately using the
-     * {@link StageFunctionConfigurer#DEFAULT_ORDER}.
+     * Registers a named stage function with a description for {@code stage} using the
+     * {@link StageFunctionConfigurer#DEFAULT_ORDER default order}.
      * <p>
      * The description is optional and will be passed to the
      * {@link StageRunnerCallback#preStageFunctionCallback(StageContext, String) preStageFunctionCallback} callback
@@ -131,6 +155,8 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
      * @param stage        stage, not {@code null}
      * @param description  stage function description or {@code null} for no description
      * @param function     stage function, not {@code null}
+     *
+     * @throws StageRunnerConfigurationException  if {@code name} is empty or not unique
      */
     default void namedStageFunction(@NotNull String name, @NotNull S stage, String description,
                                     @NotNull StageFunction<S> function) {
@@ -139,13 +165,14 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
 
 
     /**
-     * Add a named stage function to {@code stage}. The function will be inserted appropriately using the given
-     * {@code order}.
+     * Registers a named stage function for {@code stage} using the given {@code order} and no description.
      *
      * @param name      stage function name, not empty or {@code null}
      * @param stage     stage, not {@code null}
      * @param order     function order within the given {@code stage}
      * @param function  stage function, not {@code null}
+     *
+     * @throws StageRunnerConfigurationException  if {@code name} is empty or not unique
      */
     default void namedStageFunction(@NotNull String name, @NotNull S stage, int order,
                                     @NotNull StageFunction<S> function) {
@@ -154,8 +181,7 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
 
 
     /**
-     * Add a named stage function to {@code stage}. The function will be inserted appropriately using the given
-     * {@code order}.
+     * Registers a named stage function with a description for {@code stage} using the given {@code order}.
      * <p>
      * The description is optional and will be passed to the
      * {@link StageRunnerCallback#preStageFunctionCallback(StageContext, String) preStageFunctionCallback} callback
@@ -166,6 +192,8 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
      * @param order        function order within the given {@code stage}
      * @param description  stage function description or {@code null} for no description
      * @param function     stage function, not {@code null}
+     *
+     * @throws StageRunnerConfigurationException  if {@code name} is empty or not unique
      *
      * @see StageRunnerCallback#preStageFunctionCallback(StageContext, String)
      *

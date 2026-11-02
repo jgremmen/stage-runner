@@ -61,13 +61,26 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
 /**
  * Spring post processor that binds a user defined stage runner interface to the beans in the application context.
  * <p>
- * On startup this processor registers a singleton bean implementing the stage runner interface and inspects every
- * other singleton bean for methods carrying the configured stage function annotation. Matching methods are turned
- * into stage functions and registered with an internal {@link StageRunnerFactory} which the proxy delegates to.
+ * On startup this processor registers a singleton bean implementing the stage runner interface and inspects every other
+ * singleton bean for methods carrying the configured stage function annotation. Matching methods are turned into stage
+ * functions and registered with an internal {@link StageRunnerFactory} which the proxy delegates to.
  * <p>
  * The behavior can be customized by supplying a {@link StageFunctionFilter}, a {@link StageFunctionBuilder}, a
- * {@link StageRunnerProxyBuilder}, a {@link ConversionService} or a stage function name generator through the
- * various setter methods.
+ * {@link StageRunnerProxyBuilder}, a {@link ConversionService} or a stage function name generator through the various
+ * setter methods.
+ * <p>
+ * The functional method of the stage runner interface must return {@code boolean} or {@code void}. Its parameters are
+ * passed to the stage runner as data, named by the {@link Data @Data} annotation or the parameter name. A parameter of
+ * type {@link StageRunnerCallback} is not passed as data but used as callback for the execution.
+ * <p>
+ * The processor is registered as a bean, for example through a {@code static} bean method in a Spring configuration
+ * class:
+ * <pre>
+ * &#x40;Bean
+ * static StageRunnerFactoryProcessor&lt;MyRunner&gt; myRunnerProcessor() {
+ *   return new StageRunnerFactoryProcessor&lt;&gt;(MyRunner.class, MyStageDef.class);
+ * }
+ * </pre>
  *
  * @param <R>  stage runner interface type
  *
@@ -78,23 +91,49 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
 public class StageRunnerFactoryProcessor<R>
     implements BeanPostProcessor, BeanDefinitionRegistryPostProcessor, BeanFactoryAware, InitializingBean
 {
+  /** Logger used by this processor. */
   protected final Log logger = LogFactory.getLog(StageRunnerFactoryProcessor.class);
 
+  /** Stage runner interface implemented by the registered proxy bean. */
   protected final Class<R> stageRunnerInterfaceType;
+
+  /** Descriptor of the stage function annotation marking the bean methods to register. */
   protected final StageFunctionAnnotation stageFunctionAnnotation;
+
+  /** Stage runner factory populated with the discovered stage functions and used by the proxy. */
   protected final DefaultStageRunnerFactory stageRunnerFactory;
+
+  /** Functional method of the stage runner interface. */
   protected final Method stageRunnerInterfaceMethod;
+
+  /**
+   * Data names for the parameters of {@link #stageRunnerInterfaceMethod}, indexed by parameter position. An entry is
+   * {@code null} for a callback parameter.
+   */
   protected final String[] dataNames;
+
+  /** Unmodifiable mapping of data names to the types of the corresponding interface method parameters. */
   protected final Map<String,ResolvableType> dataNameTypeMap;
 
+  /** Bean factory owning this processor. */
   protected BeanFactory beanFactory;
+
+  /** Conversion service used by the default stage function builder, or {@code null} if not yet determined. */
   protected ConversionService conversionService;
 
+  /** Builder for the stage runner proxy, or {@code null} to use the default implementation. */
   protected StageRunnerProxyBuilder stageRunnerProxyBuilder;
+
+  /** Builder for stage functions, or {@code null} to use the default implementation. */
   protected StageFunctionBuilder stageFunctionBuilder;
+
+  /** Whether annotations of the interface method are copied to the generated proxy method. */
   protected boolean copyInterfaceMethodAnnotations;
+
+  /** Generator providing the stage function name for an annotated method, or {@code null} for unnamed functions. */
   protected BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator;
 
+  /** Filter deciding which discovered stage functions are registered; accepts all functions by default. */
   protected StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
     @Override
     public <B,S extends Enum<S>> boolean filter(@NotNull B bean, @NotNull S stage, int order, String name) {
@@ -104,10 +143,15 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Create a stage runner factory processor for the given stage runner interface and stage function annotation type.
+   * Creates a stage runner factory processor for the given stage runner interface and stage function annotation type.
    *
    * @param stageRunnerInterfaceType      stage runner interface type, not {@code null}
    * @param stageFunctionAnnotationType   stage function annotation type, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the stage function annotation is malformed or the stage runner
+   *                                            interface is not a valid functional interface
+   * @throws StageRunnerException               if a data name cannot be determined or is used for more than one
+   *                                            parameter of the interface method
    */
   @SuppressWarnings("unchecked")
   public StageRunnerFactoryProcessor(@NotNull Class<R> stageRunnerInterfaceType,
@@ -185,9 +229,10 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Initializes the processor after all properties have been set. Missing collaborators are supplied with default
-   * implementations: a default {@link StageRunnerProxyBuilder} and, if needed, a default {@link StageFunctionBuilder}
-   * backed by the configured or discovered {@link ConversionService}.
+   * {@inheritDoc}
+   * <p>
+   * Missing collaborators are supplied with default implementations: a default {@link StageRunnerProxyBuilder} and, if
+   * needed, a default {@link StageFunctionBuilder} backed by the configured or discovered {@link ConversionService}.
    */
   @Override
   public void afterPropertiesSet()
@@ -229,8 +274,10 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Analyses singleton beans after initialization and registers any methods carrying the stage function annotation
-   * with the internal stage runner factory. Non singleton beans and beans without a known definition are skipped.
+   * {@inheritDoc}
+   * <p>
+   * Analyses singleton beans after initialization and registers any methods carrying the stage function annotation with
+   * the internal stage runner factory. Non singleton beans and beans without a known definition are skipped.
    *
    * @param bean      the initialized bean, not {@code null}
    * @param beanName  the bean name, not {@code null}
@@ -254,6 +301,8 @@ public class StageRunnerFactoryProcessor<R>
    * Scans the given bean for methods carrying the configured stage function annotation and registers each match.
    *
    * @param bean  the bean to inspect, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if an annotated method cannot be registered as a stage function
    */
   @SuppressWarnings("DataFlowIssue")
   protected void analyseStageFunctions(@NotNull Object bean)
@@ -278,6 +327,9 @@ public class StageRunnerFactoryProcessor<R>
    * @param stageFunctionAnnotationAttributes  merged attributes of the stage function annotation, not {@code null}
    * @param method                             the annotated method, not {@code null}
    * @param bean                               the bean the method belongs to, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function or the function
+   *                                            name is not unique
    */
   @SuppressWarnings("unchecked")
   protected void registerStageFunction(@NotNull AnnotationAttributes stageFunctionAnnotationAttributes,
@@ -322,8 +374,10 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Registers a lazily initialized singleton bean definition for the stage runner interface. The bean is created
-   * through {@link #createStageRunnerProxy()} on first access.
+   * {@inheritDoc}
+   * <p>
+   * Registers a lazily initialized primary singleton bean definition for the stage runner interface, named after the
+   * fully qualified interface name. The bean is created through {@link #createStageRunnerProxy()} on first access.
    *
    * @param beanDefinitionRegistry  the target bean definition registry, not {@code null}
    */
@@ -351,6 +405,8 @@ public class StageRunnerFactoryProcessor<R>
    * @param <S>  stage enumeration type
    *
    * @return  the stage runner proxy instance, never {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the proxy cannot be created
    */
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
@@ -368,8 +424,8 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Locates the single abstract (non default) method of the given functional interface and validates its return
-   * type. The return type must be either {@code boolean} or {@code void}.
+   * Locates the single abstract (non default) method of the given functional interface and validates its return type.
+   * The return type must be either {@code boolean} or {@code void}.
    *
    * @param interfaceType  the candidate functional interface type, not {@code null}
    *
@@ -408,8 +464,10 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Stores the bean factory that owns this processor. It is used to inspect bean scopes and to look up optional
-   * collaborators such as the {@link ConversionService}.
+   * {@inheritDoc}
+   * <p>
+   * The bean factory is used to inspect bean scopes and to look up optional collaborators such as the
+   * {@link ConversionService}.
    *
    * @param beanFactory  the owning bean factory, not {@code null}
    */
@@ -425,6 +483,10 @@ public class StageRunnerFactoryProcessor<R>
    * explicitly, one is looked up in the bean factory or the shared default conversion service is used as fallback.
    *
    * @param conversionService  conversion service, not {@code null}
+   *
+   * @throws IllegalArgumentException  if {@code conversionService} is {@code null}
+   *
+   * @since 0.3.1
    */
   @Contract(mutates = "this")
   public void setConversionService(ConversionService conversionService)
@@ -435,10 +497,12 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Sets the builder used to create the stage runner proxy. When no builder is set explicitly, a default
-   * implementation is used.
+   * Sets the builder used to create the stage runner proxy. When no builder is set explicitly, a default implementation
+   * is used.
    *
    * @param stageRunnerProxyBuilder  stage runner proxy builder, not {@code null}
+   *
+   * @throws IllegalArgumentException  if {@code stageRunnerProxyBuilder} is {@code null}
    */
   @Contract(mutates = "this")
   public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder)
@@ -449,10 +513,12 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Sets the builder used to turn annotated bean methods into stage functions. When no builder is set explicitly,
-   * a default implementation is used.
+   * Sets the builder used to turn annotated bean methods into stage functions. When no builder is set explicitly, a
+   * default implementation is used.
    *
    * @param stageFunctionBuilder  stage function builder, not {@code null}
+   *
+   * @throws IllegalArgumentException  if {@code stageFunctionBuilder} is {@code null}
    */
   @Contract(mutates = "this")
   public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder)
@@ -467,6 +533,8 @@ public class StageRunnerFactoryProcessor<R>
    * default all discovered functions are accepted.
    *
    * @param stageFunctionFilter  stage function filter, not {@code null}
+   *
+   * @throws IllegalArgumentException  if {@code stageFunctionFilter} is {@code null}
    */
   @Contract(mutates = "this")
   public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter)
@@ -478,10 +546,11 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Controls whether annotations declared on the stage runner interface method are copied to the generated proxy
-   * method.
+   * method. The setting only applies to the default stage runner proxy builder and is disabled by default.
    *
-   * @param copyInterfaceMethodAnnotations  {@code true} to copy interface method annotations, {@code false}
-   *                                        otherwise
+   * @param copyInterfaceMethodAnnotations  {@code true} to copy interface method annotations, {@code false} otherwise
+   *
+   * @since 0.3.1
    */
   @Contract(mutates = "this")
   public void setCopyInterfaceMethodAnnotations(boolean copyInterfaceMethodAnnotations) {
@@ -490,14 +559,18 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
+   * Sets the generator which provides the stage function name for an annotated method.
+   * <p>
    * By default, the stage function name is provided by the
    * &#x40;{@link de.sayayi.lib.stagerunner.spring.annotation.StageDefinition.Name Name} annotation. Using a stage
-   * function name generator the name can be calculated dynamically.
+   * function name generator the name can be calculated dynamically from the annotation attributes and the method.
    * <p>
-   * If the name generator returns {@code null} the stage function will be added immediately to the stage runner
-   * factory.
+   * If the name generator returns {@code null}, the stage function is added as a regular stage function, which is
+   * executed for every stage runner execution. Otherwise, it is registered as a named stage function.
    *
    * @param stageFunctionNameGenerator  stage function name generator, not {@code null}
+   *
+   * @throws IllegalArgumentException  if {@code stageFunctionNameGenerator} is {@code null}
    *
    * @since 0.3.2
    */

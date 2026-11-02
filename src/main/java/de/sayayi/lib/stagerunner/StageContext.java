@@ -15,6 +15,8 @@
  */
 package de.sayayi.lib.stagerunner;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -25,28 +27,42 @@ import java.util.function.Predicate;
 
 
 /**
- * The stage context interface provides information about the stage runner:
+ * Context of a single stage runner execution, passed to every {@link StageFunction} and {@link StageRunnerCallback}
+ * invocation.
+ * <p>
+ * The stage context provides:
  * <ul>
- *   <li>Data associated with this stage runner instance</li>
- *   <li>Current stage</li>
- *   <li>Processed and remaining stages</li>
- *   <li>Methods for adding future stage functions</li>
- *   <li>Methods for enabling pre-defined named stage functions</li>
- *   <li>{@link #abort() Abort} function</li>
+ *   <li>the data associated with this stage runner execution</li>
+ *   <li>the current stage</li>
+ *   <li>the processed and remaining stages</li>
+ *   <li>methods for adding stage functions to the current or a future stage</li>
+ *   <li>methods for enabling predefined named stage functions</li>
+ *   <li>a function for {@link #abort() aborting} the execution</li>
  * </ul>
+ * <p>
+ * Stage functions added through this context (see {@link StageFunctionConfigurer}) only apply to the current execution.
+ * A function must be positioned after the function currently being executed; otherwise the execution is aborted and a
+ * {@link StageRunnerConfigurationException StageRunnerConfigurationException} is thrown. Adding functions after the
+ * execution has terminated also results in this exception.
+ * <p>
+ * A stage context is bound to the thread executing the stage runner and is not thread safe.
  *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer<S>
 {
   /**
-   * Returns the stage data associated with {@code name}.
+   * Returns the data value associated with {@code name}, as passed to {@link StageRunner#run(Map)}.
+   * <p>
+   * The value is cast to the type expected by the caller without any conversion. A mismatching type results in a
+   * {@link ClassCastException} at the call site.
    *
    * @param name  data name, not {@code null}
    *
-   * @return  data value for name {@code name} or null if no data is available
+   * @return  data value for name {@code name} or {@code null} if no data is available
    *
    * @param <T>  data type
    *
@@ -57,19 +73,20 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Returns the state being currently processed.
+   * Returns the stage currently being processed.
    *
-   * @return  state currently being processed, never {@code null}
+   * @return  stage currently being processed, never {@code null}
    *
-   * @throws IllegalStateException  if the stage runner hasn't started yet or has finished
+   * @throws StageRunnerException  if the stage runner has not started yet or has terminated
    */
   @Contract(pure = true)
   @NotNull S getCurrentStage();
 
 
   /**
-   * Returns a set with stages which have been processed. The current stage is never part of this
-   * collection.
+   * Returns the stages which have been processed completely. The current stage is never part of this set.
+   * <p>
+   * The returned set is a snapshot; changes to it do not affect this context.
    *
    * @return  set with processed stages, never {@code null}
    */
@@ -78,7 +95,11 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Returns a set with the remaining stages. The current stage is never part of this collection.
+   * Returns the stages which have at least one stage function waiting for execution. The current stage is never part of
+   * this set.
+   * <p>
+   * The returned set is a snapshot; changes to it do not affect this context. After the stage runner has terminated,
+   * the set is empty.
    *
    * @return  set with remaining stages, never {@code null}
    */
@@ -87,13 +108,18 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Abort stage context running.
+   * Aborts the stage runner execution.
+   * <p>
+   * The stage function currently being executed is not interrupted, but no further stage functions are executed after
+   * it returns. The stage runner then reports an unsuccessful run.
+   *
+   * @see #isAborted()
    */
   void abort();
 
 
   /**
-   * Tell, whether the stage runner has been aborted.
+   * Tells whether the stage runner execution has been aborted.
    *
    * @return  {@code true} if the stage runner has been aborted due to an invocation of {@link #abort()},
    *          {@code false} otherwise
@@ -106,16 +132,22 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Enable a named stage function by providing its exact {@code name}.
+   * Enables the named stage function with the exact {@code name} for this execution.
+   * <p>
+   * Named stage functions are registered with the factory through {@link StageFunctionConfigurer.Named} and are only
+   * executed if they are enabled. Enabling a function which has already been enabled has no effect.
    *
-   * @param name  name of the stage function to enabler
+   * @param name  name of the stage function to enable, not {@code null}
    *
    * @return  {@code true} if a stage function with {@code name} exists and has been enabled by this invocation,
    *          {@code false} otherwise
    *
+   * @throws StageRunnerConfigurationException  if the stage runner has terminated or has already passed beyond the
+   *                                            stage and order of the stage function
+   *
    * @since 0.3.0
-   * 
-   * @see #enableNamedStageFunctions(Predicate) 
+   *
+   * @see #enableNamedStageFunctions(Predicate)
    */
   default boolean enableNamedStageFunction(@NotNull String name) {
     return !enableNamedStageFunctions(n -> n.equals(name)).isEmpty();
@@ -123,13 +155,18 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Enable named stage functions by providing a name filter.
+   * Enables all named stage functions whose name is accepted by {@code nameFilter} for this execution.
+   * <p>
+   * Stage functions which have already been enabled are not passed to the filter again.
    *
-   * @param nameFilter  name filter predicate. A stage function is added if and only if the predicate
-   *                    ({@link Predicate#test(Object)}) returns {@code true}
+   * @param nameFilter  name filter predicate, not {@code null}. A stage function is enabled if and only if the
+   *                    predicate ({@link Predicate#test(Object)}) returns {@code true} for its name
    *
-   * @return  a set with the stage function names, which have been enabled as a result of this invocation,
-   *          never {@code null}
+   * @return  a set with the stage function names which have been enabled as a result of this invocation, never
+   *          {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the stage runner has terminated or has already passed beyond the
+   *                                            stage and order of an accepted stage function
    *
    * @since 0.3.0
    */
@@ -137,9 +174,12 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Returns a list of all active functions. Each function provides the {@link FunctionState state} it is currently in.
+   * Returns all stage functions of this execution in execution order, including processed, failed and waiting ones.
+   * Each function provides the {@link FunctionState state} it is in.
+   * <p>
+   * The returned list is a snapshot taken at the time of invocation and must not be modified.
    *
-   * @return  immutable list of all active functions, never {@code null}
+   * @return  list of all stage functions, never {@code null}
    *
    * @since 0.3.0
    */
@@ -150,12 +190,16 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
+   * Read only view of a stage function within a stage runner execution.
+   *
+   * @see StageContext#getFunctions()
+   *
    * @since 0.3.0
    */
   interface Function
   {
     /**
-     * Return the function state for this function.
+     * Returns the execution state of this function.
      *
      * @return  function state, never {@code null}
      */
@@ -164,7 +208,7 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
     /**
-     * Returns the stage enum for this function.
+     * Returns the stage this function belongs to.
      *
      * @return  stage enumeration, never {@code null}
      */
@@ -172,10 +216,22 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
     @NotNull Enum<?> getStage();
 
 
+    /**
+     * Returns the order of this function within its stage. Functions with a lower order are executed first.
+     *
+     * @return  function order
+     *
+     * @see StageFunctionConfigurer#DEFAULT_ORDER
+     */
     @Contract(pure = true)
     int getOrder();
 
 
+    /**
+     * Returns the description provided when this function was registered.
+     *
+     * @return  function description or {@code null} if no description was provided
+     */
     @Contract(pure = true)
     String getDescription();
   }
@@ -184,7 +240,7 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Stage function state.
+   * Execution state of a stage function.
    *
    * @since 0.3.0
    *
@@ -193,17 +249,14 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    */
   enum FunctionState
   {
-    /** Function has been processed. */
+    /** Function has been executed successfully. */
     PROCESSED,
-
 
     /** Function is currently executing. */
     EXECUTING,
 
-
-    /** Function execution failed. */
+    /** Function execution has failed with an exception. */
     FAILED,
-
 
     /** Function is waiting for execution. */
     WAITING

@@ -22,6 +22,13 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
+/**
+ * Tests {@link StageFunctionAnnotation#buildFrom(Class)}.
+ * <p>
+ * Covers the detection of all stage definition properties of a fully specified stage function annotation.
+ *
+ * @since 0.3.0
+ */
 @DisplayName("Stage function annotation")
 class StageFunctionAnnotationTest
 {

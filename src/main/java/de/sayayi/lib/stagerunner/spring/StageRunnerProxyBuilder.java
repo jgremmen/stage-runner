@@ -36,12 +36,12 @@ import java.lang.reflect.Method;
 public interface StageRunnerProxyBuilder
 {
   /**
-   * Create and initialize a proxy stage runner. The generated proxy must implement {@code stageRunnerInterfaceType}
-   * and use {@code stageRunnerFactory} for creating new staqe runner instances.
+   * Creates and initializes a stage runner proxy. The generated proxy must implement {@code stageRunnerInterfaceType}
+   * and use {@code stageRunnerFactory} for creating new stage runner instances.
    * <p>
    * The {@code dataNames} array contains the data map key name for the corresponding
-   * {@code stageRunnerInterfaceMethod} parameter. If the value in {@code dataNames} is {@code null}, it is not
-   * required to store its parameter value in the data map.
+   * {@code stageRunnerInterfaceMethod} parameter. If the value in {@code dataNames} is {@code null}, it is not required
+   * to store its parameter value in the data map.
    *
    * @param stageType                   stage enumeration type, not {@code null}
    * @param stageRunnerInterfaceType    stage runner interface type, not {@code null}
@@ -52,8 +52,8 @@ public interface StageRunnerProxyBuilder
    *
    * @return  stage runner proxy instance, never {@code null}
    *
-   * @param <R>  stage runner interface type, not {@code null}
-   * @param <S>  stage enumeration type, not {@code null}
+   * @param <R>  stage runner interface type
+   * @param <S>  stage enumeration type
    *
    * @throws StageRunnerConfigurationException  if the proxy cannot be built for the given interface
    */

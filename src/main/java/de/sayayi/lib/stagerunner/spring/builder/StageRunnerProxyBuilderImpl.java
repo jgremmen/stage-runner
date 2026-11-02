@@ -37,6 +37,7 @@ import net.bytebuddy.implementation.bytecode.member.FieldAccess;
 import net.bytebuddy.implementation.bytecode.member.MethodInvocation;
 import net.bytebuddy.implementation.bytecode.member.MethodReturn;
 import net.bytebuddy.implementation.bytecode.member.MethodVariableAccess;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -59,16 +60,21 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
  * <p>
  * The generated proxy subclasses the user defined stage runner interface, keeps a reference to a
  * {@link StageRunnerFactory} and implements {@link FactoryAccessor} to expose it. Each invocation of the interface
- * method obtains a new runner from the factory, collects the method arguments into a data map and runs it,
- * optionally forwarding a {@link StageRunnerCallback} parameter when present.
+ * method obtains a new runner from the factory, collects the method arguments into a data map and runs it, optionally
+ * forwarding a {@link StageRunnerCallback} parameter when present.
+ * <p>
+ * Instances are immutable and thread safe.
  *
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
+@ApiStatus.Internal
 public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implements StageRunnerProxyBuilder
 {
+  /** Name of the generated proxy field holding the stage runner factory. */
   private static final String FACTORY_FIELD_NAME = "factory";
 
+  /** Whether interface method annotations are copied to the proxy method. */
   private final boolean copyInterfaceMethodAnnotations;
 
 
@@ -83,6 +89,11 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
   }
 
 
+  /**
+   * {@inheritDoc}
+   * <p>
+   * The proxy class is generated in the class loader of {@code stageRunnerInterfaceType}.
+   */
   @Override
   public @NotNull <R,S extends Enum<S>> R createProxy(@NotNull Class<S> stageType,
                                                       @NotNull Class<R> stageRunnerInterfaceType,
@@ -128,11 +139,14 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
 
 
   /**
-   * ByteBuddy {@link Implementation} for the generated proxy constructor. It calls the super constructor and stores
-   * the {@link StageRunnerFactory} parameter into the private {@code factory} field.
+   * ByteBuddy {@link Implementation} for the generated proxy constructor. It calls the super constructor and stores the
+   * {@link StageRunnerFactory} parameter into the private {@code factory} field.
    */
   private static final class ProxyConstructorImplementation extends AbstractImplementation
   {
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public @NotNull ByteCodeAppender appender(@NotNull Target target)
     {
@@ -159,17 +173,28 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
 
 
   /**
-   * ByteBuddy {@link Implementation} for the generated stage runner interface method. It creates a new stage runner
-   * via the factory, assembles the data map from the method parameters and invokes
-   * {@link de.sayayi.lib.stagerunner.StageRunner#run run} on it. A trailing {@link StageRunnerCallback} parameter,
-   * if declared on the interface method, is forwarded to the runner.
+   * ByteBuddy {@link Implementation} for the generated stage runner interface method. It creates a new stage runner via
+   * the factory, assembles the data map from the method parameters and invokes
+   * {@link de.sayayi.lib.stagerunner.StageRunner#run run} on it. A {@link StageRunnerCallback} parameter, if declared
+   * on the interface method, is forwarded to the runner. The result of the run is returned if the interface method
+   * returns {@code boolean}.
    */
   private static final class ProxyMethodImplementation extends AbstractImplementation
   {
+    /** Stage runner interface method. */
     private final MethodDescription method;
+
+    /** Data names indexed by parameter position. */
     private final String[] dataNames;
 
 
+    /**
+     * Creates a new implementation for the given interface method.
+     *
+     * @param method     stage runner interface method, not {@code null}
+     * @param dataNames  data names indexed by parameter position, with {@code null} for parameters which are not passed
+     *                   as data, not {@code null}
+     */
     private ProxyMethodImplementation(@NotNull MethodDescription method, @NotNull String[] dataNames)
     {
       this.method = method;
@@ -177,6 +202,9 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public @NotNull ByteCodeAppender appender(@NotNull Target target)
     {
@@ -227,7 +255,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
 
     /**
      * Builds a data map instance from the interface method parameters that have an associated data name. Parameters
-     * with primitive types are boxed. The resulting map is an immutable copy.
+     * with primitive types are boxed. The resulting map is unmodifiable.
      *
      * @return  the stack manipulations that leave the data map on the operand stack, never {@code null}
      */
@@ -300,8 +328,8 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
 
 
     /**
-     * Returns the first parameter of the interface method whose type is assignable to {@link StageRunnerCallback},
-     * or {@code null} when the interface method does not accept a callback.
+     * Returns the first parameter of the interface method whose type is assignable to {@link StageRunnerCallback}, or
+     * {@code null} when the interface method does not accept a callback.
      *
      * @return  the callback parameter, or {@code null} if none is present
      */

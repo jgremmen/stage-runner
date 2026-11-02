@@ -25,8 +25,8 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * A filter is consulted by the {@link StageRunnerFactoryProcessor} once for every annotated stage function method
  * detected on a managed bean. Returning {@code false} silently skips the candidate, allowing callers to narrow
- * registration by bean type, stage, order or resolved function name (e.g. based on profile, environment or feature
- * flags).
+ * registration by bean type, stage, order or resolved function name (for example based on profile, environment or
+ * feature flags).
  *
  * @author Jeroen Gremmen
  * @since 0.3.0
@@ -35,7 +35,7 @@ import org.jetbrains.annotations.NotNull;
 public interface StageFunctionFilter
 {
   /**
-   * Test whether the given stage function candidate must be registered.
+   * Tests whether the given stage function candidate is registered.
    *
    * @param bean   bean instance declaring the stage function, not {@code null}
    * @param stage  stage at which the function would be executed, not {@code null}

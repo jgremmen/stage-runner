@@ -26,6 +26,11 @@ import static java.lang.annotation.ElementType.METHOD;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 
+/**
+ * Stage function annotation used by the Spring integration tests, declaring all stage definition properties.
+ *
+ * @since 0.3.0
+ */
 @Target(METHOD)
 @Retention(RUNTIME)
 public @interface StageDef

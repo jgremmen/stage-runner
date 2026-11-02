@@ -32,6 +32,14 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 
+/**
+ * Tests the {@link StageRunnerFactoryProcessor} within a Spring application context.
+ * <p>
+ * Covered aspects are the detection of the functional method of the stage runner interface and running the generated
+ * stage runner proxy, including a {@code null} data value.
+ *
+ * @since 0.3.0
+ */
 @SpringJUnitConfig(StageRunnerFactoryProcessorTest.StageConfiguration.class)
 class StageRunnerFactoryProcessorTest
 {

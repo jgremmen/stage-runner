@@ -29,7 +29,10 @@
  *       user defined stage runner interface.</li>
  * </ul>
  * The stage function annotation itself is described by
- * {@link de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation}.
+ * {@link de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation} and is built from the meta annotations in
+ * {@link de.sayayi.lib.stagerunner.spring.annotation}. Generated stage runner proxies implement
+ * {@link de.sayayi.lib.stagerunner.spring.FactoryAccessor}, which gives access to the underlying stage runner
+ * factory.
  *
  * @author Jeroen Gremmen
  * @since 0.3.0

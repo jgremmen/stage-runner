@@ -32,6 +32,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
 /**
+ * Tests the resolution of stage function parameters by type in {@link StageFunctionBuilderImpl}.
+ * <p>
+ * Covered aspects are the selection of the strongest match independent of the data map iteration order and the
+ * detection of ambiguous matches.
+ *
  * @author Jeroen Gremmen
  * @since 0.4.0
  */

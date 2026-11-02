@@ -22,7 +22,12 @@ import org.jetbrains.annotations.NotNull;
 
 
 /**
- * Stage runner proxies may implement this interface to provide access to the internal stage runner factory.
+ * Provides access to the stage runner factory behind a stage runner proxy.
+ * <p>
+ * Proxies created by the default {@link StageRunnerProxyBuilder} implement this interface. Casting a proxy to
+ * {@code FactoryAccessor} allows applications to register additional stage functions programmatically.
+ *
+ * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
  * @since 0.3.2
@@ -31,7 +36,7 @@ import org.jetbrains.annotations.NotNull;
 public interface FactoryAccessor<S extends Enum<S>>
 {
   /**
-   * Return the populated stage runner factory.
+   * Returns the stage runner factory used by the proxy, populated with the discovered stage functions.
    *
    * @return  stage runner factory, never {@code null}
    */
@@ -40,10 +45,11 @@ public interface FactoryAccessor<S extends Enum<S>>
 
 
   /**
-   * Convenience method, which allows access to the stage function configurer. If the internal stage runner factory
-   * is not configurable, an {@link IllegalStateException} is thrown.
+   * Returns the stage runner factory as a stage function configurer.
    *
    * @return  stage function configurer, never {@code null}
+   *
+   * @throws IllegalStateException  if the stage runner factory does not implement {@link StageFunctionConfigurer}
    */
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
@@ -58,10 +64,11 @@ public interface FactoryAccessor<S extends Enum<S>>
 
 
   /**
-   * Convenience method, which allows access to the named stage function configurer. If the internal stage runner
-   * factory is not configurable, an {@link IllegalStateException} is thrown.
+   * Returns the stage runner factory as a named stage function configurer.
    *
-   * @return  stage function configurer, never {@code null}
+   * @return  named stage function configurer, never {@code null}
+   *
+   * @throws IllegalStateException  if the stage runner factory does not implement {@link StageFunctionConfigurer.Named}
    */
   @Contract(pure = true)
   @SuppressWarnings("unchecked")

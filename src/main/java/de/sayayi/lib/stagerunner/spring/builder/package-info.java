@@ -28,6 +28,8 @@
  *       {@link de.sayayi.lib.stagerunner.StageRunnerFactory}.</li>
  * </ul>
  * Both builders share common helpers through {@link de.sayayi.lib.stagerunner.spring.builder.AbstractBuilder}.
+ * <p>
+ * This package is not exported by the module and is not part of the public API.
  *
  * @author Jeroen Gremmen
  * @since 0.3.0

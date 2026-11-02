@@ -29,25 +29,31 @@ import static java.util.Arrays.fill;
 /**
  * Internal ordered array of {@link StageOrderFunction stage functions}.
  * <p>
- * Entries are kept sorted by stage and, within each stage, by order value. New entries are inserted at the
- * position that keeps this ordering while preserving insertion order between functions sharing the same
- * stage and order. Alongside each function the array also tracks its current
- * {@link de.sayayi.lib.stagerunner.StageContext.FunctionState execution state} so that a stage runner can
- * report progress.
+ * Entries are kept sorted by stage and, within each stage, by order value. New entries are inserted at the position
+ * that keeps this ordering while preserving insertion order between functions sharing the same stage and order.
+ * Alongside each function the array also tracks its current
+ * {@link de.sayayi.lib.stagerunner.StageContext.FunctionState execution state} so that a stage runner can report
+ * progress.
  *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 final class StageOrderFunctionArray<S extends Enum<S>>
 {
+  /** Backing array of stage functions, or {@code null} if no function has been added yet. */
   StageOrderFunction<S>[] functions;
+
+  /** Execution state for each entry in {@link #functions}, or {@code null} if no function has been added yet. */
   FunctionState[] executionState;
+
+  /** Number of stage functions in this array. */
   int size;
 
 
   /**
-   * Create a new empty stage order function array.
+   * Creates a new empty stage order function array.
    */
   StageOrderFunctionArray()
   {
@@ -58,9 +64,8 @@ final class StageOrderFunctionArray<S extends Enum<S>>
 
 
   /**
-   * Create a copy of the given stage order function array. The copy shares the {@link StageOrderFunction}
-   * instances with the source but starts with all execution states reset to
-   * {@link FunctionState#WAITING WAITING}.
+   * Creates a copy of the given stage order function array. The copy shares the {@link StageOrderFunction} instances
+   * with the source but starts with all execution states reset to {@link FunctionState#WAITING WAITING}.
    *
    * @param array  source array, not {@code null}
    */
@@ -81,10 +86,10 @@ final class StageOrderFunctionArray<S extends Enum<S>>
 
 
   /**
-   * Insert the given stage function at the position that keeps the array sorted by stage and order.
+   * Inserts the given stage function at the position that keeps the array sorted by stage and order.
    * <p>
-   * Functions sharing the same stage and order are appended after previously inserted ones so insertion
-   * order is retained. The backing array grows on demand.
+   * Functions sharing the same stage and order are appended after previously inserted ones so insertion order is
+   * retained. The backing array grows on demand.
    *
    * @param function  stage function to add, not {@code null}
    *
@@ -131,6 +136,16 @@ final class StageOrderFunctionArray<S extends Enum<S>>
   }
 
 
+  /**
+   * Compares a stage function to be inserted with an existing array entry, ordering by stage first and by order value
+   * second. Entries with identical stage and order are treated as smaller than {@code newFunction}, so the new function
+   * is positioned after them.
+   *
+   * @param newFunction    stage function to be inserted, not {@code null}
+   * @param arrayFunction  existing array entry, not {@code null}
+   *
+   * @return  a negative value if {@code newFunction} sorts before {@code arrayFunction}, a positive value otherwise
+   */
   @Contract(pure = true)
   private int compare(@NotNull StageOrderFunction<S> newFunction, @NotNull StageOrderFunction<S> arrayFunction)
   {

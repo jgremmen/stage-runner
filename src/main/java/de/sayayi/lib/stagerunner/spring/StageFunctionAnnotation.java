@@ -32,9 +32,9 @@ import static org.springframework.util.StringUtils.hasLength;
  * Descriptor for a user defined stage function annotation.
  * <p>
  * A stage function annotation is a custom annotation that marks a method as executable within a specific stage of a
- * stage runner. This class captures the relevant metadata of such an annotation: the annotation type itself, the
- * enum type used to identify stages, and the names of the annotation properties that provide the stage, order,
- * description and function name values.
+ * stage runner. This class captures the relevant metadata of such an annotation: the annotation type itself, the enum
+ * type used to identify stages, and the names of the annotation properties that provide the stage, order, description
+ * and function name values.
  * <p>
  * Instances are created through {@link #buildFrom(Class)}, which inspects the annotation for the meta annotations
  * defined in {@link StageDefinition} and validates their return types.
@@ -44,14 +44,35 @@ import static org.springframework.util.StringUtils.hasLength;
  */
 public final class StageFunctionAnnotation
 {
+  /** Stage function annotation type. */
   private final @NotNull Class<? extends Annotation> annotationType;
+
+  /** Stage enum type. */
   private final @NotNull Class<? extends Enum<?>> stageType;
+
+  /** Name of the stage property. */
   private final @NotNull String stageProperty;
+
+  /** Name of the order property, or {@code null} if not declared. */
   private final String orderProperty;
+
+  /** Name of the description property, or {@code null} if not declared. */
   private final String descriptionProperty;
+
+  /** Name of the function name property, or {@code null} if not declared. */
   private final String nameProperty;
 
 
+  /**
+   * Creates a new descriptor. Instances are created through {@link #buildFrom(Class)}.
+   *
+   * @param annotationType       stage function annotation type, not {@code null}
+   * @param stageType            stage enum type, not {@code null}
+   * @param stageProperty        name of the stage property, not {@code null}
+   * @param orderProperty        name of the order property or {@code null}
+   * @param descriptionProperty  name of the description property or {@code null}
+   * @param nameProperty         name of the function name property or {@code null}
+   */
   private StageFunctionAnnotation(@NotNull Class<? extends Annotation> annotationType,
                                   @NotNull Class<? extends Enum<?>> stageType,
                                   @NotNull String stageProperty,
@@ -115,8 +136,8 @@ public final class StageFunctionAnnotation
 
 
   /**
-   * Returns the name of the annotation property that holds the order value, or {@code null} if the annotation does
-   * not declare one.
+   * Returns the name of the annotation property that holds the order value, or {@code null} if the annotation does not
+   * declare one.
    *
    * @return  the order property name or {@code null}
    */
@@ -166,8 +187,8 @@ public final class StageFunctionAnnotation
 
 
   /**
-   * Returns the name of the annotation property that holds the function name value, or {@code null} if the
-   * annotation does not declare one.
+   * Returns the name of the annotation property that holds the function name value, or {@code null} if the annotation
+   * does not declare one.
    *
    * @return  the name property name or {@code null}
    */
@@ -286,6 +307,9 @@ public final class StageFunctionAnnotation
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public boolean equals(Object o)
   {
@@ -305,6 +329,9 @@ public final class StageFunctionAnnotation
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public int hashCode()
   {
@@ -323,6 +350,9 @@ public final class StageFunctionAnnotation
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public String toString()
   {

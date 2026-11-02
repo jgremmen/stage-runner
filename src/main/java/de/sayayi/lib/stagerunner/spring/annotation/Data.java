@@ -27,29 +27,34 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 
 /**
- * This annotation is used for associating method parameters - either stage function parameters or runner interface
- * functional method parameters - with the data passed to {@link StageRunner#run(Map)}.
+ * Associates a method parameter with an entry of the data passed to {@link StageRunner#run(Map)}.
  * <p>
- * If this annotation is missing, the parameter name is used.
- *
- * @see StageDefinition
+ * The annotation can be used on stage function parameters as well as on parameters of the functional method of a stage
+ * runner interface. If this annotation is missing, the parameter name is used as data name and, for stage function
+ * parameters, the data entry is matched by type if no entry with that name exists.
  *
  * @author Jeroen Gremmen
  * @since 0.3.0
+ *
+ * @see StageDefinition
  */
 @Target(PARAMETER)
 @Retention(RUNTIME)
 public @interface Data
 {
   /**
-   * Name of the data parameter.
+   * Name of the data entry. Alias for {@link #name()}.
+   *
+   * @return  data name, or an empty string to use the parameter name
    */
   @AliasFor("name")
   String value() default "";
 
 
   /**
-   * Name of the data parameter.
+   * Name of the data entry. Alias for {@link #value()}.
+   *
+   * @return  data name, or an empty string to use the parameter name
    */
   @AliasFor("value")
   String name() default "";

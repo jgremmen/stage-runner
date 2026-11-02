@@ -21,6 +21,12 @@ import java.beans.Transient;
 import java.util.List;
 
 
+/**
+ * Stage runner interface used by the Spring integration tests.
+ *
+ * @since 0.3.0
+ */
+@FunctionalInterface
 public interface MyRunnerInterface
 {
   @Transient

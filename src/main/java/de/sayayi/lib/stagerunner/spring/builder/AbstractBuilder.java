@@ -19,6 +19,7 @@ import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.scaffold.InstrumentedType;
 import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.utility.RandomString;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
@@ -32,9 +33,14 @@ import java.lang.reflect.Type;
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
+@ApiStatus.Internal
 abstract class AbstractBuilder
 {
-  /** Random string generator used to make generated class names unique. */
+  /**
+   * Random string generator used to make generated class names unique.
+   *
+   * @since 0.3.2
+   */
   protected final RandomString randomString = new RandomString(5);
 
 
@@ -56,7 +62,7 @@ abstract class AbstractBuilder
    * type arguments.
    *
    * @param rawType    the raw type to parameterize, not {@code null}
-   * @param parameter  the type arguments to apply
+   * @param parameter  the type arguments to apply, not {@code null}
    *
    * @return  a parameterized generic type description, never {@code null}
    */
@@ -74,6 +80,11 @@ abstract class AbstractBuilder
    */
   protected static abstract class AbstractImplementation implements Implementation
   {
+    /**
+     * {@inheritDoc}
+     * <p>
+     * This implementation returns {@code instrumentedType} unchanged.
+     */
     @Override
     public @NotNull InstrumentedType prepare(@NotNull InstrumentedType instrumentedType) {
       return instrumentedType;

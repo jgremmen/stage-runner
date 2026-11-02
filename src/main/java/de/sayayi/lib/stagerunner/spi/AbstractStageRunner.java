@@ -25,22 +25,23 @@ import java.util.Map;
 /**
  * Abstract base implementation of {@link StageRunner}.
  * <p>
- * Each invocation of {@link #run(Map, StageRunnerCallback)} creates a fresh stage context that iterates
- * through the stage functions configured on the associated {@link AbstractStageRunnerFactory factory}.
- * Subclasses may extend this class in order to expose an application specific runner API on top of the
- * standard runner contract.
+ * Each invocation of {@link #run(Map, StageRunnerCallback)} creates a fresh stage context that iterates through the
+ * stage functions configured on the associated {@link AbstractStageRunnerFactory factory}. Subclasses may extend this
+ * class in order to expose an application specific runner API on top of the standard runner contract.
  *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRunner<S>
 {
+  /** Factory providing the shared stage function configuration. */
   private final AbstractStageRunnerFactory<S> stageRunnerFactory;
 
 
   /**
-   * Create a new stage runner bound to the given factory.
+   * Creates a new stage runner bound to the given factory.
    *
    * @param stageRunnerFactory  factory providing the shared stage function configuration, not {@code null}
    */
@@ -49,6 +50,12 @@ public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRun
   }
 
 
+  /**
+   * {@inheritDoc}
+   * <p>
+   * Each invocation executes the stage functions configured on the factory at the time of invocation, using a new
+   * stage context.
+   */
   @Override
   public boolean run(@NotNull Map<String,Object> data, @NotNull StageRunnerCallback<S> callback) {
     return new StageContextImpl<>(stageRunnerFactory, data).run(callback);

@@ -21,7 +21,23 @@ import org.jetbrains.annotations.NotNull;
 
 
 /**
- * Interface providing callback functions and exception handler which are invoked during stage running.
+ * Callback for observing and influencing a stage runner execution.
+ * <p>
+ * It provides notification methods which are invoked at the start and end of each stage and stage function, as well as
+ * exception handlers which decide how failures of stage functions are handled. All methods have a default
+ * implementation, so implementations only need to override the methods they are interested in.
+ * <p>
+ * For a single stage function, the callback methods are invoked in this order:
+ * <ul>
+ *   <li>{@link #preStageCallback(StageContext)}, if the function is the first one of its stage</li>
+ *   <li>{@link #preStageFunctionCallback(StageContext, String)}</li>
+ *   <li>{@link #stageExceptionHandler(StageContext, Throwable)} or
+ *       {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)}, if the
+ *       function has failed</li>
+ *   <li>{@link #postStageFunctionCallback(StageContext)}</li>
+ *   <li>{@link #postStageCallback(StageContext, Enum)}, if the function is the last one of its stage and the
+ *       execution has not been aborted</li>
+ * </ul>
  *
  * @param <S>  Stage enum type
  *
@@ -30,14 +46,15 @@ import org.jetbrains.annotations.NotNull;
 public interface StageRunnerCallback<S extends Enum<S>>
 {
   /**
-   * Default callback instance aborting stage runner execution in case of an exception.
+   * Default callback instance which ignores all notifications and stops the stage runner execution by throwing a
+   * {@link StageRunnerException} in case of an exception.
    */
   @SuppressWarnings("rawtypes")
   StageRunnerCallback<?> DEFAULT = new StageRunnerCallback() {};
 
 
   /**
-   * Callback method which is invoked at the beginning of a new stage.
+   * Notifies the callback at the beginning of a new stage, before its first stage function is executed.
    *
    * @param stageContext  stage context, not {@code null}
    */
@@ -46,20 +63,23 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
 
   /**
-   * Callback method which is invoked at the beginning of a stage function.
+   * Notifies the callback before a stage function is executed.
    *
    * @param stageContext  stage context, not {@code null}
    * @param description   optional description for the stage function which was provided on
-   *                      {@link StageFunctionConfigurer#addStageFunction(Enum, String, StageFunction) registration}
+   *                      {@link StageFunctionConfigurer#addStageFunction(Enum, String, StageFunction) registration} or
+   *                      {@code null}
    */
   default void preStageFunctionCallback(@NotNull StageContext<S> stageContext, String description) {
   }
 
 
   /**
-   * Callback method which is invoked after each stage function.
+   * Notifies the callback after a stage function has been executed, regardless of whether it has succeeded.
    * <p>
-   * In case of an exception, {@link #stageExceptionHandler(StageContext, Throwable)} has already been invoked.
+   * In case of an exception, {@link #stageExceptionHandler(StageContext, Throwable)} or
+   * {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)} has already been
+   * invoked.
    *
    * @param stageContext  stage context, not {@code null}
    */
@@ -68,7 +88,9 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
 
   /**
-   * Callback method which is invoked after each stage has completed.
+   * Notifies the callback after all stage functions of a stage have been executed.
+   * <p>
+   * This method is not invoked for the current stage if the execution has been aborted.
    *
    * @param stageContext  stage context, not {@code null}
    * @param stage         stage which has completed, not {@code null}
@@ -78,11 +100,12 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
 
   /**
-   * Callback method which is invoked when a new stage function is added during stage running.
+   * Notifies the callback that a stage function has been added to the running execution, either through
+   * {@link StageContext#addStageFunction(Enum, int, String, StageFunction)} or by enabling a named stage function.
    *
    * @param stage        current or future stage the function was added to, never {@code null}
-   * @param order        order of the stage function within {@code stage}, never {@code null}
-   * @param description  optional description of the function
+   * @param order        order of the stage function within {@code stage}
+   * @param description  optional description of the function or {@code null}
    *
    * @since 0.3.4
    */
@@ -91,15 +114,23 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
 
   /**
-   * Exception handler which is invoked if the stage function currently being processed throws an exception.
+   * Handles an exception thrown by the stage function currently being processed.
    * <p>
-   * The default implementation throws the exception wrapped inside a {@link StageRunnerException}.
+   * This handler is not invoked for a {@link StageRunnerConfigurationException}; those are passed to
+   * {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)} instead. If the
+   * handler returns normally, the exception is considered handled and the execution continues with the next stage
+   * function.
+   * <p>
+   * The default implementation rethrows a {@link StageRunnerException} as is and wraps any other exception inside a
+   * {@link StageRunnerException}.
    * <p>
    * Any exception thrown by this handler will lead to exiting the stage runner. On its way out, callback
    * {@link #postStageFunctionCallback(StageContext)} will be invoked.
    *
    * @param stageContext  stage context, not {@code null}
    * @param exception     exception thrown by the current stage function, not {@code null}
+   *
+   * @throws StageRunnerException  if the exception is not handled (default behavior)
    */
   default void stageExceptionHandler(@NotNull StageContext<S> stageContext, @NotNull Throwable exception)
   {
@@ -111,9 +142,23 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
 
   /**
+   * Handles a configuration exception thrown by the stage function currently being processed, for example when the
+   * function adds another stage function at a position the execution has already passed.
+   * <p>
+   * If the handler returns normally, the exception is considered handled and the execution continues with the next
+   * stage function, unless the execution has been aborted.
+   * <p>
+   * The default implementation rethrows the exception, which leads to exiting the stage runner. On its way out,
+   * callback {@link #postStageFunctionCallback(StageContext)} will be invoked.
+   *
+   * @param stageContext            stage context, not {@code null}
+   * @param configurationException  configuration exception thrown by the current stage function, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the exception is not handled (default behavior)
+   *
    * @since 0.4.0
    */
-  default void stageConfigurationExceptionHandler(@NotNull StageContext<S> stageContext,
+  default void stageConfigurationExceptionHandler(@SuppressWarnings("unused") @NotNull StageContext<S> stageContext,
                                                   @NotNull StageRunnerConfigurationException configurationException) {
     throw configurationException;
   }

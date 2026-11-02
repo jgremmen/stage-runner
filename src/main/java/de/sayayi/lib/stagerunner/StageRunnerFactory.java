@@ -21,16 +21,21 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Factory for creating stage runner instances.
+ * <p>
+ * The factory holds the stage function configuration that is shared by all runners it creates.
  *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
+ *
+ * @see de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory
  */
 @FunctionalInterface
 public interface StageRunnerFactory<S extends Enum<S>>
 {
   /**
-   * Create a new stage runner.
+   * Creates a new stage runner which executes the stage functions configured for this factory.
    *
    * @return  newly created stage runner, never {@code null}
    */

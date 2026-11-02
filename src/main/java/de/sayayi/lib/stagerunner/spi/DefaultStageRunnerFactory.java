@@ -29,11 +29,12 @@ import org.jetbrains.annotations.NotNull;
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 public class DefaultStageRunnerFactory<S extends Enum<S>> extends AbstractStageRunnerFactory<S>
 {
   /**
-   * Create a new default stage runner factory for the given stage enum type.
+   * Creates a new default stage runner factory for the given stage enum type.
    *
    * @param stageEnumType  stage enum class, not {@code null}
    */
@@ -42,6 +43,9 @@ public class DefaultStageRunnerFactory<S extends Enum<S>> extends AbstractStageR
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public @NotNull StageRunner<S> createRunner() {
     return new AbstractStageRunner<>(DefaultStageRunnerFactory.this) {};

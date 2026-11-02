@@ -34,7 +34,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 /**
+ * Tests the execution of stage runners created by an {@link de.sayayi.lib.stagerunner.spi.AbstractStageRunnerFactory}.
+ * <p>
+ * Covered aspects are the order of the callback notifications, the current, processed and remaining stages and the data
+ * reported by the {@link StageContext}, and stage functions added dynamically during an execution.
+ *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 @DisplayName("Stage runner")
 class StageRunnerTest

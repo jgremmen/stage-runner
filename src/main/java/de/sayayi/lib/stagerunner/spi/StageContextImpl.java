@@ -34,35 +34,54 @@ import static java.util.Collections.emptySet;
 /**
  * Default {@link StageContext} implementation used by {@link AbstractStageRunner}.
  * <p>
- * Each instance represents a single execution of a stage runner. It holds the working copy of the factory's
- * stage function configuration, tracks which stages have already been processed and drives the callback
- * notifications while iterating through the stage functions. Once the context has finished or has been
- * aborted, it cannot be reused.
+ * Each instance represents a single execution of a stage runner. It holds the working copy of the factory's stage
+ * function configuration, tracks which stages have already been processed and drives the callback notifications while
+ * iterating through the stage functions. Once the context has finished or has been aborted, it cannot be reused.
+ * <p>
+ * Instances are not thread safe and must only be used by the thread executing the stage runner.
  *
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 {
+  /** Factory this context has been created for. */
   private final AbstractStageRunnerFactory<S> stageRunnerFactory;
+
+  /** Working copy of the stage functions for this execution. */
   private final StageOrderFunctionArray<S> functionArray;
+
+  /** Stages which have been processed completely. */
   private final Set<S> processedStages;
+
+  /** Data passed to the stage runner. */
   private final Map<String,Object> data;
+
+  /** Names of the named stage functions enabled for this execution. */
   private final Set<String> enabledStageFunctionNames;
 
+  /** Callback for the running execution, or {@code null} if not running. */
   private StageRunnerCallback<S> callback;
+
+  /** Lifecycle state of this context. */
   private State state;
+
+  /** Index of the stage function currently being executed, or {@code -1} before the first one. */
   private int functionIndex;
+
+  /** Whether the execution has been aborted. */
   private boolean aborted;
 
 
   /**
-   * Create a new stage context for a single run.
+   * Creates a new stage context for a single run, based on a snapshot of the factory's current stage function
+   * configuration.
    *
    * @param stageRunnerFactory  factory providing the shared stage function configuration, not {@code null}
-   * @param data                data map accessible from stage functions through {@link #getData(String)},
-   *                            not {@code null}
+   * @param data                data map accessible from stage functions through {@link #getData(String)}, not
+   *                            {@code null}
    */
   StageContextImpl(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory, @NotNull Map<String,Object> data)
   {
@@ -88,6 +107,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   @SuppressWarnings("unchecked")
   public <T> T getData(@NotNull String name) {
@@ -95,12 +117,18 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Contract(pure = true)
   public boolean isAborted() {
     return aborted;
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public @NotNull S getCurrentStage()
   {
@@ -114,6 +142,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public @NotNull Set<S> getProcessedStages()
   {
@@ -123,6 +154,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public @NotNull Set<S> getRemainingStages()
   {
@@ -143,6 +177,13 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   * <p>
+   * The stage function only applies to this execution. If it would be positioned before the stage function currently
+   * being executed, the execution is aborted before the exception is thrown. If a callback is active, it is notified
+   * through {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)}.
+   */
   @Override
   public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
   {
@@ -162,6 +203,13 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   * <p>
+   * If an accepted stage function would be positioned before the stage function currently being executed, the execution
+   * is aborted before the exception is thrown. If a callback is active, it is notified through
+   * {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)} for each enabled function.
+   */
   @Override
   public @NotNull Set<String> enableNamedStageFunctions(@NotNull Predicate<String> nameFilter)
   {
@@ -195,6 +243,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public void abort() {
     aborted = true;
@@ -202,8 +253,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
 
   /**
-   * Run all configured stage functions in order, notifying the given callback about stage and function
-   * transitions as well as failures.
+   * Runs all configured stage functions in order, notifying the given callback about stage and function transitions as
+   * well as failures.
    * <p>
    * The context must be in {@link State#IDLE idle} state. When the method returns, the context is either
    * {@link State#FINISHED finished} or {@link State#ABORTED aborted} and cannot be run again.
@@ -211,6 +262,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    * @param callback  stage runner callback, not {@code null}
    *
    * @return  {@code true} if the run completed without being aborted, {@code false} otherwise
+   *
+   * @throws StageRunnerException  if the context is currently running
+   * @throws RuntimeException      any exception thrown by one of the {@code callback} methods
    */
   boolean run(@NotNull StageRunnerCallback<S> callback)
   {
@@ -278,6 +332,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public @NotNull List<Function> getFunctions()
   {
@@ -307,14 +364,14 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     FINISHED,
 
     /**
-     * Context execution has been aborted, either by {@link StageContext#abort()} or by a configuration error
-     * occurring during the run.
+     * Context execution has been aborted, either by {@link StageContext#abort()} or by a configuration error occurring
+     * during the run.
      */
     ABORTED;
 
 
     /**
-     * Tell whether this state represents a terminated context that can no longer run.
+     * Tells whether this state represents a terminated context that can no longer run.
      *
      * @return  {@code true} if the state is {@link #FINISHED} or {@link #ABORTED}, {@code false} otherwise
      */
@@ -328,16 +385,25 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
 
   /**
-   * Adapter exposing a {@link StageOrderFunction} together with its current execution state through the
-   * public {@link Function} view returned by {@link StageContext#getFunctions()}.
+   * Adapter exposing a {@link StageOrderFunction} together with its current execution state through the public
+   * {@link Function} view returned by {@link StageContext#getFunctions()}.
    */
   @SuppressWarnings("ClassCanBeRecord")
   private static final class FunctionAdapter implements Function
   {
+    /** Execution state of the function at the time of creation. */
     private final FunctionState functionState;
+
+    /** Stage function descriptor. */
     private final StageOrderFunction<?> stageFunction;
 
 
+    /**
+     * Creates a new function view.
+     *
+     * @param functionState  execution state of the function at the time of creation, not {@code null}
+     * @param stageFunction  stage function descriptor, not {@code null}
+     */
     private FunctionAdapter(@NotNull FunctionState functionState,
                             @NotNull StageOrderFunction<?> stageFunction)
     {
@@ -346,30 +412,45 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public @NotNull FunctionState getFunctionState() {
       return functionState;
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public @NotNull Enum<?> getStage() {
       return stageFunction.stage;
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int getOrder() {
       return stageFunction.order;
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String getDescription() {
       return stageFunction.description;
     }
 
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String toString()
     {

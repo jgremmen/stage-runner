@@ -23,9 +23,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 
 /**
- * This interface contains a collection of annotations used to build your stage type specific method annotation.
+ * Collection of meta annotations used to build an application specific stage function annotation.
  * <p>
- * E.g.
+ * The properties of the stage function annotation are marked with these meta annotations. A {@link Stage @Stage}
+ * property is mandatory; {@link Name @Name}, {@link Order @Order} and {@link Description @Description} are optional.
+ * For example:
  * <pre>
  * &#x40;Target(METHOD)
  * &#x40;Retention(RUNTIME)
@@ -44,7 +46,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *   String comment();
  * }
  * </pre>
- *
+ * <p>
  * A stage function is then decorated with this annotation:
  * <pre>
  * &#x40;MyStageDef(stage = MyStage.INIT, priority = 100, comment = "initialize")
@@ -59,8 +61,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 public interface StageDefinition
 {
   /**
-   * Marks the annotation method which returns the name.
-   * The return value must be of type {@code String}.
+   * Marks the annotation property which provides the stage function name. The property type must be {@code String}.
+   * <p>
+   * A stage function with a non empty name is registered as a named stage function, which must be enabled explicitly
+   * for an execution.
+   *
+   * @see de.sayayi.lib.stagerunner.StageFunctionConfigurer.Named
    */
   @Target(METHOD)
   @Retention(RUNTIME)
@@ -69,8 +75,7 @@ public interface StageDefinition
 
 
   /**
-   * Marks the annotation method which returns the stage.
-   * The return value must be an enumeration.
+   * Marks the annotation property which provides the stage. The property type must be the stage enum type.
    */
   @Target(METHOD)
   @Retention(RUNTIME)
@@ -79,8 +84,7 @@ public interface StageDefinition
 
 
   /**
-   * Marks the annotation method which returns the stage function order.
-   * The return value must be an {@code int}.
+   * Marks the annotation property which provides the stage function order. The property type must be {@code int}.
    */
   @Target(METHOD)
   @Retention(RUNTIME)
@@ -89,8 +93,8 @@ public interface StageDefinition
 
 
   /**
-   * Marks the annotation method which returns the stage function description.
-   * The return value must be of type {@code String}.
+   * Marks the annotation property which provides the stage function description. The property type must be
+   * {@code String}.
    */
   @Target(METHOD)
   @Retention(RUNTIME)

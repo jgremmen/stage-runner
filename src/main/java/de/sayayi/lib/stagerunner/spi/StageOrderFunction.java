@@ -29,18 +29,26 @@ import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 @SuppressWarnings("ClassCanBeRecord")
 final class StageOrderFunction<S extends Enum<S>>
 {
+  /** Stage the function belongs to, never {@code null}. */
   final @NotNull S stage;
+
+  /** Optional stage function description, may be {@code null}. */
   final String description;
+
+  /** Ordering value of the function within its stage. */
   final int order;
+
+  /** Stage function to execute, never {@code null}. */
   final @NotNull StageFunction<S> function;
 
 
   /**
-   * Create a new stage function descriptor with a {@code null} description and the
+   * Creates a new stage function descriptor with a {@code null} description and the
    * {@link de.sayayi.lib.stagerunner.StageFunctionConfigurer#DEFAULT_ORDER default order}.
    *
    * @param stage     stage the function belongs to, not {@code null}
@@ -52,7 +60,7 @@ final class StageOrderFunction<S extends Enum<S>>
 
 
   /**
-   * Create a new stage function descriptor.
+   * Creates a new stage function descriptor.
    *
    * @param stage        stage the function belongs to, not {@code null}
    * @param description  optional stage function description, may be {@code null}
@@ -69,6 +77,12 @@ final class StageOrderFunction<S extends Enum<S>>
   }
 
 
+  /**
+   * {@inheritDoc}
+   * <p>
+   * Two descriptors are equal if they share the same stage, order and function. The description is not taken into
+   * account.
+   */
   @Override
   public boolean equals(Object o)
   {
@@ -81,12 +95,18 @@ final class StageOrderFunction<S extends Enum<S>>
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public int hashCode() {
     return (stage.hashCode() * 31 + order) * 31 + function.hashCode();
   }
 
 
+  /**
+   * {@inheritDoc}
+   */
   @Override
   public String toString()
   {
