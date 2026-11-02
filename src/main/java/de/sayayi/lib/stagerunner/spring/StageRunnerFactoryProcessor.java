@@ -42,7 +42,6 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
-import org.springframework.util.Assert;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -50,6 +49,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 
+import static java.util.Objects.requireNonNull;
 import static org.springframework.aop.framework.AopProxyUtils.ultimateTargetClass;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
@@ -124,7 +124,10 @@ public class StageRunnerFactoryProcessor<R>
   /** Builder for the stage runner proxy, or {@code null} to use the default implementation. */
   protected StageRunnerProxyBuilder stageRunnerProxyBuilder;
 
-  /** Builder for stage functions, or {@code null} to use the default implementation. */
+  /**
+   * Builder for stage functions, or {@code null} to use the default implementation. Access it through
+   * {@link #getStageFunctionBuilder()}, which creates the default implementation on first use.
+   */
   protected StageFunctionBuilder stageFunctionBuilder;
 
   /** Whether annotations of the interface method are copied to the generated proxy method. */
@@ -231,8 +234,9 @@ public class StageRunnerFactoryProcessor<R>
   /**
    * {@inheritDoc}
    * <p>
-   * Missing collaborators are supplied with default implementations: a default {@link StageRunnerProxyBuilder} and, if
-   * needed, a default {@link StageFunctionBuilder} backed by the configured or discovered {@link ConversionService}.
+   * A missing {@link StageRunnerProxyBuilder} is supplied with a default implementation. The default
+   * {@link StageFunctionBuilder} is not created here, but when the first stage function is registered (see
+   * {@link #getStageFunctionBuilder()}).
    */
   @Override
   public void afterPropertiesSet()
@@ -242,22 +246,40 @@ public class StageRunnerFactoryProcessor<R>
       logger.trace("set default stage runner proxy builder");
       setStageRunnerProxyBuilder(new StageRunnerProxyBuilderImpl(copyInterfaceMethodAnnotations));
     }
+  }
 
+
+  /**
+   * Returns the stage function builder, creating the default implementation on first use if none has been set.
+   * <p>
+   * The default builder uses the configured {@link ConversionService}. If none has been set, the unique
+   * {@code ConversionService} bean of the bean factory is used, or the shared default conversion service if there is no
+   * unique bean.
+   * <p>
+   * This processor is a {@link BeanDefinitionRegistryPostProcessor} and is therefore initialized before any bean post
+   * processor has been registered. Looking up the conversion service lazily, when the first stage function is
+   * registered, makes sure the conversion service bean is created and post-processed like any other bean.
+   *
+   * @return  stage function builder, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  protected synchronized @NotNull StageFunctionBuilder getStageFunctionBuilder()
+  {
     if (stageFunctionBuilder == null)
     {
       if (conversionService == null)
       {
-        try {
-          conversionService = beanFactory.getBean(ConversionService.class);
-        } catch(NoSuchBeanDefinitionException ex) {
-          logger.warn("could not find ConversionService bean - use default conversion service", ex);
-          conversionService = DefaultConversionService.getSharedInstance();
-        }
+        conversionService = beanFactory
+            .getBeanProvider(ConversionService.class)
+            .getIfUnique(DefaultConversionService::getSharedInstance);
       }
 
       logger.trace("set default stage function builder");
       setStageFunctionBuilder(new StageFunctionBuilderImpl(conversionService));
     }
+
+    return stageFunctionBuilder;
   }
 
 
@@ -346,7 +368,7 @@ public class StageRunnerFactoryProcessor<R>
     if (stageFunctionFilter.filter(bean, (Enum)stageEnum, order, name))
     {
       var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
-      var function = stageFunctionBuilder
+      var function = getStageFunctionBuilder()
           .createStageFunction(stageFunctionAnnotation, dataNameTypeMap, method, bean);
 
       if (logger.isDebugEnabled())
@@ -483,7 +505,8 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Sets the conversion service used to convert data map values to method parameter types. When no service is set
-   * explicitly, one is looked up in the bean factory or the shared default conversion service is used as fallback.
+   * explicitly, the unique {@code ConversionService} bean is looked up when the first stage function is registered,
+   * with the shared default conversion service as fallback.
    *
    * @param conversionService  conversion service, not {@code null}
    *
@@ -492,10 +515,8 @@ public class StageRunnerFactoryProcessor<R>
    * @since 0.3.1
    */
   @Contract(mutates = "this")
-  public void setConversionService(ConversionService conversionService)
-  {
-    Assert.notNull(conversionService, "conversionService must not be null");
-    this.conversionService = conversionService;
+  public void setConversionService(ConversionService conversionService) {
+    this.conversionService = requireNonNull(conversionService, "conversionService must not be null");
   }
 
 
@@ -510,8 +531,8 @@ public class StageRunnerFactoryProcessor<R>
   @Contract(mutates = "this")
   public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder)
   {
-    Assert.notNull(stageRunnerProxyBuilder, "stageRunnerProxyBuilder must not be null");
-    this.stageRunnerProxyBuilder = stageRunnerProxyBuilder;
+    this.stageRunnerProxyBuilder =
+        requireNonNull(stageRunnerProxyBuilder, "stageRunnerProxyBuilder must not be null");
   }
 
 
@@ -524,10 +545,8 @@ public class StageRunnerFactoryProcessor<R>
    * @throws IllegalArgumentException  if {@code stageFunctionBuilder} is {@code null}
    */
   @Contract(mutates = "this")
-  public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder)
-  {
-    Assert.notNull(stageFunctionBuilder, "stageFunctionBuilder must not be null");
-    this.stageFunctionBuilder = stageFunctionBuilder;
+  public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder) {
+    this.stageFunctionBuilder = requireNonNull(stageFunctionBuilder, "stageFunctionBuilder must not be null");
   }
 
 
@@ -540,10 +559,8 @@ public class StageRunnerFactoryProcessor<R>
    * @throws IllegalArgumentException  if {@code stageFunctionFilter} is {@code null}
    */
   @Contract(mutates = "this")
-  public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter)
-  {
-    Assert.notNull(stageFunctionFilter, "stageFunctionFilter must not be null");
-    this.stageFunctionFilter = stageFunctionFilter;
+  public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter) {
+    this.stageFunctionFilter = requireNonNull(stageFunctionFilter, "stageFunctionFilter must not be null");
   }
 
 
@@ -581,7 +598,7 @@ public class StageRunnerFactoryProcessor<R>
   public void setStageFunctionNameGenerator(
       @NotNull BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator)
   {
-    Assert.notNull(stageFunctionNameGenerator, "stageFunctionNameGenerator must not be null");
-    this.stageFunctionNameGenerator = stageFunctionNameGenerator;
+    this.stageFunctionNameGenerator =
+        requireNonNull(stageFunctionNameGenerator, "stageFunctionNameGenerator must not be null");
   }
 }
