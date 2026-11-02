@@ -26,6 +26,7 @@ import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.modifier.MethodManifestation;
 import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.bytecode.ByteCodeAppender;
@@ -50,6 +51,7 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.TypeDescriptor;
 
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
@@ -60,7 +62,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
-import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.Default.INJECTION;
 import static net.bytebuddy.matcher.ElementMatchers.isToString;
 import static net.bytebuddy.matcher.ElementMatchers.named;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
@@ -120,14 +121,14 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       @NotNull Method stageFunction,
       @NotNull Object bean)
   {
-    var methodParameters = stageFunction.getParameters();
-    var parameters = new NameWithQualifierAndType[methodParameters.length];
-    var stageContextType = forClassWithGenerics(
+    final var methodParameters = stageFunction.getParameters();
+    final var parameters = new NameWithQualifierAndType[methodParameters.length];
+    final var stageContextType = forClassWithGenerics(
         StageContext.class, stageFunctionAnnotation.getStageType());
 
-    for(int p = 0; p < methodParameters.length; p++)
+    for(var p = 0; p < methodParameters.length; p++)
     {
-      var parameterType = new TypeDescriptor(new MethodParameter(stageFunction, p));
+      final var parameterType = new TypeDescriptor(new MethodParameter(stageFunction, p));
 
       parameters[p] = new NameWithQualifierAndType(
           parameterType.getResolvableType().isAssignableFrom(stageContextType)
@@ -140,13 +141,46 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     if (methodDescription.isStatic())
       bean = null;
 
+    final var hostLookup = hostLookup(stageFunction.getDeclaringClass());
+
     try {
       return Arrays.stream(parameters).anyMatch(NameWithQualifierAndType::isConvertableQualifier)
-          ? buildForWithConversion(bean, methodDescription, parameters, stageFunctionAnnotation)
-          : buildForNoConversion(bean, methodDescription, parameters, stageFunctionAnnotation);
+          ? buildForWithConversion(bean, methodDescription, parameters, stageFunctionAnnotation, hostLookup)
+          : buildForNoConversion(bean, methodDescription, parameters, stageFunctionAnnotation, hostLookup);
     } catch(ReflectiveOperationException ex) {
       throw new StageRunnerConfigurationException(
           "failed to generate stage function for method " + methodDescription, ex);
+    }
+  }
+
+
+  /**
+   * Returns a lookup with full privilege access on {@code hostClass}. It is used to define the generated stage function
+   * class in the package and class loader of {@code hostClass}, giving the generated class access to package-private
+   * bean classes and parameter types.
+   *
+   * @param hostClass  class declaring the stage function method, not {@code null}
+   *
+   * @return  private lookup on {@code hostClass}, never {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the package of {@code hostClass} is not open to this library
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  private static @NotNull MethodHandles.Lookup hostLookup(@NotNull Class<?> hostClass)
+  {
+    final var lookup = MethodHandles.lookup();
+    final var libraryModule = lookup.lookupClass().getModule();
+
+    libraryModule.addReads(hostClass.getModule());
+
+    try {
+      return MethodHandles.privateLookupIn(hostClass, lookup);
+    } catch(IllegalAccessException ex) {
+      throw new StageRunnerConfigurationException("failed to access package " + hostClass.getPackageName() +
+          " for generating a stage function for " + hostClass.getName() +
+          "; the package must be open to " + libraryModule, ex);
     }
   }
 
@@ -159,6 +193,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * @param method                   target method, not {@code null}
    * @param parameters               resolved parameter bindings, not {@code null}
    * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
+   * @param hostLookup               lookup on the class declaring {@code method}, not {@code null}
    *
    * @return  new stage function instance, never {@code null}
    *
@@ -168,11 +203,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    */
   private @NotNull <S extends Enum<S>> StageFunction<S> buildForNoConversion(
       Object bean, @NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters,
-      @NotNull StageFunctionAnnotation stageFunctionAnnotation) throws ReflectiveOperationException
+      @NotNull StageFunctionAnnotation stageFunctionAnnotation, @NotNull MethodHandles.Lookup hostLookup)
+      throws ReflectiveOperationException
   {
     final Class<? extends StageFunction<S>> stageFunctionClass = createStageFunctionType(
         parameterizedType(AbstractStageFunction.class, stageFunctionAnnotation.getStageType()),
-        method, parameters, stageFunctionAnnotation);
+        method, parameters, stageFunctionAnnotation, hostLookup);
 
     return stageFunctionClass
         .getDeclaredConstructor(Object.class)
@@ -189,6 +225,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * @param method                   target method, not {@code null}
    * @param parameters               resolved parameter bindings, not {@code null}
    * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
+   * @param hostLookup               lookup on the class declaring {@code method}, not {@code null}
    *
    * @return  new stage function instance, never {@code null}
    *
@@ -200,11 +237,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       Object bean,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters,
-      @NotNull StageFunctionAnnotation stageFunctionAnnotation) throws ReflectiveOperationException
+      @NotNull StageFunctionAnnotation stageFunctionAnnotation,
+      @NotNull MethodHandles.Lookup hostLookup) throws ReflectiveOperationException
   {
     final Class<? extends StageFunction<S>> stageFunctionClass = createStageFunctionType(
         parameterizedType(AbstractStageFunctionWithConversion.class, stageFunctionAnnotation.getStageType()),
-        method, parameters, stageFunctionAnnotation);
+        method, parameters, stageFunctionAnnotation, hostLookup);
 
     return stageFunctionClass
         .getDeclaredConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
@@ -223,6 +261,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * @param method                   target method, not {@code null}
    * @param parameters               resolved parameter bindings, not {@code null}
    * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
+   * @param hostLookup               lookup on the class declaring {@code method}, not {@code null}
    *
    * @return  generated stage function class, never {@code null}
    *
@@ -233,12 +272,13 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       @NotNull TypeDescription.Generic superType,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters,
-      @NotNull StageFunctionAnnotation stageFunctionAnnotation)
+      @NotNull StageFunctionAnnotation stageFunctionAnnotation,
+      @NotNull MethodHandles.Lookup hostLookup)
   {
     return (Class<? extends StageFunction<S>>)stageFunctionClassCache
         .computeIfAbsent(
             new CacheKey(method, parameters),
-            ck -> buildStageFunctionClass(superType, method, parameters, stageFunctionAnnotation));
+            ck -> buildStageFunctionClass(superType, method, parameters, stageFunctionAnnotation, hostLookup));
   }
 
 
@@ -246,12 +286,15 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * Generates a new {@link StageFunction} class as a subclass of {@code superType} that invokes {@code method} on its
    * bean with the values obtained from the stage context data map.
    * <p>
-   * The class is defined in the class loader of the stage function annotation.
+   * The class is defined through {@code hostLookup} in the package and class loader of the class declaring
+   * {@code method}. This way the generated class can access the declaring class and its parameter types, even if they
+   * are not public.
    *
    * @param superType                generic super type of the generated class, not {@code null}
    * @param method                   target method, not {@code null}
    * @param parameters               resolved parameter bindings, not {@code null}
    * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
+   * @param hostLookup               lookup on the class declaring {@code method}, not {@code null}
    *
    * @return  generated stage function class, never {@code null}
    */
@@ -260,9 +303,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       @NotNull TypeDescription.Generic superType,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters,
-      @NotNull StageFunctionAnnotation stageFunctionAnnotation)
+      @NotNull StageFunctionAnnotation stageFunctionAnnotation,
+      @NotNull MethodHandles.Lookup hostLookup)
   {
-    var className = StageFunction.class.getName() +
+    final var hostClass = hostLookup.lookupClass();
+    var className = hostClass.getName() +
+        "$StageFunction" +
         '$' + stageFunctionAnnotation.getStageType().getSimpleName() +
         '$' + method.getName() +
         '$' + randomString.nextString();
@@ -278,7 +324,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
             .method(isToString())
                 .intercept(FixedValue.value(StageFunction.class.getSimpleName() + " adapter for " + method))
             .make()
-            .load(stageFunctionAnnotation.getAnnotationType().getClassLoader(), INJECTION)
+            .load(hostClass.getClassLoader(), ClassLoadingStrategy.UsingLookup.of(hostLookup))
             .getLoaded();
   }
 
