@@ -94,15 +94,32 @@ final class StageOrderFunctionArray<S extends Enum<S>>
    * @param function  stage function to add, not {@code null}
    *
    * @return  the index at which the function has been inserted
+   *
+   * @see #insertionIndex(StageOrderFunction)
    */
-  @SuppressWarnings("unchecked")
-  int add(@NotNull StageOrderFunction<S> function)
-  {
-    int low = 0;
+  int add(@NotNull StageOrderFunction<S> function) {
+    return insert(insertionIndex(function), function);
+  }
 
-    for(int high = size - 1; low <= high;)
+
+  /**
+   * Returns the position at which the given stage function would be inserted by {@link #add(StageOrderFunction)},
+   * without modifying this array.
+   *
+   * @param function  stage function, not {@code null}
+   *
+   * @return  insertion index, in the range {@code 0} to {@link #size}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  int insertionIndex(@NotNull StageOrderFunction<S> function)
+  {
+    var low = 0;
+
+    for(var high = size - 1; low <= high;)
     {
-      final int mid = (low + high) >>> 1;
+      final var mid = (low + high) >>> 1;
 
       if (compare(function, functions[mid]) > 0)
         low = mid + 1;
@@ -110,6 +127,25 @@ final class StageOrderFunctionArray<S extends Enum<S>>
         high = mid - 1;
     }
 
+    return low;
+  }
+
+
+  /**
+   * Inserts the given stage function at {@code index}, which must have been obtained from
+   * {@link #insertionIndex(StageOrderFunction)} for the current state of this array. The backing array grows on
+   * demand.
+   *
+   * @param index     insertion index, as returned by {@link #insertionIndex(StageOrderFunction)}
+   * @param function  stage function to insert, not {@code null}
+   *
+   * @return  {@code index}
+   *
+   * @since 0.4.0
+   */
+  @SuppressWarnings("unchecked")
+  int insert(int index, @NotNull StageOrderFunction<S> function)
+  {
     if (functions == null)
     {
       functions = (StageOrderFunction<S>[])newInstance(StageOrderFunction.class, 4);
@@ -121,18 +157,18 @@ final class StageOrderFunctionArray<S extends Enum<S>>
       executionState = copyOf(executionState, size + 4);
     }
 
-    final int moveElements = size - low;
+    final int moveElements = size - index;
     if (moveElements > 0)
     {
-      arraycopy(functions, low, functions, low + 1, moveElements);
-      arraycopy(executionState, low, executionState, low + 1, moveElements);
+      arraycopy(functions, index, functions, index + 1, moveElements);
+      arraycopy(executionState, index, executionState, index + 1, moveElements);
     }
 
-    functions[low] = function;
-    executionState[low] = WAITING;
+    functions[index] = function;
+    executionState[index] = WAITING;
     size++;
 
-    return low;
+    return index;
   }
 
 

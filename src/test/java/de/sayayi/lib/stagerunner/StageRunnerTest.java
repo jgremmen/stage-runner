@@ -15,6 +15,7 @@
  */
 package de.sayayi.lib.stagerunner;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.spi.AbstractStageRunner;
 import de.sayayi.lib.stagerunner.spi.AbstractStageRunnerFactory;
 import lombok.SneakyThrows;
@@ -29,8 +30,7 @@ import java.util.*;
 import static de.sayayi.lib.stagerunner.TestStage.*;
 import static java.util.Arrays.asList;
 import static java.util.Collections.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
@@ -171,6 +171,80 @@ class StageRunnerTest
     assertEquals(
         asList(">START", ">fn(S)", "<fn", "<START", ">PROCESS", ">fn(P)", "<fn", "<PROCESS", ">END", ">fn(E)", "<fn", "<END"),
         runner.log);
+  }
+
+
+  @Test
+  @DisplayName("Rejected stage function is not added")
+  void rejectedFunctionIsNotAdded()
+  {
+    val factory = new MyStageRunnerFactory();
+    val functions = new ArrayList<StageContext.Function>();
+
+    factory.addStageFunction(START, "S", ctx -> {});
+    factory.addStageFunction(PROCESS, "P", ctx -> {
+      assertThrows(StageRunnerConfigurationException.class,
+          () -> ctx.addStageFunction(START, "late", c -> fail()));
+      assertEquals(PROCESS, ctx.getCurrentStage());
+      functions.addAll(ctx.getFunctions());
+    });
+    factory.addStageFunction(END, "E", ctx -> {});
+
+    assertFalse(factory.createRunner().run(emptyMap()));
+    assertEquals(asList("S:PROCESSED", "P:EXECUTING", "E:WAITING"), states(functions));
+  }
+
+
+  @Test
+  @DisplayName("Function failing with a rejected stage function is marked as failed")
+  void rejectedFunctionMarksCurrentFunctionFailed()
+  {
+    val factory = new MyStageRunnerFactory();
+    val functions = new ArrayList<StageContext.Function>();
+
+    factory.addStageFunction(START, "S", ctx -> ctx.addStageFunction(INIT, "late", c -> {}));
+    factory.addStageFunction(END, "E", ctx -> {});
+
+    assertThrows(StageRunnerConfigurationException.class,
+        () -> factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+          @Override
+          public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+            functions.addAll(stageContext.getFunctions());
+          }
+        }));
+    assertEquals(asList("S:FAILED", "E:WAITING"), states(functions));
+  }
+
+
+  @Test
+  @DisplayName("Rejected named stage function prevents enabling any accepted function")
+  void rejectedNamedFunctionEnablesNone()
+  {
+    val factory = new MyStageRunnerFactory();
+    val functions = new ArrayList<StageContext.Function>();
+
+    factory.namedStageFunction("early", INIT, "early", ctx -> fail());
+    factory.namedStageFunction("later", END, "later", ctx -> fail());
+    factory.addStageFunction(START, "S", ctx -> {
+      assertThrows(StageRunnerConfigurationException.class, () -> ctx.enableNamedStageFunctions(name -> true));
+      assertEquals(START, ctx.getCurrentStage());
+      functions.addAll(ctx.getFunctions());
+    });
+    factory.addStageFunction(PROCESS, "P", ctx -> {});
+
+    assertFalse(factory.createRunner().run(emptyMap()));
+    assertEquals(asList("S:EXECUTING", "P:WAITING"), states(functions));
+  }
+
+
+  private static List<String> states(List<StageContext.Function> functions)
+  {
+    val states = new ArrayList<String>();
+
+    for(val function: functions)
+      states.add(function.getDescription() + ':' + function.getFunctionState());
+
+    return states;
   }
 
 

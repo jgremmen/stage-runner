@@ -41,9 +41,9 @@ import java.util.function.Predicate;
  * </ul>
  * <p>
  * Stage functions added through this context (see {@link StageFunctionConfigurer}) only apply to the current execution.
- * A function must be positioned after the function currently being executed; otherwise the execution is aborted and a
- * {@link StageRunnerConfigurationException StageRunnerConfigurationException} is thrown. Adding functions after the
- * execution has terminated also results in this exception.
+ * A function must be positioned after the function currently being executed; otherwise the function is not added, the
+ * execution is aborted and a {@link StageRunnerConfigurationException StageRunnerConfigurationException} is thrown.
+ * Adding functions after the execution has terminated also results in this exception.
  * <p>
  * A stage context is bound to the thread executing the stage runner and is not thread safe.
  *
@@ -166,7 +166,8 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    *          {@code null}
    *
    * @throws StageRunnerConfigurationException  if the stage runner has terminated or has already passed beyond the
-   *                                            stage and order of an accepted stage function
+   *                                            stage and order of an accepted stage function. In the latter case none
+   *                                            of the accepted stage functions is enabled
    *
    * @since 0.3.0
    */

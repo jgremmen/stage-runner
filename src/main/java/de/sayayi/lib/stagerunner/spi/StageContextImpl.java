@@ -24,6 +24,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
+import java.util.Map.Entry;
 import java.util.function.Predicate;
 
 import static de.sayayi.lib.stagerunner.StageContext.FunctionState.*;
@@ -181,8 +182,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    * {@inheritDoc}
    * <p>
    * The stage function only applies to this execution. If it would be positioned before the stage function currently
-   * being executed, the execution is aborted before the exception is thrown. If a callback is active, it is notified
-   * through {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)}.
+   * being executed, it is not added and the execution is aborted before the exception is thrown. If a callback is
+   * active, it is notified through {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)}.
    */
   @Override
   public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
@@ -190,13 +191,16 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     if (state.isTerminated())
       throw new StageRunnerConfigurationException("stage runner has terminated");
 
-    final int index = functionArray.add(new StageOrderFunction<>(stage, description, order, function));
+    final var stageFunction = new StageOrderFunction<>(stage, description, order, function);
+    final var index = functionArray.insertionIndex(stageFunction);
 
     if (state == RUNNING && index <= functionIndex)
     {
       abort();
       throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage + " and order " + order);
     }
+
+    functionArray.insert(index, stageFunction);
 
     if (callback != null)
       callback.addStageFunctionCallback(stage, order, description);
@@ -206,8 +210,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   /**
    * {@inheritDoc}
    * <p>
-   * If an accepted stage function would be positioned before the stage function currently being executed, the execution
-   * is aborted before the exception is thrown. If a callback is active, it is notified through
+   * All accepted stage functions are validated before any of them is enabled. If an accepted stage function would be
+   * positioned before the stage function currently being executed, none of them is enabled and the execution is
+   * aborted before the exception is thrown. If a callback is active, it is notified through
    * {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)} for each enabled function.
    */
   @Override
@@ -216,28 +221,39 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     if (state.isTerminated())
       throw new StageRunnerConfigurationException("stage runner has terminated");
 
-    var enabledFunctions = new HashSet<String>();
+    final var acceptedFunctions = new ArrayList<Entry<String,StageOrderFunction<S>>>();
     String name;
 
     for(var stageFunctionEntry: stageRunnerFactory.namedStageFunctions().entrySet())
       if (!enabledStageFunctionNames.contains(name = stageFunctionEntry.getKey()) && nameFilter.test(name))
       {
-        var stageFunction = stageFunctionEntry.getValue();
-        var index = functionArray.add(stageFunction);
+        final var stageFunction = stageFunctionEntry.getValue();
 
-        if (state == RUNNING && index <= functionIndex)
+        // inserting accepted functions positioned after the current function does not move the current function,
+        // so validating each of them against the unmodified array is sufficient
+        if (state == RUNNING && functionArray.insertionIndex(stageFunction) <= functionIndex)
         {
           abort();
           throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stageFunction.stage +
               " and order " + stageFunction.order + " for stage function '" + name + '\'');
         }
 
-        enabledFunctions.add(name);
-        enabledStageFunctionNames.add(name);
-
-        if (callback != null)
-          callback.addStageFunctionCallback(stageFunction.stage, stageFunction.order, stageFunction.description);
+        acceptedFunctions.add(stageFunctionEntry);
       }
+
+    final var enabledFunctions = new HashSet<String>();
+
+    for(var acceptedFunction: acceptedFunctions)
+    {
+      var stageFunction = acceptedFunction.getValue();
+
+      functionArray.add(stageFunction);
+      enabledFunctions.add(name = acceptedFunction.getKey());
+      enabledStageFunctionNames.add(name);
+
+      if (callback != null)
+        callback.addStageFunctionCallback(stageFunction.stage, stageFunction.order, stageFunction.description);
+    }
 
     return enabledFunctions;
   }

@@ -86,4 +86,23 @@ class StageOrderFunctionArrayTest
     assertEquals(4, array.add(new StageOrderFunction<>(PROCESS, null, 100, ctx -> {})));
     assertEquals(5, array.add(new StageOrderFunction<>(PROCESS, null, 200, ctx -> {})));
   }
+
+
+  @Test
+  @DisplayName("Insertion index does not modify the array")
+  void insertionIndex()
+  {
+    val array = new StageOrderFunctionArray<TestStage>();
+
+    assertEquals(0, array.insertionIndex(new StageOrderFunction<>(START, ctx -> {})));
+    assertEquals(0, array.size);
+
+    array.add(new StageOrderFunction<>(START, ctx -> {}));
+    array.add(new StageOrderFunction<>(END, ctx -> {}));
+
+    assertEquals(0, array.insertionIndex(new StageOrderFunction<>(INIT, ctx -> {})));
+    assertEquals(1, array.insertionIndex(new StageOrderFunction<>(START, ctx -> {})));
+    assertEquals(2, array.insertionIndex(new StageOrderFunction<>(END, ctx -> {})));
+    assertEquals(2, array.size);
+  }
 }
