@@ -46,6 +46,7 @@ import net.bytebuddy.jar.asm.Opcodes;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.springframework.aop.support.AopUtils;
 import org.springframework.core.MethodParameter;
 import org.springframework.core.ResolvableType;
 import org.springframework.core.convert.ConversionService;
@@ -53,6 +54,7 @@ import org.springframework.core.convert.TypeDescriptor;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -113,6 +115,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * <p>
    * A parameter whose type is assignable from {@link StageContext} receives the stage context itself. If the method is
    * static, {@code bean} is ignored.
+   * <p>
+   * Parameters are bound using {@code stageFunction} as declared on the target class. If {@code bean} is a JDK dynamic
+   * proxy, the generated stage function invokes the corresponding interface method on the proxy instead.
+   *
+   * @throws StageRunnerConfigurationException  if {@code bean} is a JDK dynamic proxy which does not expose
+   *                                            {@code stageFunction} through one of its interfaces
    */
   @Override
   public @NotNull <S extends Enum<S>> StageFunction<S> createStageFunction(
@@ -137,11 +145,14 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
           parameterType);
     }
 
-    var methodDescription = new MethodDescription.ForLoadedMethod(stageFunction);
-    if (methodDescription.isStatic())
+    var invocableMethod = stageFunction;
+    if (Modifier.isStatic(stageFunction.getModifiers()))
       bean = null;
+    else
+      invocableMethod = selectInvocableMethod(stageFunction, bean);
 
-    final var hostLookup = hostLookup(stageFunction.getDeclaringClass());
+    final var methodDescription = new MethodDescription.ForLoadedMethod(invocableMethod);
+    final var hostLookup = hostLookup(invocableMethod.getDeclaringClass());
 
     try {
       return Arrays.stream(parameters).anyMatch(NameWithQualifierAndType::isConvertableQualifier)
@@ -150,6 +161,35 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     } catch(ReflectiveOperationException ex) {
       throw new StageRunnerConfigurationException(
           "failed to generate stage function for method " + methodDescription, ex);
+    }
+  }
+
+
+  /**
+   * Returns the method to invoke on {@code bean} for the given stage function method.
+   * <p>
+   * If {@code bean} is a JDK dynamic proxy, the method declared on the target class cannot be invoked on it. In that
+   * case the corresponding method of an interface implemented by the proxy is returned. For all other beans, including
+   * class based (CGLIB) proxies, {@code stageFunction} is returned unchanged.
+   *
+   * @param stageFunction  stage function method, as declared on the target class, not {@code null}
+   * @param bean           bean instance, possibly a proxy, not {@code null}
+   *
+   * @return  method which can be invoked on {@code bean}, never {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if {@code bean} is a proxy which does not expose {@code stageFunction}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  private static @NotNull Method selectInvocableMethod(@NotNull Method stageFunction, @NotNull Object bean)
+  {
+    try {
+      return AopUtils.selectInvocableMethod(stageFunction, bean.getClass());
+    } catch(IllegalStateException ex) {
+      throw new StageRunnerConfigurationException("stage function " + stageFunction +
+          " cannot be invoked on proxy " + bean.getClass().getName() + "; declare the method in an interface " +
+          "implemented by the proxy or use class based proxies", ex);
     }
   }
 

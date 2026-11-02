@@ -46,15 +46,18 @@ public interface StageFunctionBuilder
    *                                 {@code null}
    * @param dataNameTypeMap          mapping of data names to their resolvable types as expected by the method
    *                                 parameters, not {@code null}
-   * @param stageFunction            the annotated method to invoke, not {@code null}
-   * @param bean                     the bean instance on which the method is invoked, not {@code null}
+   * @param stageFunction            the annotated method to invoke, as declared on the bean's target class, not
+   *                                 {@code null}
+   * @param bean                     the bean instance on which the method is invoked, not {@code null}. The bean may be
+   *                                 an AOP proxy; for a JDK dynamic proxy, {@code stageFunction} is not declared by the
+   *                                 proxy class and must be invoked through the corresponding interface method
    *
    * @return  the executable stage function, never {@code null}
    *
    * @param <S>  stage enumeration type
    *
-   * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function, for example when
-   *                                            a parameter cannot be matched against the data name/type map
+   * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function, for example when a
+   *                                            parameter cannot be matched against the data name/type map
    */
   @Contract(pure = true)
   <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(
