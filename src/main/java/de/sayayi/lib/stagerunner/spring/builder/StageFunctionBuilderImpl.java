@@ -66,6 +66,7 @@ import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
 import static net.bytebuddy.matcher.ElementMatchers.isToString;
 import static net.bytebuddy.matcher.ElementMatchers.named;
+import static org.springframework.core.BridgeMethodResolver.findBridgedMethod;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 import static org.springframework.util.StringUtils.hasLength;
@@ -169,8 +170,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * Returns the method to invoke on {@code bean} for the given stage function method.
    * <p>
    * If {@code bean} is a JDK dynamic proxy, the method declared on the target class cannot be invoked on it. In that
-   * case the corresponding method of an interface implemented by the proxy is returned. For all other beans, including
-   * class based (CGLIB) proxies, {@code stageFunction} is returned unchanged.
+   * case the corresponding method of an interface implemented by the proxy is returned. If {@code stageFunction}
+   * implements a generic interface method, the interface declares the erased signature; that interface method is found
+   * through the bridge method of {@code stageFunction}, which forwards the invocation to {@code stageFunction}.
+   * <p>
+   * For all other beans, including class based (CGLIB) proxies, {@code stageFunction} is returned unchanged.
    *
    * @param stageFunction  stage function method, as declared on the target class, not {@code null}
    * @param bean           bean instance, possibly a proxy, not {@code null}
@@ -184,11 +188,23 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   @Contract(pure = true)
   private static @NotNull Method selectInvocableMethod(@NotNull Method stageFunction, @NotNull Object bean)
   {
+    final var beanType = bean.getClass();
+
     try {
-      return AopUtils.selectInvocableMethod(stageFunction, bean.getClass());
+      return AopUtils.selectInvocableMethod(stageFunction, beanType);
     } catch(IllegalStateException ex) {
+      for(var method: stageFunction.getDeclaringClass().getDeclaredMethods())
+        if (method.isBridge() && findBridgedMethod(method).equals(stageFunction))
+        {
+          try {
+            return AopUtils.selectInvocableMethod(method, beanType);
+          } catch(IllegalStateException ignored) {
+            // bridge method is not exposed by the proxy either
+          }
+        }
+
       throw new StageRunnerConfigurationException("stage function " + stageFunction +
-          " cannot be invoked on proxy " + bean.getClass().getName() + "; declare the method in an interface " +
+          " cannot be invoked on proxy " + beanType.getName() + "; declare the method in an interface " +
           "implemented by the proxy or use class based proxies", ex);
     }
   }

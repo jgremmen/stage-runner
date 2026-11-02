@@ -299,6 +299,9 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Scans the given bean for methods carrying the configured stage function annotation and registers each match.
+   * <p>
+   * Bridge and synthetic methods are skipped. The compiler copies the annotations of a method to its bridge methods, so
+   * registering them would add the same stage function more than once.
    *
    * @param bean  the bean to inspect, not {@code null}
    *
@@ -307,10 +310,10 @@ public class StageRunnerFactoryProcessor<R>
   @SuppressWarnings("DataFlowIssue")
   protected void analyseStageFunctions(@NotNull Object bean)
   {
-    var annotationType = stageFunctionAnnotation.getAnnotationType();
+    final var annotationType = stageFunctionAnnotation.getAnnotationType();
 
     for(var method: ultimateTargetClass(bean).getMethods())
-      if (method.isAnnotationPresent(annotationType))
+      if (!method.isBridge() && !method.isSynthetic() && method.isAnnotationPresent(annotationType))
       {
         registerStageFunction(
             findMergedAnnotationAttributes(method, annotationType, false, false),
