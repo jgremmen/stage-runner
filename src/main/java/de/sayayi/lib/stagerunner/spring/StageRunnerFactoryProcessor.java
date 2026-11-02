@@ -15,6 +15,7 @@
  */
 package de.sayayi.lib.stagerunner.spring;
 
+import de.sayayi.lib.stagerunner.StageRunner;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
@@ -31,8 +32,7 @@ import org.jetbrains.annotations.Nullable;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.InitializingBean;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.config.BeanPostProcessor;
+import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.BeanDefinitionRegistryPostProcessor;
@@ -42,6 +42,7 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.annotation.AnnotationAttributes;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.core.convert.support.DefaultConversionService;
+import org.springframework.util.ClassUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -61,9 +62,12 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
 /**
  * Spring post processor that binds a user defined stage runner interface to the beans in the application context.
  * <p>
- * On startup this processor registers a singleton bean implementing the stage runner interface and inspects every other
- * singleton bean for methods carrying the configured stage function annotation. Matching methods are turned into stage
- * functions and registered with an internal {@link StageRunnerFactory} which the proxy delegates to.
+ * On startup this processor registers a singleton bean implementing the stage runner interface. Once all non lazy
+ * singletons have been instantiated, it inspects every singleton bean for methods carrying the configured stage
+ * function annotation. Matching methods are turned into stage functions and registered with an internal
+ * {@link StageRunnerFactory} which the proxy delegates to. Lazy-init singletons declaring stage functions are created
+ * at that point; lazy-init singletons without stage functions are not. The stage runner cannot be run before the stage
+ * functions have been discovered (see {@link #afterSingletonsInstantiated()}).
  * <p>
  * The behavior can be customized by supplying a {@link StageFunctionFilter}, a {@link StageFunctionBuilder}, a
  * {@link StageRunnerProxyBuilder}, a {@link ConversionService} or a stage function name generator through the various
@@ -89,7 +93,7 @@ import static org.springframework.core.annotation.AnnotatedElementUtils.findMerg
  */
 @SuppressWarnings("rawtypes")
 public class StageRunnerFactoryProcessor<R>
-    implements BeanPostProcessor, BeanDefinitionRegistryPostProcessor, BeanFactoryAware, InitializingBean
+    implements BeanDefinitionRegistryPostProcessor, BeanFactoryAware, InitializingBean, SmartInitializingSingleton
 {
   /** Logger used by this processor. */
   protected final Log logger = LogFactory.getLog(StageRunnerFactoryProcessor.class);
@@ -136,6 +140,9 @@ public class StageRunnerFactoryProcessor<R>
   /** Generator providing the stage function name for an annotated method, or {@code null} for unnamed functions. */
   protected BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator;
 
+  /** Whether the stage functions of all singleton beans have been discovered and registered. */
+  private volatile boolean stageFunctionsDiscovered;
+
   /** Filter deciding which discovered stage functions are registered; accepts all functions by default. */
   protected StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
     @Override
@@ -164,7 +171,20 @@ public class StageRunnerFactoryProcessor<R>
         (stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotationType)).getStageType();
     logger.debug("stage type = " + stageType);
 
-    this.stageRunnerFactory = new DefaultStageRunnerFactory(stageType);
+    this.stageRunnerFactory = new DefaultStageRunnerFactory(stageType) {
+      @Override
+      public @NotNull StageRunner createRunner()
+      {
+        // running before discovery has completed would silently execute an incomplete set of stage functions
+        if (!stageFunctionsDiscovered)
+        {
+          throw new StageRunnerException("stage runner " + stageRunnerInterfaceType.getName() +
+              " cannot be run before the stage functions of all singleton beans have been discovered");
+        }
+
+        return super.createRunner();
+      }
+    };
     this.stageRunnerInterfaceType = stageRunnerInterfaceType;
     this.stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
     logger.debug("stage runner interface method = " + stageRunnerInterfaceMethod);
@@ -298,36 +318,56 @@ public class StageRunnerFactoryProcessor<R>
   /**
    * {@inheritDoc}
    * <p>
-   * Analyses singleton beans after initialization and registers any methods carrying the stage function annotation with
-   * the internal stage runner factory. Non singleton beans and beans without a known definition are skipped.
+   * Discovers the stage functions of all singleton beans and registers them with the internal stage runner factory.
+   * This happens once, after all non lazy singletons have been instantiated, so the result does not depend on the order
+   * in which beans are created:
+   * <ul>
+   *   <li>Singletons which already exist are analysed using their instance.</li>
+   *   <li>Singletons which have not been created yet, like lazy-init singletons or objects created by factory beans,
+   *       are analyzed by type. They are only created if they declare stage functions.</li>
+   * </ul>
+   * Non singleton beans are skipped. Until this method has completed, running the stage runner fails with a
+   * {@link StageRunnerException}.
    *
-   * @param bean      the initialized bean, not {@code null}
-   * @param beanName  the bean name, not {@code null}
+   * @throws StageRunnerConfigurationException  if a stage function of a bean cannot be registered
    *
-   * @return  the bean instance unchanged, never {@code null}
+   * @since 0.4.0
    */
   @Override
-  public @NotNull Object postProcessAfterInitialization(@NotNull Object bean, @NotNull String beanName)
+  public void afterSingletonsInstantiated()
   {
-    try {
-      if (beanFactory.isSingleton(beanName))
-        analyseStageFunctions(bean);
-    } catch(NoSuchBeanDefinitionException ignored) {
+    if (!(beanFactory instanceof ConfigurableListableBeanFactory listableBeanFactory))
+      throw new IllegalStateException("bean factory must be a ConfigurableListableBeanFactory");
+
+    for(var beanName: listableBeanFactory.getBeanNamesForType(Object.class, false, false))
+    {
+      try {
+        if (listableBeanFactory.containsSingleton(beanName) && !listableBeanFactory.isFactoryBean(beanName))
+          analyseStageFunctions(listableBeanFactory.getBean(beanName));
+        else
+        {
+          var beanType = listableBeanFactory.getType(beanName, false);
+          if (beanType != null && hasStageFunctions(ClassUtils.getUserClass(beanType)))
+            analyseStageFunctions(listableBeanFactory.getBean(beanName));
+        }
+      } catch(StageRunnerConfigurationException ex) {
+        throw new StageRunnerConfigurationException(
+            "failed to register stage functions of bean '" + beanName + "': " + ex.getMessage(), ex);
+      }
     }
 
-    return bean;
+    stageFunctionsDiscovered = true;
   }
 
 
   /**
    * Scans the given bean for methods carrying the configured stage function annotation and registers each match.
-   * <p>
-   * Bridge and synthetic methods are skipped. The compiler copies the annotations of a method to its bridge methods, so
-   * registering them would add the same stage function more than once.
    *
    * @param bean  the bean to inspect, not {@code null}
    *
    * @throws StageRunnerConfigurationException  if an annotated method cannot be registered as a stage function
+   *
+   * @see #isStageFunction(Method)
    */
   @SuppressWarnings("DataFlowIssue")
   protected void analyseStageFunctions(@NotNull Object bean)
@@ -335,12 +375,53 @@ public class StageRunnerFactoryProcessor<R>
     final var annotationType = stageFunctionAnnotation.getAnnotationType();
 
     for(var method: ultimateTargetClass(bean).getMethods())
-      if (!method.isBridge() && !method.isSynthetic() && method.isAnnotationPresent(annotationType))
+      if (isStageFunction(method))
       {
         registerStageFunction(
             findMergedAnnotationAttributes(method, annotationType, false, false),
             method, bean);
       }
+  }
+
+
+  /**
+   * Tells whether the given type declares at least one stage function method.
+   *
+   * @param type  bean type, not {@code null}
+   *
+   * @return  {@code true} if {@code type} declares a stage function method, {@code false} otherwise
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected boolean hasStageFunctions(@NotNull Class<?> type)
+  {
+    for(var method: type.getMethods())
+      if (isStageFunction(method))
+        return true;
+
+    return false;
+  }
+
+
+  /**
+   * Tells whether the given method is a stage function method, i.e. it carries the configured stage function
+   * annotation.
+   * <p>
+   * Bridge and synthetic methods are not considered. The compiler copies the annotations of a method to its bridge
+   * methods, so registering them would add the same stage function more than once.
+   *
+   * @param method  method to check, not {@code null}
+   *
+   * @return  {@code true} if {@code method} is a stage function method, {@code false} otherwise
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected boolean isStageFunction(@NotNull Method method)
+  {
+    return !method.isBridge() && !method.isSynthetic() &&
+        method.isAnnotationPresent(stageFunctionAnnotation.getAnnotationType());
   }
 
 
