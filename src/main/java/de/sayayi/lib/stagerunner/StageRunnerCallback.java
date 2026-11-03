@@ -100,6 +100,12 @@ public interface StageRunnerCallback<S extends Enum<S>>
   /**
    * Notifies the callback after all stage functions of a stage have been executed.
    * <p>
+   * The method is invoked before the next stage begins, or the execution terminates. While it is invoked, the stage
+   * context reports {@code stage} as {@link StageContext#getCurrentStage() current stage} and includes it in the
+   * {@link StageContext#getProcessedStages() processed stages}. The {@link StageContext#getRemainingStages() remaining
+   * stages} are the stages which follow. No more stage functions can be added to {@code stage}, but stage functions can
+   * be added to the stages which follow.
+   * <p>
    * This method is not invoked for the current stage if the execution has been aborted.
    *
    * @param stageContext  stage context, not {@code null}

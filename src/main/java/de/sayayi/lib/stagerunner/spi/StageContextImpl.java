@@ -194,7 +194,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     final var stageFunction = new StageOrderFunction<>(stage, description, order, function);
     final var index = functionArray.insertionIndex(stageFunction);
 
-    if (state == RUNNING && index <= functionIndex)
+    if (state == RUNNING && (index <= functionIndex || processedStages.contains(stage)))
     {
       abort();
       throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage + " and order " + order);
@@ -231,7 +231,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
         // inserting accepted functions positioned after the current function does not move the current function,
         // so validating each of them against the unmodified array is sufficient
-        if (state == RUNNING && functionArray.insertionIndex(stageFunction) <= functionIndex)
+        if (state == RUNNING &&
+            (functionArray.insertionIndex(stageFunction) <= functionIndex ||
+             processedStages.contains(stageFunction.stage)))
         {
           abort();
           throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stageFunction.stage +
@@ -308,13 +310,6 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
         if (currentStage != lastStage)
         {
-          if (lastStage != null)
-          {
-            processedStages.add(lastStage);
-            callback.postStageCallback(this, lastStage);
-          }
-
-          lastStage = null;
           callback.preStageCallback(this);
           lastStage = currentStage;
         }
@@ -339,6 +334,14 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
           callback.postStageFunctionCallback(this);
         }
+
+        // the stage has completed if no other function of the same stage follows; the callback is notified while the
+        // context still points to the last function of the stage, so it reports the completed stage as current stage
+        if (!aborted && isLastFunctionOfStage(functionIndex))
+        {
+          processedStages.add(currentStage);
+          callback.postStageCallback(this, currentStage);
+        }
       }
 
       completed = true;
@@ -349,13 +352,22 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
       state = aborted || !completed ? ABORTED : FINISHED;
     }
 
-    if (!aborted && lastStage != null)
-    {
-      processedStages.add(lastStage);
-      callback.postStageCallback(this, lastStage);
-    }
-
     return !aborted;
+  }
+
+
+  /**
+   * Tells whether the function at the given index is the last function of its stage.
+   *
+   * @param index  function index
+   *
+   * @return  {@code true} if the function at {@code index} is the last function of its stage, {@code false} otherwise
+   */
+  @Contract(pure = true)
+  private boolean isLastFunctionOfStage(int index)
+  {
+    return index + 1 == functionArray.size ||
+           functionArray.functions[index + 1].stage != functionArray.functions[index].stage;
   }
 
 

@@ -75,6 +75,9 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
   /**
    * Returns the stage currently being processed.
+   * <p>
+   * Within {@link StageRunnerCallback#postStageCallback(StageContext, Enum) postStageCallback}, this is the stage which
+   * has just completed.
    *
    * @return  stage currently being processed, never {@code null}
    *
@@ -85,7 +88,8 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
 
 
   /**
-   * Returns the stages which have been processed completely. The current stage is never part of this set.
+   * Returns the stages which have been processed completely. The current stage is only part of this set within
+   * {@link StageRunnerCallback#postStageCallback(StageContext, Enum) postStageCallback}, after it has completed.
    * <p>
    * The returned set is a snapshot; changes to it do not affect this context.
    *

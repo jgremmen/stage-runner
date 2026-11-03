@@ -325,6 +325,60 @@ class StageRunnerTest
   }
 
 
+  @Test
+  @DisplayName("Stage context reports the completed stage within postStageCallback")
+  void contextWithinPostStageCallback()
+  {
+    val factory = new MyStageRunnerFactory();
+    val log = new ArrayList<String>();
+
+    factory.addStageFunction(START, ctx -> log.add("fn START"));
+    factory.addStageFunction(PROCESS, ctx -> log.add("fn PROCESS"));
+
+    assertTrue(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void postStageCallback(@NotNull StageContext<TestStage> stageContext, @NotNull TestStage stage)
+      {
+        log.add("<" + stage + " current=" + stageContext.getCurrentStage() +
+            " processed=" + stageContext.getProcessedStages() + " remaining=" + stageContext.getRemainingStages());
+
+        // stage functions can still be added to the following stages, even after the last stage has completed
+        if (stage == PROCESS)
+          stageContext.addStageFunction(CLEANUP, ctx -> log.add("fn CLEANUP"));
+      }
+    }));
+
+    assertEquals(asList(
+        "fn START",
+        "<START current=START processed=[START] remaining=[PROCESS]",
+        "fn PROCESS",
+        "<PROCESS current=PROCESS processed=[START, PROCESS] remaining=[]",
+        "fn CLEANUP",
+        "<CLEANUP current=CLEANUP processed=[START, PROCESS, CLEANUP] remaining=[]"), log);
+  }
+
+
+  @Test
+  @DisplayName("Stage function cannot be added to a completed stage within postStageCallback")
+  void addToCompletedStageIsRejected()
+  {
+    val factory = new MyStageRunnerFactory();
+
+    factory.addStageFunction(START, ctx -> {});
+    factory.addStageFunction(PROCESS, ctx -> fail());
+
+    assertFalse(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void postStageCallback(@NotNull StageContext<TestStage> stageContext, @NotNull TestStage stage)
+      {
+        assertThrows(StageRunnerConfigurationException.class,
+            () -> stageContext.addStageFunction(stage, Integer.MAX_VALUE, ctx -> fail()));
+        assertTrue(stageContext.isAborted());
+      }
+    }));
+  }
+
+
   private static List<String> states(List<StageContext.Function<TestStage>> functions)
   {
     val states = new ArrayList<String>();
