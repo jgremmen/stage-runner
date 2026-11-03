@@ -20,6 +20,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import static de.sayayi.lib.stagerunner.StageContext.FunctionState.WAITING;
+import static java.lang.Math.max;
 import static java.lang.System.arraycopy;
 import static java.lang.reflect.Array.newInstance;
 import static java.util.Arrays.copyOf;
@@ -133,8 +134,8 @@ final class StageOrderFunctionArray<S extends Enum<S>>
 
   /**
    * Inserts the given stage function at {@code index}, which must have been obtained from
-   * {@link #insertionIndex(StageOrderFunction)} for the current state of this array. The backing array grows on
-   * demand.
+   * {@link #insertionIndex(StageOrderFunction)} for the current state of this array. The backing array grows on demand,
+   * by a number of entries which decreases as the array grows.
    *
    * @param index     insertion index, as returned by {@link #insertionIndex(StageOrderFunction)}
    * @param function  stage function to insert, not {@code null}
@@ -153,8 +154,10 @@ final class StageOrderFunctionArray<S extends Enum<S>>
     }
     else if (functions.length == size)
     {
-      functions = copyOf(functions, size + 4);
-      executionState = copyOf(executionState, size + 4);
+      final var capacity = size + max(40 - (size >> 2), 4);
+
+      functions = copyOf(functions, capacity);
+      executionState = copyOf(executionState, capacity);
     }
 
     final int moveElements = size - index;

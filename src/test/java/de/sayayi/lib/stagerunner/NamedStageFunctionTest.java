@@ -17,6 +17,7 @@ package de.sayayi.lib.stagerunner;
 
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory;
+import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -111,6 +112,47 @@ class NamedStageFunctionTest
     assertTrue(runner.run(Map.of("enable", true)));
     assertTrue(runner.run(Map.of("enable", false)));
     assertEquals(List.of("a"), executed);
+  }
+
+
+  @Test
+  @DisplayName("Enabling a named stage function by name notifies the callback")
+  void enableNotifiesCallback()
+  {
+    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    var added = new ArrayList<String>();
+
+    factory.namedStageFunction("a", PROCESS, 5, "named", ctx -> {});
+    factory.addStageFunction(START, ctx -> assertTrue(ctx.enableNamedStageFunction("a")));
+
+    assertTrue(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void addStageFunctionCallback(@NotNull TestStage stage, int order, String description) {
+        added.add(stage + "#" + order + ":" + description);
+      }
+    }));
+
+    assertEquals(List.of("PROCESS#5:named"), added);
+  }
+
+
+  @Test
+  @DisplayName("Enabling a named stage function by name the execution has passed beyond is rejected")
+  void enablePassedFunctionIsRejected()
+  {
+    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+
+    factory.namedStageFunction("early", INIT, ctx -> fail());
+    factory.addStageFunction(START, ctx -> {
+      var exception = assertThrows(StageRunnerConfigurationException.class,
+          () -> ctx.enableNamedStageFunction("early"));
+
+      assertEquals("stage runner has passed beyond stage INIT and order 1000 for stage function 'early'",
+          exception.getMessage());
+      assertTrue(ctx.isAborted());
+    });
+
+    assertFalse(factory.createRunner().run(emptyMap()));
   }
 
 

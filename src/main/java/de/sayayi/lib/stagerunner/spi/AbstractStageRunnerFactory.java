@@ -146,6 +146,29 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
 
 
   /**
+   * Returns the named stage function with the given name.
+   *
+   * @param name  stage function name, not {@code null}
+   *
+   * @return  named stage function or {@code null} if no stage function with {@code name} has been registered
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  StageOrderFunction<S> namedStageFunction(@NotNull String name)
+  {
+    final var readLock = configurationLock.readLock();
+
+    readLock.lock();
+    try {
+      return namedStageFunctions.get(name);
+    } finally {
+      readLock.unlock();
+    }
+  }
+
+
+  /**
    * Creates a consistent copy of the current named stage functions, safe to iterate even if {@link #namedStageFunction}
    * is invoked concurrently on another thread.
    *

@@ -30,6 +30,7 @@ import java.util.function.Predicate;
 import static de.sayayi.lib.stagerunner.StageContext.FunctionState.*;
 import static de.sayayi.lib.stagerunner.spi.StageContextImpl.State.*;
 import static java.util.Collections.emptySet;
+import static java.util.Objects.requireNonNull;
 
 
 /**
@@ -227,19 +228,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     for(var stageFunctionEntry: stageRunnerFactory.namedStageFunctions().entrySet())
       if (!enabledStageFunctionNames.contains(name = stageFunctionEntry.getKey()) && nameFilter.test(name))
       {
-        final var stageFunction = stageFunctionEntry.getValue();
-
         // inserting accepted functions positioned after the current function does not move the current function,
         // so validating each of them against the unmodified array is sufficient
-        if (state == RUNNING &&
-            (functionArray.insertionIndex(stageFunction) <= functionIndex ||
-             processedStages.contains(stageFunction.stage)))
-        {
-          abort();
-          throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stageFunction.stage +
-              " and order " + stageFunction.order + " for stage function '" + name + '\'');
-        }
-
+        validateNamedStageFunction(name, stageFunctionEntry.getValue());
         acceptedFunctions.add(stageFunctionEntry);
       }
 
@@ -247,17 +238,74 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
     for(var acceptedFunction: acceptedFunctions)
     {
-      var stageFunction = acceptedFunction.getValue();
-
-      functionArray.add(stageFunction);
-      enabledFunctions.add(name = acceptedFunction.getKey());
-      enabledStageFunctionNames.add(name);
-
-      if (callback != null)
-        callback.addStageFunctionCallback(stageFunction.stage, stageFunction.order, stageFunction.description);
+      enableNamedStageFunction(name = acceptedFunction.getKey(), acceptedFunction.getValue());
+      enabledFunctions.add(name);
     }
 
     return enabledFunctions;
+  }
+
+
+  /**
+   * {@inheritDoc}
+   * <p>
+   * The stage function is looked up by its exact name, without copying all named stage functions of the factory.
+   */
+  @Override
+  public boolean enableNamedStageFunction(@NotNull String name)
+  {
+    if (state.isTerminated())
+      throw new StageRunnerConfigurationException("stage runner has terminated");
+
+    if (enabledStageFunctionNames.contains(requireNonNull(name, "name must not be null")))
+      return false;
+
+    final var stageFunction = stageRunnerFactory.namedStageFunction(name);
+    if (stageFunction == null)
+      return false;
+
+    validateNamedStageFunction(name, stageFunction);
+    enableNamedStageFunction(name, stageFunction);
+
+    return true;
+  }
+
+
+  /**
+   * Validates that the given named stage function can still be enabled for this execution. If the execution has
+   * already passed beyond its stage and order, the execution is aborted and an exception is thrown.
+   *
+   * @param name           stage function name, not {@code null}
+   * @param stageFunction  named stage function, not {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the execution has passed beyond the stage function
+   */
+  private void validateNamedStageFunction(@NotNull String name, @NotNull StageOrderFunction<S> stageFunction)
+  {
+    if (state == RUNNING &&
+        (functionArray.insertionIndex(stageFunction) <= functionIndex ||
+         processedStages.contains(stageFunction.stage)))
+    {
+      abort();
+      throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stageFunction.stage +
+          " and order " + stageFunction.order + " for stage function '" + name + '\'');
+    }
+  }
+
+
+  /**
+   * Adds the given named stage function to this execution and notifies the callback, if any.
+   *
+   * @param name           stage function name, not {@code null}
+   * @param stageFunction  named stage function, not {@code null}
+   */
+  private void enableNamedStageFunction(@NotNull String name, @NotNull StageOrderFunction<S> stageFunction)
+  {
+    functionArray.add(stageFunction);
+    enabledStageFunctionNames.add(name);
+
+    if (callback != null)
+      callback.addStageFunctionCallback(stageFunction.stage, stageFunction.order, stageFunction.description);
   }
 
 

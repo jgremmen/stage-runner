@@ -15,6 +15,7 @@
  */
 package de.sayayi.lib.stagerunner.spi;
 
+import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.TestStage;
 import lombok.val;
 import org.junit.jupiter.api.DisplayName;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.Test;
 import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
 import static de.sayayi.lib.stagerunner.TestStage.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 
 /**
@@ -105,6 +107,35 @@ class StageOrderFunctionArrayTest
     assertEquals(1, array.insertionIndex(function(START)));
     assertEquals(2, array.insertionIndex(function(END)));
     assertEquals(2, array.size);
+  }
+
+
+  @Test
+  @DisplayName("Many functions are kept sorted while the array grows")
+  void growth()
+  {
+    final var array = new StageOrderFunctionArray<TestStage>();
+    final var stages = TestStage.values();
+    final var count = 1000;
+
+    for(var n = 0; n < count; n++)
+      array.add(new StageOrderFunction<>(stages[(n * 7) % stages.length], String.valueOf(n), n % 3, ctx -> {}));
+
+    assertEquals(count, array.size);
+
+    for(var n = 1; n < count; n++)
+    {
+      final var previous = array.functions[n - 1];
+      final var current = array.functions[n];
+      final var cmp = previous.stage != current.stage
+          ? previous.stage.compareTo(current.stage)
+          : Integer.compare(previous.order, current.order);
+
+      // sorted by stage and order; equal stage and order in insertion order
+      assertTrue(cmp < 0 || cmp == 0 &&
+          Integer.parseInt(previous.description) < Integer.parseInt(current.description));
+      assertEquals(StageContext.FunctionState.WAITING, array.executionState[n]);
+    }
   }
 
 
