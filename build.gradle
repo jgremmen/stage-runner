@@ -172,9 +172,6 @@ testlogger {
 apply from: file('gradle/publish.gradle')
 
 
-def snapshot = version.toString().endsWith('-SNAPSHOT')
-
-
 clean {
   delete layout.projectDirectory.dir('build')
 }

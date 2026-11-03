@@ -138,9 +138,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
 
     readLock.lock();
     try {
-      return functionArray.size == 0
-          ? new StageOrderFunctionArray<>()
-          : new StageOrderFunctionArray<>(functionArray);
+      return new StageOrderFunctionArray<>(functionArray);
     } finally {
       readLock.unlock();
     }

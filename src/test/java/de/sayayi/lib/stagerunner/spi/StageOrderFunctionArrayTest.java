@@ -20,6 +20,7 @@ import lombok.val;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
 import static de.sayayi.lib.stagerunner.TestStage.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -42,11 +43,11 @@ class StageOrderFunctionArrayTest
   {
     val array = new StageOrderFunctionArray<>(new StageOrderFunctionArray<TestStage>());
 
-    assertEquals(0, array.add(new StageOrderFunction<>(START, ctx -> {})));
-    assertEquals(1, array.add(new StageOrderFunction<>(CLEANUP, ctx -> {})));
-    assertEquals(0, array.add(new StageOrderFunction<>(INIT, ctx -> {})));
-    assertEquals(2, array.add(new StageOrderFunction<>(PROCESS, ctx -> {})));
-    assertEquals(4, array.add(new StageOrderFunction<>(END, ctx -> {})));
+    assertEquals(0, array.add(function(START)));
+    assertEquals(1, array.add(function(CLEANUP)));
+    assertEquals(0, array.add(function(INIT)));
+    assertEquals(2, array.add(function(PROCESS)));
+    assertEquals(4, array.add(function(END)));
   }
 
 
@@ -57,16 +58,16 @@ class StageOrderFunctionArrayTest
     val array = new StageOrderFunctionArray<TestStage>();
 
     // prepare
-    assertEquals(0, array.add(new StageOrderFunction<>(START, ctx -> {})));
-    assertEquals(0, array.add(new StageOrderFunction<>(INIT, ctx -> {})));
-    assertEquals(2, array.add(new StageOrderFunction<>(CLEANUP, ctx -> {})));
+    assertEquals(0, array.add(function(START)));
+    assertEquals(0, array.add(function(INIT)));
+    assertEquals(2, array.add(function(CLEANUP)));
 
     val arrayCopy = new StageOrderFunctionArray<>(array);
 
     // add existing stage types
-    assertEquals(2, arrayCopy.add(new StageOrderFunction<>(START, ctx -> {})));
-    assertEquals(3, arrayCopy.add(new StageOrderFunction<>(START, ctx -> {})));
-    assertEquals(5, arrayCopy.add(new StageOrderFunction<>(CLEANUP, ctx -> {})));
+    assertEquals(2, arrayCopy.add(function(START)));
+    assertEquals(3, arrayCopy.add(function(START)));
+    assertEquals(5, arrayCopy.add(function(CLEANUP)));
   }
 
 
@@ -94,15 +95,20 @@ class StageOrderFunctionArrayTest
   {
     val array = new StageOrderFunctionArray<TestStage>();
 
-    assertEquals(0, array.insertionIndex(new StageOrderFunction<>(START, ctx -> {})));
+    assertEquals(0, array.insertionIndex(function(START)));
     assertEquals(0, array.size);
 
-    array.add(new StageOrderFunction<>(START, ctx -> {}));
-    array.add(new StageOrderFunction<>(END, ctx -> {}));
+    array.add(function(START));
+    array.add(function(END));
 
-    assertEquals(0, array.insertionIndex(new StageOrderFunction<>(INIT, ctx -> {})));
-    assertEquals(1, array.insertionIndex(new StageOrderFunction<>(START, ctx -> {})));
-    assertEquals(2, array.insertionIndex(new StageOrderFunction<>(END, ctx -> {})));
+    assertEquals(0, array.insertionIndex(function(INIT)));
+    assertEquals(1, array.insertionIndex(function(START)));
+    assertEquals(2, array.insertionIndex(function(END)));
     assertEquals(2, array.size);
+  }
+
+
+  private static StageOrderFunction<TestStage> function(TestStage stage) {
+    return new StageOrderFunction<>(stage, null, DEFAULT_ORDER, ctx -> {});
   }
 }

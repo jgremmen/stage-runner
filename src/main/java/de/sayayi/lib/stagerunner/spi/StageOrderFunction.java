@@ -18,7 +18,6 @@ package de.sayayi.lib.stagerunner.spi;
 import de.sayayi.lib.stagerunner.StageFunction;
 import org.jetbrains.annotations.NotNull;
 
-import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
 import static java.util.Objects.requireNonNull;
 
 
@@ -49,18 +48,6 @@ final class StageOrderFunction<S extends Enum<S>>
 
 
   /**
-   * Creates a new stage function descriptor with a {@code null} description and the
-   * {@link de.sayayi.lib.stagerunner.StageFunctionConfigurer#DEFAULT_ORDER default order}.
-   *
-   * @param stage     stage the function belongs to, not {@code null}
-   * @param function  stage function to execute, not {@code null}
-   */
-  StageOrderFunction(@NotNull S stage, @NotNull StageFunction<S> function) {
-    this(stage, null, DEFAULT_ORDER, function);
-  }
-
-
-  /**
    * Creates a new stage function descriptor.
    *
    * @param stage        stage the function belongs to, not {@code null}
@@ -74,33 +61,6 @@ final class StageOrderFunction<S extends Enum<S>>
     this.description = description;
     this.order = order;
     this.function = requireNonNull(function, "function must not be null");
-  }
-
-
-  /**
-   * {@inheritDoc}
-   * <p>
-   * Two descriptors are equal if they share the same stage, order and function. The description is not taken into
-   * account.
-   */
-  @Override
-  public boolean equals(Object o)
-  {
-    if (this == o)
-      return true;
-    if (!(o instanceof StageOrderFunction<?> that))
-      return false;
-
-    return order == that.order && stage == that.stage && function.equals(that.function);
-  }
-
-
-  /**
-   * {@inheritDoc}
-   */
-  @Override
-  public int hashCode() {
-    return (stage.hashCode() * 31 + order) * 31 + function.hashCode();
   }
 
 
