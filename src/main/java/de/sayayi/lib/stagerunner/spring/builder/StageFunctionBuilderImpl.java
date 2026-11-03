@@ -18,22 +18,25 @@ package de.sayayi.lib.stagerunner.spring.builder;
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
-import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation;
 import de.sayayi.lib.stagerunner.spring.StageFunctionBuilder;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.method.MethodDescription;
+import net.bytebuddy.description.modifier.FieldManifestation;
 import net.bytebuddy.description.modifier.MethodManifestation;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
+import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.Implementation;
+import net.bytebuddy.implementation.MethodCall;
 import net.bytebuddy.implementation.bytecode.ByteCodeAppender;
 import net.bytebuddy.implementation.bytecode.Duplication;
 import net.bytebuddy.implementation.bytecode.Removal;
 import net.bytebuddy.implementation.bytecode.StackManipulation;
 import net.bytebuddy.implementation.bytecode.assign.TypeCasting;
+import net.bytebuddy.implementation.bytecode.collection.ArrayAccess;
 import net.bytebuddy.implementation.bytecode.assign.primitive.PrimitiveUnboxingDelegate;
 import net.bytebuddy.implementation.bytecode.constant.IntegerConstant;
 import net.bytebuddy.implementation.bytecode.constant.TextConstant;
@@ -41,8 +44,6 @@ import net.bytebuddy.implementation.bytecode.member.FieldAccess;
 import net.bytebuddy.implementation.bytecode.member.MethodInvocation;
 import net.bytebuddy.implementation.bytecode.member.MethodReturn;
 import net.bytebuddy.implementation.bytecode.member.MethodVariableAccess;
-import net.bytebuddy.jar.asm.MethodVisitor;
-import net.bytebuddy.jar.asm.Opcodes;
 import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
@@ -60,12 +61,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
+import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
-import static net.bytebuddy.matcher.ElementMatchers.isToString;
-import static net.bytebuddy.matcher.ElementMatchers.named;
+import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
+import static net.bytebuddy.matcher.ElementMatchers.*;
 import static org.springframework.core.BridgeMethodResolver.findBridgedMethod;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
@@ -79,8 +82,11 @@ import static org.springframework.util.StringUtils.hasLength;
  * For every unique combination of target method and parameter binding a dedicated {@link StageFunction} class is
  * generated at runtime using ByteBuddy and cached. Method parameters are matched to entries of the stage runner data
  * map by name (either through a {@link Data @Data} annotation or the parameter name) or by type. Parameters that
- * require type conversion are handled by an {@link AbstractStageFunctionWithConversion} subclass and a configurable
- * {@link ConversionService}.
+ * require type conversion are converted using a configurable {@link ConversionService}.
+ * <p>
+ * The generated classes implement {@link StageFunction} directly and only refer to types of exported packages, Spring
+ * and the JDK. This way they can be defined in the package of the bean class, even if the bean class is part of a named
+ * application module.
  * <p>
  * Instances are thread safe; generated classes are cached per builder instance.
  *
@@ -90,6 +96,19 @@ import static org.springframework.util.StringUtils.hasLength;
 @ApiStatus.Internal
 public final class StageFunctionBuilderImpl extends AbstractBuilder implements StageFunctionBuilder
 {
+  /** Name of the generated field holding the target bean, or {@code null} for static methods. */
+  private static final String BEAN_FIELD_NAME = "bean";
+
+  /** Name of the generated field holding the conversion service. */
+  private static final String CONVERSION_SERVICE_FIELD_NAME = "conversionService";
+
+  /**
+   * Name of the generated field holding the target type for each method parameter, with {@code null} for parameters
+   * which do not require a conversion.
+   */
+  private static final String TARGET_TYPES_FIELD_NAME = "targetTypes";
+
+
   /** Conversion service used for parameters requiring a conversion. */
   private final ConversionService conversionService;
 
@@ -156,9 +175,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     final var hostLookup = hostLookup(invocableMethod.getDeclaringClass());
 
     try {
-      return Arrays.stream(parameters).anyMatch(NameWithQualifierAndType::isConvertableQualifier)
-          ? buildForWithConversion(bean, methodDescription, parameters, stageFunctionAnnotation, hostLookup)
-          : buildForNoConversion(bean, methodDescription, parameters, stageFunctionAnnotation, hostLookup);
+      return this.<S>createStageFunctionType(methodDescription, parameters, stageFunctionAnnotation, hostLookup)
+          .getDeclaredConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
+          .newInstance(bean, conversionService, Arrays
+              .stream(parameters)
+              .map(p -> p.isConvertableQualifier() ? p.type : null)
+              .toArray(TypeDescriptor[]::new));
     } catch(ReflectiveOperationException ex) {
       throw new StageRunnerConfigurationException(
           "failed to generate stage function for method " + methodDescription, ex);
@@ -211,78 +233,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
   /**
-   * Builds a stage function instance for a method whose parameters do not require any value conversion. The generated
-   * class extends {@link AbstractStageFunction}.
-   *
-   * @param bean                     target bean or {@code null} for a static method
-   * @param method                   target method, not {@code null}
-   * @param parameters               resolved parameter bindings, not {@code null}
-   * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
-   * @param hostLookup               lookup on the class declaring {@code method}, not {@code null}
-   *
-   * @return  new stage function instance, never {@code null}
-   *
-   * @param <S>  stage enumeration type
-   *
-   * @throws ReflectiveOperationException  if the generated class cannot be instantiated
-   */
-  private @NotNull <S extends Enum<S>> StageFunction<S> buildForNoConversion(
-      Object bean, @NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters,
-      @NotNull StageFunctionAnnotation stageFunctionAnnotation, @NotNull MethodHandles.Lookup hostLookup)
-      throws ReflectiveOperationException
-  {
-    final Class<? extends StageFunction<S>> stageFunctionClass = createStageFunctionType(
-        parameterizedType(AbstractStageFunction.class, stageFunctionAnnotation.getStageType()),
-        method, parameters, stageFunctionAnnotation, hostLookup);
-
-    return stageFunctionClass
-        .getDeclaredConstructor(Object.class)
-        .newInstance(bean);
-  }
-
-
-  /**
-   * Builds a stage function instance for a method that has at least one parameter which requires value conversion
-   * through the configured {@link ConversionService}. The generated class extends
-   * {@link AbstractStageFunctionWithConversion}.
-   *
-   * @param bean                     target bean or {@code null} for a static method
-   * @param method                   target method, not {@code null}
-   * @param parameters               resolved parameter bindings, not {@code null}
-   * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
-   * @param hostLookup               lookup on the class declaring {@code method}, not {@code null}
-   *
-   * @return  new stage function instance, never {@code null}
-   *
-   * @param <S>  stage enumeration type
-   *
-   * @throws ReflectiveOperationException  if the generated class cannot be instantiated
-   */
-  private @NotNull <S extends Enum<S>> StageFunction<S> buildForWithConversion(
-      Object bean,
-      @NotNull MethodDescription method,
-      @NotNull NameWithQualifierAndType[] parameters,
-      @NotNull StageFunctionAnnotation stageFunctionAnnotation,
-      @NotNull MethodHandles.Lookup hostLookup) throws ReflectiveOperationException
-  {
-    final Class<? extends StageFunction<S>> stageFunctionClass = createStageFunctionType(
-        parameterizedType(AbstractStageFunctionWithConversion.class, stageFunctionAnnotation.getStageType()),
-        method, parameters, stageFunctionAnnotation, hostLookup);
-
-    return stageFunctionClass
-        .getDeclaredConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
-        .newInstance(bean, conversionService, Arrays
-            .stream(parameters)
-            .map(p -> p.isConvertableQualifier() ? p.type : null)
-            .toArray(TypeDescriptor[]::new));
-  }
-
-
-  /**
    * Returns the generated stage function class for the given method and parameter binding, either from the cache or by
    * building a fresh class through {@link #buildStageFunctionClass}.
    *
-   * @param superType                generic super type of the generated class, not {@code null}
    * @param method                   target method, not {@code null}
    * @param parameters               resolved parameter bindings, not {@code null}
    * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
@@ -294,7 +247,6 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    */
   @SuppressWarnings("unchecked")
   private @NotNull <S extends Enum<S>> Class<? extends StageFunction<S>> createStageFunctionType(
-      @NotNull TypeDescription.Generic superType,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters,
       @NotNull StageFunctionAnnotation stageFunctionAnnotation,
@@ -303,19 +255,23 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     return (Class<? extends StageFunction<S>>)stageFunctionClassCache
         .computeIfAbsent(
             new CacheKey(method, parameters),
-            ck -> buildStageFunctionClass(superType, method, parameters, stageFunctionAnnotation, hostLookup));
+            ck -> buildStageFunctionClass(method, parameters, stageFunctionAnnotation, hostLookup));
   }
 
 
   /**
-   * Generates a new {@link StageFunction} class as a subclass of {@code superType} that invokes {@code method} on its
-   * bean with the values obtained from the stage context data map.
+   * Generates a new {@link StageFunction} class that invokes {@code method} on its bean with the values obtained from
+   * the stage context data map.
    * <p>
    * The class is defined through {@code hostLookup} in the package and class loader of the class declaring
    * {@code method}. This way the generated class can access the declaring class and its parameter types, even if they
-   * are not public.
+   * are not public. The generated class does not extend a class of this library, as the library's internal packages
+   * are not accessible from an application module.
+   * <p>
+   * The generated class has a public constructor taking the bean (or {@code null} for a static method), the conversion
+   * service and the target type for each method parameter, with {@code null} for parameters which do not require a
+   * conversion.
    *
-   * @param superType                generic super type of the generated class, not {@code null}
    * @param method                   target method, not {@code null}
    * @param parameters               resolved parameter bindings, not {@code null}
    * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
@@ -325,7 +281,6 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    */
   @SuppressWarnings({"unchecked", "resource"})
   private @NotNull Class<? extends StageFunction<?>> buildStageFunctionClass(
-      @NotNull TypeDescription.Generic superType,
       @NotNull MethodDescription method,
       @NotNull NameWithQualifierAndType[] parameters,
       @NotNull StageFunctionAnnotation stageFunctionAnnotation,
@@ -340,9 +295,20 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
     return (Class<? extends StageFunction<?>>)
         new ByteBuddy()
-            .subclass(superType)
+            .subclass(Object.class, NO_CONSTRUCTORS)
+            .implement(parameterizedType(StageFunction.class, stageFunctionAnnotation.getStageType()))
             .name(className)
             .modifiers(PUBLIC, FINAL)
+            .defineField(BEAN_FIELD_NAME, Object.class, PRIVATE, FieldManifestation.FINAL)
+            .defineField(CONVERSION_SERVICE_FIELD_NAME, ConversionService.class, PRIVATE, FieldManifestation.FINAL)
+            .defineField(TARGET_TYPES_FIELD_NAME, TypeDescriptor[].class, PRIVATE, FieldManifestation.FINAL)
+            .defineConstructor(PUBLIC)
+                .withParameters(Object.class, ConversionService.class, TypeDescriptor[].class)
+                .intercept(MethodCall
+                    .invoke(typeDescription(Object.class).getDeclaredMethods().filter(isConstructor()).getOnly())
+                    .andThen(FieldAccessor.ofField(BEAN_FIELD_NAME).setsArgumentAt(0))
+                    .andThen(FieldAccessor.ofField(CONVERSION_SERVICE_FIELD_NAME).setsArgumentAt(1))
+                    .andThen(FieldAccessor.ofField(TARGET_TYPES_FIELD_NAME).setsArgumentAt(2)))
             .defineMethod("process", void.class, PUBLIC, MethodManifestation.FINAL)
                 .withParameter(typeDescription(StageContext.class), "stageContext")
                 .intercept(new ProcessMethodImplementation(method, parameters))
@@ -722,113 +688,14 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
   /**
-   * Base class for generated {@link StageFunction} implementations. It holds the target bean instance on which the
-   * annotated method is invoked and provides a small helper for runtime null checks on primitive parameters.
-   *
-   * @param <S>  stage enumeration type
-   */
-  public static abstract class AbstractStageFunction<S extends Enum<S>> implements StageFunction<S>
-  {
-    /** Target bean on which the annotated method is invoked, or {@code null} for static methods. */
-    protected final Object bean;
-
-
-    /**
-     * Creates a new stage function for the given target bean.
-     *
-     * @param bean  target bean or {@code null} for a static method
-     */
-    protected AbstractStageFunction(Object bean) {
-      this.bean = bean;
-    }
-
-
-    /**
-     * Ensures that {@code value} is not {@code null}. Used by the generated bytecode before unboxing a primitive
-     * method parameter.
-     *
-     * @param value     the data value to check
-     * @param dataName  the data map key, used for the error message
-     *
-     * @throws StageRunnerException  if {@code value} is {@code null}
-     */
-    @Contract("null, _ -> fail")
-    @SuppressWarnings("unused")
-    protected void checkNotNull(Object value, @NotNull String dataName)
-    {
-      if (value == null)
-        throw new StageRunnerException("Data value '" + dataName + "' must not be null");
-    }
-  }
-
-
-
-
-  /**
-   * Base class for generated {@link StageFunction} implementations whose target method has one or more parameters that
-   * require value conversion. It carries the {@link ConversionService} and the per parameter target types.
-   *
-   * @param <S>  stage enumeration type
-   */
-  public static abstract class AbstractStageFunctionWithConversion<S extends Enum<S>> extends AbstractStageFunction<S>
-  {
-    /** Conversion service used by {@link #convert(Object, int)}. */
-    private final @NotNull ConversionService conversionService;
-
-    /** Target type for each method parameter, or {@code null} if no conversion is required. */
-    private final @NotNull TypeDescriptor[] targetTypes;
-
-
-    /**
-     * Creates a new stage function for the given target bean with conversion support.
-     *
-     * @param bean               target bean or {@code null} for a static method
-     * @param conversionService  conversion service, not {@code null}
-     * @param targetTypes        target type for each method parameter, with {@code null} for parameters which do not
-     *                           require a conversion, not {@code null}
-     */
-    protected AbstractStageFunctionWithConversion(Object bean,
-                                                  @NotNull ConversionService conversionService,
-                                                  @NotNull TypeDescriptor[] targetTypes)
-    {
-      super(bean);
-
-      this.conversionService = conversionService;
-      this.targetTypes = targetTypes;
-    }
-
-
-    /**
-     * Converts {@code value} to the target type registered for parameter index {@code p}.
-     *
-     * @param value  the data value to convert, may be {@code null}
-     * @param p      the parameter index
-     *
-     * @return  the converted value, may be {@code null}
-     */
-    @SuppressWarnings("unused")
-    protected Object convert(Object value, int p) {
-      return conversionService.convert(value, TypeDescriptor.forObject(value), targetTypes[p]);
-    }
-  }
-
-
-
-
-  /**
    * ByteBuddy {@link Implementation} for the generated {@code process(StageContext)} method. It loads each parameter
    * value from the stage context data map (or the context itself for the special {@code $context} binding), applies a
    * conversion where needed and finally invokes the target method on the stored bean.
+   * <p>
+   * The generated code only refers to the generated class itself, exported types of this library, Spring and the JDK.
    */
   private static final class ProcessMethodImplementation extends AbstractImplementation
   {
-    /** Field access for {@link AbstractStageFunction#bean}. */
-    private static final FieldAccess.Defined FIELD_ACCESS_BEAN = FieldAccess
-        .forField(typeDescription(AbstractStageFunction.class)
-            .getDeclaredFields()
-            .filter(named("bean"))
-            .getOnly());
-
     /** Method description of {@link StageContext#getData(String)}. */
     private static final MethodDescription METHOD_CONTEXT_GET_DATA =
         typeDescription(StageContext.class)
@@ -836,29 +703,26 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
             .filter(named("getData"))
             .getOnly();
 
-    /** Method description of {@link AbstractStageFunctionWithConversion#convert(Object, int)}. */
-    private static final MethodDescription METHOD_STAGE_FUNCTION_CONVERT =
-        typeDescription(AbstractStageFunctionWithConversion.class)
+    /** Method description of {@link ConversionService#convert(Object, TypeDescriptor, TypeDescriptor)}. */
+    private static final MethodDescription METHOD_CONVERSION_SERVICE_CONVERT =
+        typeDescription(ConversionService.class)
             .getDeclaredMethods()
-            .filter(named("convert"))
+            .filter(named("convert").and(takesArguments(Object.class, TypeDescriptor.class, TypeDescriptor.class)))
             .getOnly();
 
-    /** Method description of {@link AbstractStageFunction#checkNotNull(Object, String)}. */
-    private static final MethodDescription METHOD_STAGE_FUNCTION_CHECK_NOT_NULL =
-        typeDescription(AbstractStageFunction.class)
+    /** Method description of {@link TypeDescriptor#forObject(Object)}. */
+    private static final MethodDescription METHOD_TYPE_DESCRIPTOR_FOR_OBJECT =
+        typeDescription(TypeDescriptor.class)
             .getDeclaredMethods()
-            .filter(named("checkNotNull"))
+            .filter(named("forObject"))
             .getOnly();
 
-    /** Stack manipulation swapping the two topmost single size values on the operand stack. */
-    private static final @NotNull StackManipulation SWAP = new StackManipulation.AbstractBase() {
-      @Override
-      public @NotNull Size apply(@NotNull MethodVisitor methodVisitor, @NotNull Context context)
-      {
-        methodVisitor.visitInsn(Opcodes.SWAP);
-        return Size.ZERO;
-      }
-    };
+    /** Method description of {@link Objects#requireNonNull(Object, String)}. */
+    private static final MethodDescription METHOD_OBJECTS_REQUIRE_NON_NULL =
+        typeDescription(Objects.class)
+            .getDeclaredMethods()
+            .filter(named("requireNonNull").and(takesArguments(Object.class, String.class)))
+            .getOnly();
 
     /** Target method. */
     private final MethodDescription method;
@@ -891,8 +755,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
       if (!method.isStatic())
       {
+        // (DeclaringType)this.bean
         stackManipulations.add(MethodVariableAccess.loadThis());
-        stackManipulations.add(FIELD_ACCESS_BEAN.read());
+        stackManipulations.add(field(target, BEAN_FIELD_NAME).read());
         stackManipulations.add(TypeCasting.to(method.getDeclaringType()));
       }
 
@@ -914,13 +779,20 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
           }
           else
           {
-            // this.convert(context.getData(dataName), p)
+            // value = context.getData(dataName)
+            // this.conversionService.convert(value, TypeDescriptor.forObject(value), this.targetTypes[p])
             stackManipulations.add(MethodVariableAccess.loadThis());
+            stackManipulations.add(field(target, CONVERSION_SERVICE_FIELD_NAME).read());
             stackManipulations.add(MethodVariableAccess.REFERENCE.loadFrom(1));
             stackManipulations.add(new TextConstant(dataName));
             stackManipulations.add(MethodInvocation.invoke(METHOD_CONTEXT_GET_DATA));
+            stackManipulations.add(Duplication.SINGLE);
+            stackManipulations.add(MethodInvocation.invoke(METHOD_TYPE_DESCRIPTOR_FOR_OBJECT));
+            stackManipulations.add(MethodVariableAccess.loadThis());
+            stackManipulations.add(field(target, TARGET_TYPES_FIELD_NAME).read());
             stackManipulations.add(IntegerConstant.forValue(p));
-            stackManipulations.add(MethodInvocation.invoke(METHOD_STAGE_FUNCTION_CONVERT));
+            stackManipulations.add(ArrayAccess.REFERENCE.load());
+            stackManipulations.add(MethodInvocation.invoke(METHOD_CONVERSION_SERVICE_CONVERT));
           }
 
           stackManipulations.addAll(castToParameterType(methodParameters.get(p).getType(), dataName));
@@ -932,6 +804,25 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       stackManipulations.add(MethodReturn.VOID);
 
       return new ByteCodeAppender.Simple(stackManipulations.toArray(StackManipulation[]::new));
+    }
+
+
+    /**
+     * Returns the field access for the field with the given {@code name}, declared by the generated class.
+     *
+     * @param target  implementation target, not {@code null}
+     * @param name    field name, not {@code null}
+     *
+     * @return  field access, never {@code null}
+     */
+    @Contract(pure = true)
+    private static @NotNull FieldAccess.Defined field(@NotNull Target target, @NotNull String name)
+    {
+      return FieldAccess.forField(target
+          .getInstrumentedType()
+          .getDeclaredFields()
+          .filter(named(name))
+          .getOnly());
     }
 
 
@@ -952,12 +843,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
         return List.of(TypeCasting.to(methodParameterType));
 
       return List.of(
-          // checkNotNull(<value>, dataName)
-          Duplication.SINGLE,
-          MethodVariableAccess.loadThis(),
-          SWAP,
-          new TextConstant(dataName),
-          MethodInvocation.invoke(METHOD_STAGE_FUNCTION_CHECK_NOT_NULL),
+          // Objects.requireNonNull(<value>, message)
+          new TextConstant("Data value '" + dataName + "' must not be null"),
+          MethodInvocation.invoke(METHOD_OBJECTS_REQUIRE_NON_NULL),
 
           // cast -> primitive
           TypeCasting.to(methodParameterType.asErasure().asBoxed()),

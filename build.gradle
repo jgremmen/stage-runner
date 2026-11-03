@@ -29,6 +29,12 @@ version = libs.versions.stage.runner.get()
 layout.buildDirectory = '.build'
 
 
+sourceSets {
+  // integration tests running the library and an application module on the module path
+  moduleTest
+}
+
+
 configurations {
   optionalApi
 
@@ -36,6 +42,12 @@ configurations {
   runtimeClasspath.extendsFrom optionalApi
   testCompileClasspath.extendsFrom optionalApi
   testRuntimeClasspath.extendsFrom optionalApi
+
+  moduleTestCompileClasspath.extendsFrom optionalApi
+  moduleTestRuntimeClasspath.extendsFrom optionalApi
+
+  moduleTestImplementation.extendsFrom testImplementation
+  moduleTestRuntimeOnly.extendsFrom testRuntimeOnly
 }
 
 
@@ -61,6 +73,29 @@ test {
 compileTestJava {
   options.compilerArgs.add '-parameters'
 }
+
+
+compileModuleTestJava {
+  options.compilerArgs.add '-parameters'
+}
+
+
+tasks.register('moduleTest', Test) {
+  description = 'Runs the integration tests on the module path.'
+  group = 'verification'
+
+  testClassesDirs = sourceSets.moduleTest.output.classesDirs
+  classpath = sourceSets.moduleTest.runtimeClasspath
+
+  useJUnitPlatform()
+
+  javaLauncher = javaToolchains.launcherFor {
+    languageVersion = JavaLanguageVersion.of(21)
+  }
+}
+
+
+test.dependsOn moduleTest
 
 
 repositories {
@@ -93,6 +128,8 @@ dependencies {
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 
   testImplementation libs.spring.test
+
+  moduleTestImplementation sourceSets.main.output
 }
 
 

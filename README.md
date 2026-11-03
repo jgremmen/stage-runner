@@ -295,6 +295,23 @@ myRunner.run("import-users", List.of(1, 67, -4), 56);
 The JPMS module name is `de.sayayi.lib.stagerunner`. Spring and Byte Buddy are declared as
 `requires static`, so they are only needed on the module path when the Spring integration is used.
 
+When using the Spring integration from a named application module:
+
+- Byte Buddy must be resolved at runtime. As it is an optional dependency of the library, require it in your
+  module (or add it with `--add-modules net.bytebuddy`).
+- The packages containing the stage runner interface and the beans with stage functions must be open to the
+  library, because the generated stage functions and runner proxies are defined in these packages.
+
+```java
+module my.app {
+  requires de.sayayi.lib.stagerunner;
+  requires net.bytebuddy;
+  requires spring.context;
+
+  opens my.app.stages to de.sayayi.lib.stagerunner, spring.core, spring.beans, spring.context;
+}
+```
+
 ## Building from source
 
 The project uses the Gradle wrapper and a Java 21 toolchain.
