@@ -46,10 +46,12 @@ import org.springframework.util.ClassUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.BiFunction;
 
+import static java.lang.reflect.Modifier.isAbstract;
 import static java.util.Objects.requireNonNull;
 import static org.springframework.aop.framework.AopProxyUtils.ultimateTargetClass;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
@@ -57,6 +59,7 @@ import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotationAttributes;
+import static org.springframework.util.ReflectionUtils.isObjectMethod;
 
 
 /**
@@ -525,8 +528,12 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Locates the single abstract (non default) method of the given functional interface and validates its return type.
-   * The return type must be either {@code boolean} or {@code void}.
+   * Locates the single abstract method of the given functional interface and validates its return type. The return
+   * type must be either {@code boolean} or {@code void}.
+   * <p>
+   * Abstract methods inherited from super-interfaces are taken into account, whereas default, static, private and
+   * synthetic methods as well as abstract redeclarations of public {@link Object} methods are ignored. An abstract
+   * method declared by multiple super-interfaces with the same signature is counted once.
    *
    * @param interfaceType  the candidate functional interface type, not {@code null}
    *
@@ -544,10 +551,10 @@ public class StageRunnerFactoryProcessor<R>
 
     Method functionalInterfaceMethod = null;
 
-    for(var method: interfaceType.getDeclaredMethods())
-      if (!method.isDefault())
+    for(var method: interfaceType.getMethods())
+      if (isAbstract(method.getModifiers()) && !isObjectMethod(method))
       {
-        if (functionalInterfaceMethod != null)
+        if (functionalInterfaceMethod != null && !hasSameSignature(functionalInterfaceMethod, method))
           throw new StageRunnerConfigurationException(interfaceType.getName() + " is not a functional interface");
 
         functionalInterfaceMethod = method;
@@ -561,6 +568,23 @@ public class StageRunnerFactoryProcessor<R>
       throw new StageRunnerConfigurationException(functionalInterfaceMethod + " must return boolean or void");
 
     return functionalInterfaceMethod;
+  }
+
+
+  /**
+   * Tells whether both methods have the same name, parameter types and return type.
+   *
+   * @param method1  first method, not {@code null}
+   * @param method2  second method, not {@code null}
+   *
+   * @return  {@code true} if both methods have the same signature, {@code false} otherwise
+   */
+  @Contract(pure = true)
+  private static boolean hasSameSignature(@NotNull Method method1, @NotNull Method method2)
+  {
+    return method1.getName().equals(method2.getName()) &&
+           method1.getReturnType() == method2.getReturnType() &&
+           Arrays.equals(method1.getParameterTypes(), method2.getParameterTypes());
   }
 
 
