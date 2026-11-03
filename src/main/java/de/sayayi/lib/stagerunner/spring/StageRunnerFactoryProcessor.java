@@ -60,7 +60,9 @@ import static org.springframework.beans.factory.config.ConfigurableBeanFactory.S
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
 import static org.springframework.core.annotation.AnnotatedElementUtils.*;
+import static org.springframework.core.annotation.AnnotationUtils.isCandidateClass;
 import static org.springframework.util.ReflectionUtils.isObjectMethod;
+import static org.springframework.util.StringUtils.hasLength;
 
 
 /**
@@ -447,7 +449,9 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Scans the public methods of the given bean, including inherited ones, for methods carrying the configured stage
-   * function annotation and registers each match. Non-public methods are not considered.
+   * function annotation and registers each match. Non-public methods are not considered. Beans whose type cannot carry
+   * the annotation according to {@link org.springframework.core.annotation.AnnotationUtils#isCandidateClass(Class,
+   * Class) AnnotationUtils.isCandidateClass}, such as JDK types, are skipped without scanning their methods.
    *
    * @param bean  the bean to inspect, not {@code null}
    *
@@ -459,8 +463,12 @@ public class StageRunnerFactoryProcessor<R>
   protected void analyseStageFunctions(@NotNull Object bean)
   {
     final var annotationType = stageFunctionAnnotation.getAnnotationType();
+    final var beanType = ultimateTargetClass(bean);
 
-    for(var method: ultimateTargetClass(bean).getMethods())
+    if (!isCandidateClass(beanType, annotationType))
+      return;
+
+    for(var method: beanType.getMethods())
       if (isStageFunction(method))
       {
         registerStageFunction(
@@ -471,7 +479,10 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Tells whether the given type declares at least one public stage function method, including inherited ones.
+   * Tells whether the given type declares at least one public stage function method, including inherited ones. Types
+   * which cannot carry the annotation according to
+   * {@link org.springframework.core.annotation.AnnotationUtils#isCandidateClass(Class, Class)
+   * AnnotationUtils.isCandidateClass}, such as JDK types, are rejected without scanning their methods.
    *
    * @param type  bean type, not {@code null}
    *
@@ -482,6 +493,9 @@ public class StageRunnerFactoryProcessor<R>
   @Contract(pure = true)
   protected boolean hasStageFunctions(@NotNull Class<?> type)
   {
+    if (!isCandidateClass(type, stageFunctionAnnotation.getAnnotationType()))
+      return false;
+
     for(var method: type.getMethods())
       if (isStageFunction(method))
         return true;
@@ -519,8 +533,8 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Registers a single annotated method as a stage function on the internal stage runner factory. Registration is
-   * skipped when the configured {@link StageFunctionFilter} rejects the function. If a name is provided by the name
-   * generator the function is registered as a named function, otherwise it is added anonymously.
+   * skipped when the configured {@link StageFunctionFilter} rejects the function. If a non-empty name is provided by the
+   * name generator the function is registered as a named function, otherwise it is added anonymously.
    *
    * @param stageFunctionAnnotationAttributes  merged attributes of the stage function annotation, not {@code null}
    * @param method                             the annotated method, not {@code null}
@@ -535,7 +549,8 @@ public class StageRunnerFactoryProcessor<R>
   {
     final var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
     final var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
-    final var name = stageFunctionNameGenerator.apply(stageFunctionAnnotationAttributes, method);
+    final var generatedName = stageFunctionNameGenerator.apply(stageFunctionAnnotationAttributes, method);
+    final var name = hasLength(generatedName) ? generatedName : null;
 
     if (stageFunctionFilter.filter(bean, stageEnum, order, name))
     {
@@ -942,8 +957,9 @@ public class StageRunnerFactoryProcessor<R>
    * &#x40;{@link de.sayayi.lib.stagerunner.spring.annotation.StageDefinition.Name Name} annotation. Using a stage
    * function name generator the name can be calculated dynamically from the annotation attributes and the method.
    * <p>
-   * If the name generator returns {@code null}, the stage function is added as a regular stage function, which is
-   * executed for every stage runner execution. Otherwise, it is registered as a named stage function.
+   * If the name generator returns {@code null} or an empty string, the stage function is added as a regular stage
+   * function, which is executed for every stage runner execution. Otherwise, it is registered as a named stage
+   * function.
    *
    * @param stageFunctionNameGenerator  stage function name generator, not {@code null}
    *
