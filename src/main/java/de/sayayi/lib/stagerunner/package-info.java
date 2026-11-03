@@ -21,16 +21,28 @@
  * constants of a user defined stage enum. This package contains the interfaces used by applications to configure and
  * run stage runners:
  * <ul>
- *   <li>{@link de.sayayi.lib.stagerunner.StageRunnerFactory} creates stage runners sharing the same stage function
- *       configuration.</li>
- *   <li>{@link de.sayayi.lib.stagerunner.StageRunner} executes the configured stage functions.</li>
- *   <li>{@link de.sayayi.lib.stagerunner.StageFunction} is a unit of work executed within a specific stage.</li>
- *   <li>{@link de.sayayi.lib.stagerunner.StageFunctionConfigurer} adds regular and named stage functions.</li>
- *   <li>{@link de.sayayi.lib.stagerunner.StageContext} provides data and progress information to stage functions
- *       during an execution.</li>
- *   <li>{@link de.sayayi.lib.stagerunner.StageRunnerCallback} observes the execution and handles failing stage
- *       functions.</li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.StageRunnerFactory} creates stage runners sharing the same stage function
+ *     configuration.
+ *   </li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.StageRunner} executes the configured stage functions.
+ *   </li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.StageFunction} is a unit of work executed within a specific stage.
+ *   </li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.StageFunctionConfigurer} adds regular and named stage functions.
+ *   </li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.StageContext} provides data and progress information to stage functions during
+ *     an execution.
+ *   </li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.StageRunnerCallback} observes the execution and handles failing stage functions.
+ *   </li>
  * </ul>
+ * <p>
  * Ready to use implementations are provided by the {@link de.sayayi.lib.stagerunner.spi} package.
  *
  * @author Jeroen Gremmen

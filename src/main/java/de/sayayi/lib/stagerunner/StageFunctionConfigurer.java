@@ -66,8 +66,7 @@ public interface StageFunctionConfigurer<S extends Enum<S>>
    * @param description  stage function description or {@code null} for no description
    * @param function     stage function, not {@code null}
    *
-   * @throws StageRunnerConfigurationException  if the stage function cannot
-   *         be added
+   * @throws StageRunnerConfigurationException  if the stage function cannot be added
    *
    * @see StageRunnerCallback#preStageFunctionCallback(StageContext, String)
    */

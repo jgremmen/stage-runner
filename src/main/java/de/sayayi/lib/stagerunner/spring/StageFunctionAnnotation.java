@@ -218,7 +218,7 @@ public final class StageFunctionAnnotation
 
 
   /**
-   * Analyses the given annotation type and builds a descriptor for it.
+   * Analyzes the given annotation type and builds a descriptor for it.
    * <p>
    * The annotation is scanned for methods that are marked with {@link StageDefinition.Stage @Stage},
    * {@link StageDefinition.Order @Order}, {@link StageDefinition.Description @Description} and
@@ -230,9 +230,8 @@ public final class StageFunctionAnnotation
    * @return  a descriptor for the given annotation, never {@code null}
    *
    * @throws StageRunnerConfigurationException  if the annotation is malformed, for example when the mandatory
-   *                                            {@code @Stage} property is missing, when a meta annotation is
-   *                                            declared more than once or when a property has an unsupported
-   *                                            return type
+   *                                            {@code @Stage} property is missing, when a meta annotation is declared
+   *                                            more than once or when a property has an unsupported return type
    */
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
@@ -246,8 +245,8 @@ public final class StageFunctionAnnotation
 
     for(var method: stageFunctionAnnotation.getDeclaredMethods())
     {
-      var propertyName = method.getName();
-      var returnType = method.getReturnType();
+      final var propertyName = method.getName();
+      final var returnType = method.getReturnType();
 
       if (method.isAnnotationPresent(StageDefinition.Name.class))
       {

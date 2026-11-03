@@ -20,12 +20,18 @@
  * This package contains the base implementations that library users can build upon in order to create and
  * execute their own stage runners:
  * <ul>
- *   <li>{@link de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory} is a ready to use factory that fits
- *       most use cases.</li>
- *   <li>{@link de.sayayi.lib.stagerunner.spi.AbstractStageRunnerFactory} is the extension point for
- *       applications that need custom factory behaviour, such as producing a specific runner subtype.</li>
- *   <li>{@link de.sayayi.lib.stagerunner.spi.AbstractStageRunner} is the default runner implementation and
- *       can be subclassed to enrich the runner with additional API.</li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory} is a ready to use factory that fits most use
+ *     cases.
+ *   </li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.spi.AbstractStageRunnerFactory} is the extension point for applications that
+ *     need custom factory behavior, such as producing a specific runner subtype.
+ *   </li>
+ *   <li>
+ *     {@link de.sayayi.lib.stagerunner.spi.AbstractStageRunner} is the default runner implementation and can be
+ *     subclassed to enrich the runner with additional API.
+ *   </li>
  * </ul>
  *
  * @author Jeroen Gremmen

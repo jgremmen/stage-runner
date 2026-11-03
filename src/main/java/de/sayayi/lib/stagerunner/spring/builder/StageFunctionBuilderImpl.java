@@ -92,15 +92,25 @@ import static org.springframework.util.StringUtils.hasLength;
 @ApiStatus.Internal
 public final class StageFunctionBuilderImpl extends AbstractBuilder implements StageFunctionBuilder
 {
-  /** Name of the generated field holding the target bean, or {@code null} for static methods. */
+  /**
+   * Name of the generated field holding the target bean. The field value is {@code null} for static methods.
+   *
+   * @since 0.4.0
+   */
   private static final String BEAN_FIELD_NAME = "bean";
 
-  /** Name of the generated field holding the conversion service. */
+  /**
+   * Name of the generated field holding the conversion service.
+   *
+   * @since 0.4.0
+   */
   private static final String CONVERSION_SERVICE_FIELD_NAME = "conversionService";
 
   /**
    * Name of the generated field holding the target type for each method parameter, with {@code null} for parameters
    * which do not require a conversion.
+   *
+   * @since 0.4.0
    */
   private static final String TARGET_TYPES_FIELD_NAME = "targetTypes";
 
@@ -139,8 +149,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    *
    * @throws StageRunnerConfigurationException  if {@code bean} is a JDK dynamic proxy which does not expose
    *                                            {@code stageFunction} through one of its interfaces, or if a parameter
-   *                                            which cannot be assigned the stage context is annotated wit
-   *                                            {@code @Data} without name
+   *                                            which cannot be assigned the stage context is annotated with
+   *                                            {@code @Data} without name, or if a parameter cannot be bound to the
+   *                                            stage context or a data entry
    */
   @Override
   public @NotNull <S extends Enum<S>> StageFunction<S> createStageFunction(
@@ -599,7 +610,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
   /**
    * Pairing of a data map key ({@code name}) with the {@link TypeQualifier} describing how the associated data value
-   * can be supplied to a method parameter. Instances have a natural order that favours stronger qualifiers so that the
+   * can be supplied to a method parameter. Instances have a natural order that favors stronger qualifiers so that the
    * best match can be picked when several candidates exist.
    */
   private static class NameWithQualifier implements Comparable<NameWithQualifier>
@@ -735,21 +746,33 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
             .filter(named("getData"))
             .getOnly();
 
-    /** Method description of {@link ConversionService#convert(Object, TypeDescriptor, TypeDescriptor)}. */
+    /**
+     * Method description of {@link ConversionService#convert(Object, TypeDescriptor, TypeDescriptor)}.
+     *
+     * @since 0.4.0
+     */
     private static final MethodDescription METHOD_CONVERSION_SERVICE_CONVERT =
         typeDescription(ConversionService.class)
             .getDeclaredMethods()
             .filter(named("convert").and(takesArguments(Object.class, TypeDescriptor.class, TypeDescriptor.class)))
             .getOnly();
 
-    /** Method description of {@link TypeDescriptor#forObject(Object)}. */
+    /**
+     * Method description of {@link TypeDescriptor#forObject(Object)}.
+     *
+     * @since 0.4.0
+     */
     private static final MethodDescription METHOD_TYPE_DESCRIPTOR_FOR_OBJECT =
         typeDescription(TypeDescriptor.class)
             .getDeclaredMethods()
             .filter(named("forObject"))
             .getOnly();
 
-    /** Method description of {@link Objects#requireNonNull(Object, String)}. */
+    /**
+     * Method description of {@link Objects#requireNonNull(Object, String)}.
+     *
+     * @since 0.4.0
+     */
     private static final MethodDescription METHOD_OBJECTS_REQUIRE_NON_NULL =
         typeDescription(Objects.class)
             .getDeclaredMethods()
@@ -846,6 +869,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
      * @param name    field name, not {@code null}
      *
      * @return  field access, never {@code null}
+     *
+     * @since 0.4.0
      */
     @Contract(pure = true)
     private static @NotNull FieldAccess.Defined field(@NotNull Target target, @NotNull String name)

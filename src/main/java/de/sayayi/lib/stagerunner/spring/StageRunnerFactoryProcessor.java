@@ -141,13 +141,26 @@ public class StageRunnerFactoryProcessor<R>
    */
   private StageFunctionBuilder stageFunctionBuilder;
 
-  /** Whether annotations of the interface method are copied to the generated proxy method. */
+  /**
+   * Whether annotations of the interface method are copied to the generated proxy method.
+   *
+   * @since 0.3.1
+   */
   private boolean copyInterfaceMethodAnnotations;
 
-  /** Generator providing the stage function name for an annotated method, or {@code null} for unnamed functions. */
+  /**
+   * Generator providing the stage function name for an annotated method. The generator returns {@code null} for a
+   * regular (unnamed) stage function.
+   *
+   * @since 0.3.2
+   */
   private BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator;
 
-  /** Whether the stage functions of all singleton beans have been discovered and registered. */
+  /**
+   * Whether the stage functions of all singleton beans have been discovered and registered.
+   *
+   * @since 0.4.0
+   */
   private volatile boolean stageFunctionsDiscovered;
 
   /** Filter deciding which discovered stage functions are registered; accepts all functions by default. */
@@ -229,6 +242,8 @@ public class StageRunnerFactoryProcessor<R>
    * @return  stage runner factory, never {@code null}
    *
    * @param <S>  stage enumeration type
+   *
+   * @since 0.4.0
    */
   @SuppressWarnings("unchecked")
   private <S extends Enum<S>> @NotNull DefaultStageRunnerFactory<S> createStageRunnerFactory(@NotNull Class<?> stageType)
@@ -377,6 +392,8 @@ public class StageRunnerFactoryProcessor<R>
    * {@link StageRunnerException}.
    *
    * @throws StageRunnerConfigurationException  if a stage function of a bean cannot be registered
+   * @throws IllegalStateException              if the owning bean factory is not a
+   *                                            {@link ConfigurableListableBeanFactory}
    *
    * @since 0.4.0
    */
@@ -488,8 +505,8 @@ public class StageRunnerFactoryProcessor<R>
    * @param method                             the annotated method, not {@code null}
    * @param bean                               the bean the method belongs to, not {@code null}
    *
-   * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function or the function
-   *                                            name is not unique
+   * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function or the function name
+   *                                            is not unique
    */
   protected void registerStageFunction(@NotNull AnnotationAttributes stageFunctionAnnotationAttributes,
                                        @NotNull Method method,
@@ -541,6 +558,10 @@ public class StageRunnerFactoryProcessor<R>
    * @param function     stage function for the factory's stage type, not {@code null}
    *
    * @param <S>  stage enumeration type
+   *
+   * @throws StageRunnerConfigurationException  if {@code name} is not unique for the factory
+   *
+   * @since 0.4.0
    */
   @SuppressWarnings("unchecked")
   private static <S extends Enum<S>> void addStageFunction(@NotNull DefaultStageRunnerFactory<S> factory, String name,
@@ -655,6 +676,8 @@ public class StageRunnerFactoryProcessor<R>
    * @param method2  second method, not {@code null}
    *
    * @return  {@code true} if both methods have the same signature, {@code false} otherwise
+   *
+   * @since 0.4.0
    */
   @Contract(pure = true)
   private static boolean hasSameSignature(@NotNull Method method1, @NotNull Method method2)
@@ -823,7 +846,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param conversionService  conversion service, not {@code null}
    *
-   * @throws IllegalArgumentException  if {@code conversionService} is {@code null}
+   * @throws NullPointerException  if {@code conversionService} is {@code null}
    *
    * @since 0.3.1
    */
@@ -839,7 +862,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageRunnerProxyBuilder  stage runner proxy builder, not {@code null}
    *
-   * @throws IllegalArgumentException  if {@code stageRunnerProxyBuilder} is {@code null}
+   * @throws NullPointerException  if {@code stageRunnerProxyBuilder} is {@code null}
    */
   @Contract(mutates = "this")
   public void setStageRunnerProxyBuilder(@NotNull StageRunnerProxyBuilder stageRunnerProxyBuilder)
@@ -855,7 +878,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionBuilder  stage function builder, not {@code null}
    *
-   * @throws IllegalArgumentException  if {@code stageFunctionBuilder} is {@code null}
+   * @throws NullPointerException  if {@code stageFunctionBuilder} is {@code null}
    */
   @Contract(mutates = "this")
   public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder) {
@@ -869,7 +892,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionFilter  stage function filter, not {@code null}
    *
-   * @throws IllegalArgumentException  if {@code stageFunctionFilter} is {@code null}
+   * @throws NullPointerException  if {@code stageFunctionFilter} is {@code null}
    */
   @Contract(mutates = "this")
   public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter) {
@@ -903,7 +926,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionNameGenerator  stage function name generator, not {@code null}
    *
-   * @throws IllegalArgumentException  if {@code stageFunctionNameGenerator} is {@code null}
+   * @throws NullPointerException  if {@code stageFunctionNameGenerator} is {@code null}
    *
    * @since 0.3.2
    */

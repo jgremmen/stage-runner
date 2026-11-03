@@ -46,6 +46,8 @@ public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRun
    * Creates a new stage runner bound to the given factory.
    *
    * @param stageRunnerFactory  factory providing the shared stage function configuration, not {@code null}
+   *
+   * @throws NullPointerException  if {@code stageRunnerFactory} is {@code null}
    */
   protected AbstractStageRunner(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory) {
     this.stageRunnerFactory = requireNonNull(stageRunnerFactory, "stageRunnerFactory must not be null");
@@ -57,6 +59,8 @@ public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRun
    * <p>
    * Each invocation executes the stage functions configured on the factory at the time of invocation, using a new
    * stage context.
+   *
+   * @throws NullPointerException  if {@code data} or {@code callback} is {@code null}
    */
   @Override
   public boolean run(@NotNull Map<String,Object> data, @NotNull StageRunnerCallback<S> callback)

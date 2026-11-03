@@ -52,6 +52,7 @@ import org.jetbrains.annotations.NotNull;
  * @param <S>  Stage enum type
  *
  * @author Jeroen Gremmen
+ * @since 0.3.0
  */
 public interface StageRunnerCallback<S extends Enum<S>>
 {
@@ -66,8 +67,8 @@ public interface StageRunnerCallback<S extends Enum<S>>
   /**
    * Notifies the callback at the beginning of a new stage, before its first stage function is executed.
    * <p>
-   * If the execution is {@link StageContext#abort() aborted} by this method, no stage function of the stage is
-   * executed and no further callback methods are invoked.
+   * If the execution is {@link StageContext#abort() aborted} by this method, no stage function of the stage is executed
+   * and no further callback methods are invoked.
    *
    * @param stageContext  stage context, not {@code null}
    */

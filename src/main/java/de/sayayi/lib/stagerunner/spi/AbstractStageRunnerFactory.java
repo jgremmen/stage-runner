@@ -60,7 +60,11 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
   /** Named stage functions keyed by name in registration order, executed only if enabled. */
   private final Map<String,StageOrderFunction<S>> namedStageFunctions;
 
-  /** Lock guarding {@link #functionArray} and {@link #namedStageFunctions}. */
+  /**
+   * Lock guarding {@link #functionArray} and {@link #namedStageFunctions}.
+   *
+   * @since 0.4.0
+   */
   private final ReentrantReadWriteLock configurationLock = new ReentrantReadWriteLock();
 
 
@@ -68,6 +72,8 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
    * Creates a new stage runner factory for the given stage enum type.
    *
    * @param stageEnumType  stage enum class, not {@code null}
+   *
+   * @throws NullPointerException  if {@code stageEnumType} is {@code null}
    */
   protected AbstractStageRunnerFactory(@NotNull Class<S> stageEnumType)
   {
@@ -95,6 +101,8 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
    * {@inheritDoc}
    * <p>
    * The stage function applies to all subsequently started stage runner executions.
+   *
+   * @throws NullPointerException  if {@code stage} or {@code function} is {@code null}
    */
   @Override
   public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
@@ -114,6 +122,10 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
    * {@inheritDoc}
    * <p>
    * The name must be unique for this factory.
+   *
+   * @throws StageRunnerConfigurationException  if {@code name} is empty or a named stage function with the same name
+   *                                            has already been registered with this factory
+   * @throws NullPointerException               if {@code name}, {@code stage} or {@code function} is {@code null}
    */
   @Override
   public void namedStageFunction(@NotNull String name, @NotNull S stage, int order, String description,

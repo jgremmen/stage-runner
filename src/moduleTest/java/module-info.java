@@ -19,6 +19,8 @@
  * <p>
  * The test package is only opened to the modules which need reflective access: the stage runner library (for defining
  * generated classes in the package), Spring and JUnit.
+ *
+ * @since 0.4.0
  */
 module de.sayayi.lib.stagerunner.it
 {

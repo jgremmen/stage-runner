@@ -56,8 +56,8 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
 
 
 /**
- * Default {@link StageRunnerProxyBuilder} implementation that generates the stage runner proxy class at runtime
- * using ByteBuddy.
+ * Default {@link StageRunnerProxyBuilder} implementation that generates the stage runner proxy class at runtime using
+ * ByteBuddy.
  * <p>
  * The generated proxy subclasses the user defined stage runner interface, keeps a reference to a
  * {@link StageRunnerFactory} and implements {@link FactoryAccessor} to expose it. Each invocation of the interface
@@ -72,7 +72,11 @@ import static net.bytebuddy.matcher.ElementMatchers.*;
 @ApiStatus.Internal
 public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implements StageRunnerProxyBuilder
 {
-  /** Name of the generated proxy field holding the stage runner factory. */
+  /**
+   * Name of the generated proxy field holding the stage runner factory.
+   *
+   * @since 0.3.2
+   */
   private static final String FACTORY_FIELD_NAME = "factory";
 
   /** Whether interface method annotations are copied to the proxy method. */
@@ -180,11 +184,10 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
 
   /**
    * ByteBuddy {@link Implementation} for the generated stage runner interface method. It creates a new stage runner via
-   * the factory, assembles the data map from the method parameters and invokes
-   * {@link de.sayayi.lib.stagerunner.StageRunner#run run} on it. A {@link StageRunnerCallback} parameter, if declared
-   * on the interface method, is forwarded to the runner; if its value is {@code null}, the
-   * {@link StageRunnerCallback#DEFAULT default callback} is used instead. The result of the run is returned if the interface method
-   * returns {@code boolean}.
+   * the factory, assembles the data map from the method parameters and invokes {@link StageRunner#run run} on it. A
+   * {@link StageRunnerCallback} parameter, if declared on the interface method, is forwarded to the runner; if its
+   * value is {@code null}, the {@link StageRunnerCallback#DEFAULT default callback} is used instead. The result of the
+   * run is returned if the interface method returns {@code boolean}.
    */
   private static final class ProxyMethodImplementation extends AbstractImplementation
   {

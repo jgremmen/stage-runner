@@ -37,6 +37,8 @@ public class DefaultStageRunnerFactory<S extends Enum<S>> extends AbstractStageR
    * Creates a new default stage runner factory for the given stage enum type.
    *
    * @param stageEnumType  stage enum class, not {@code null}
+   *
+   * @throws NullPointerException  if {@code stageEnumType} is {@code null}
    */
   public DefaultStageRunnerFactory(@NotNull Class<S> stageEnumType) {
     super(stageEnumType);

@@ -64,7 +64,11 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   /** Names of the named stage functions enabled for this execution. */
   private final Set<String> enabledStageFunctionNames;
 
-  /** Callback for the running execution, or {@code null} if not running. */
+  /**
+   * Callback for the running execution, or {@code null} if not running.
+   *
+   * @since 0.3.4
+   */
   private StageRunnerCallback<S> callback;
 
   /** Lifecycle state of this context. */
@@ -185,6 +189,10 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    * The stage function only applies to this execution. If it would be positioned before the stage function currently
    * being executed, it is not added and the execution is aborted before the exception is thrown. If a callback is
    * active, it is notified through {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)}.
+   *
+   * @throws StageRunnerConfigurationException  if the execution has terminated or has already passed beyond
+   *                                            {@code stage} and {@code order}
+   * @throws NullPointerException               if {@code stage} or {@code function} is {@code null}
    */
   @Override
   public void addStageFunction(@NotNull S stage, int order, String description, @NotNull StageFunction<S> function)
@@ -272,13 +280,15 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
 
   /**
-   * Validates that the given named stage function can still be enabled for this execution. If the execution has
-   * already passed beyond its stage and order, the execution is aborted and an exception is thrown.
+   * Validates that the given named stage function can still be enabled for this execution. If the execution has already
+   * passed beyond its stage and order, the execution is aborted and an exception is thrown.
    *
    * @param name           stage function name, not {@code null}
    * @param stageFunction  named stage function, not {@code null}
    *
    * @throws StageRunnerConfigurationException  if the execution has passed beyond the stage function
+   *
+   * @since 0.4.0
    */
   private void validateNamedStageFunction(@NotNull String name, @NotNull StageOrderFunction<S> stageFunction)
   {
@@ -298,6 +308,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    *
    * @param name           stage function name, not {@code null}
    * @param stageFunction  named stage function, not {@code null}
+   *
+   * @since 0.4.0
    */
   private void enableNamedStageFunction(@NotNull String name, @NotNull StageOrderFunction<S> stageFunction)
   {
@@ -322,9 +334,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    * Runs all configured stage functions in order, notifying the given callback about stage and function transitions as
    * well as failures.
    * <p>
-   * The context must be in {@link State#IDLE idle} state. When the method returns, the context is either
-   * {@link State#FINISHED finished} or {@link State#ABORTED aborted} and cannot be run again. A run terminated by an
-   * exception leaves the context aborted, without notifying
+   * The context runs only once. When the method returns, the context is either {@link State#FINISHED finished} or
+   * {@link State#ABORTED aborted}; invoking it again executes no stage function and returns the outcome of the first
+   * run. A run terminated by an exception leaves the context aborted, without notifying
    * {@link StageRunnerCallback#postStageCallback(StageContext, Enum) postStageCallback} for the stage being executed.
    *
    * @param callback  stage runner callback, not {@code null}
@@ -416,6 +428,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    * @param index  function index
    *
    * @return  {@code true} if the function at {@code index} is the last function of its stage, {@code false} otherwise
+   *
+   * @since 0.4.0
    */
   @Contract(pure = true)
   private boolean isLastFunctionOfStage(int index)
