@@ -254,7 +254,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   {
     return (Class<? extends StageFunction<S>>)stageFunctionClassCache
         .computeIfAbsent(
-            new CacheKey(method, parameters),
+            new CacheKey(method, stageFunctionAnnotation.getStageType(), List.of(parameters)),
             ck -> buildStageFunctionClass(method, parameters, stageFunctionAnnotation, hostLookup));
   }
 
@@ -676,12 +676,20 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
   /**
-   * Cache key that identifies a generated stage function class by the target method and its parameter binding.
+   * Cache key that identifies a generated stage function class by the target method, the stage type and its parameter
+   * binding.
+   * <p>
+   * The parameter bindings are kept as a list, so they are compared by content rather than by reference.
    *
    * @param method      the target method, not {@code null}
+   * @param stageType   the stage enumeration type implemented by the generated class, not {@code null}
    * @param parameters  the resolved parameter bindings, not {@code null}
+   *
+   * @since 0.4.0
    */
-  private record CacheKey(@NotNull MethodDescription method, @NotNull NameWithQualifierAndType[] parameters) {
+  private record CacheKey(@NotNull MethodDescription method,
+                          @NotNull Class<?> stageType,
+                          @NotNull List<NameWithQualifierAndType> parameters) {
   }
 
 

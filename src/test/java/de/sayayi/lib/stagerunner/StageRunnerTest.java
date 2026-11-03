@@ -237,6 +237,24 @@ class StageRunnerTest
 
 
   @Test
+  @DisplayName("Named stage functions with the same stage and order are executed in registration order")
+  void namedFunctionsInRegistrationOrder()
+  {
+    val factory = new MyStageRunnerFactory();
+    val names = asList("zeta", "alpha", "mid", "beta", "omega", "x1", "q");
+    val executed = new ArrayList<String>();
+
+    for(val name: names)
+      factory.namedStageFunction(name, PROCESS, ctx -> executed.add(name));
+
+    factory.addStageFunction(START, ctx -> ctx.enableNamedStageFunctions(name -> true));
+
+    assertTrue(factory.createRunner().run(emptyMap()));
+    assertEquals(names, executed);
+  }
+
+
+  @Test
   @DisplayName("Stage functions reported by stage context are unmodifiable")
   @SuppressWarnings("DataFlowIssue")
   void functionsAreUnmodifiable()

@@ -22,7 +22,7 @@ import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
@@ -57,7 +57,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
   /** Regular stage functions, executed for every stage runner execution. */
   private final StageOrderFunctionArray<S> functionArray;
 
-  /** Named stage functions keyed by name, executed only if enabled. */
+  /** Named stage functions keyed by name in registration order, executed only if enabled. */
   private final Map<String,StageOrderFunction<S>> namedStageFunctions;
 
   /** Lock guarding {@link #functionArray} and {@link #namedStageFunctions}. */
@@ -71,10 +71,10 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
    */
   protected AbstractStageRunnerFactory(@NotNull Class<S> stageEnumType)
   {
-    this.stageEnumType = stageEnumType;
+    this.stageEnumType = requireNonNull(stageEnumType, "stageEnumType must not be null");
 
     functionArray = new StageOrderFunctionArray<>();
-    namedStageFunctions = new HashMap<>();
+    namedStageFunctions = new LinkedHashMap<>();
   }
 
 
@@ -151,7 +151,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
    * Creates a consistent copy of the current named stage functions, safe to iterate even if {@link #namedStageFunction}
    * is invoked concurrently on another thread.
    *
-   * @return  copy of the current named stage functions, keyed by name, never {@code null}
+   * @return  copy of the current named stage functions, keyed by name in registration order, never {@code null}
    *
    * @since 0.4.0
    */
@@ -162,7 +162,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
 
     readLock.lock();
     try {
-      return new HashMap<>(namedStageFunctions);
+      return new LinkedHashMap<>(namedStageFunctions);
     } finally {
       readLock.unlock();
     }

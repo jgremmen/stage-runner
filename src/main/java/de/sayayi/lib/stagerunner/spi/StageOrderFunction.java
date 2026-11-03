@@ -19,6 +19,7 @@ import de.sayayi.lib.stagerunner.StageFunction;
 import org.jetbrains.annotations.NotNull;
 
 import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
+import static java.util.Objects.requireNonNull;
 
 
 /**
@@ -67,13 +68,12 @@ final class StageOrderFunction<S extends Enum<S>>
    * @param order        ordering value for the function within its stage
    * @param function     stage function to execute, not {@code null}
    */
-  StageOrderFunction(@NotNull S stage, String description, int order,
-                     @NotNull StageFunction<S> function)
+  StageOrderFunction(@NotNull S stage, String description, int order, @NotNull StageFunction<S> function)
   {
-    this.stage = stage;
+    this.stage = requireNonNull(stage, "stage must not be null");
     this.description = description;
     this.order = order;
-    this.function = function;
+    this.function = requireNonNull(function, "function must not be null");
   }
 
 

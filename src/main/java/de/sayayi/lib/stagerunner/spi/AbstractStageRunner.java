@@ -21,6 +21,8 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
+import static java.util.Objects.requireNonNull;
+
 
 /**
  * Abstract base implementation of {@link StageRunner}.
@@ -46,7 +48,7 @@ public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRun
    * @param stageRunnerFactory  factory providing the shared stage function configuration, not {@code null}
    */
   protected AbstractStageRunner(@NotNull AbstractStageRunnerFactory<S> stageRunnerFactory) {
-    this.stageRunnerFactory = stageRunnerFactory;
+    this.stageRunnerFactory = requireNonNull(stageRunnerFactory, "stageRunnerFactory must not be null");
   }
 
 
@@ -57,7 +59,11 @@ public abstract class AbstractStageRunner<S extends Enum<S>> implements StageRun
    * stage context.
    */
   @Override
-  public boolean run(@NotNull Map<String,Object> data, @NotNull StageRunnerCallback<S> callback) {
+  public boolean run(@NotNull Map<String,Object> data, @NotNull StageRunnerCallback<S> callback)
+  {
+    requireNonNull(data, "data must not be null");
+    requireNonNull(callback, "callback must not be null");
+
     return new StageContextImpl<>(stageRunnerFactory, data).run(callback);
   }
 }

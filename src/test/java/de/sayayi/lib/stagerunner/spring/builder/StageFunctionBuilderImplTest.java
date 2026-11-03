@@ -16,6 +16,8 @@
 package de.sayayi.lib.stagerunner.spring.builder;
 
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.spring.StageDef;
+import de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -27,9 +29,7 @@ import java.lang.reflect.Parameter;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
@@ -105,6 +105,27 @@ class StageFunctionBuilderImplTest
 
 
   @Test
+  @DisplayName("Generated stage function class is reused for the same method and parameter binding")
+  void stageFunctionClassIsCached() throws ReflectiveOperationException
+  {
+    final var annotation = StageFunctionAnnotation.buildFrom(StageDef.class);
+    final var method = TestTarget.class.getMethod("process", String.class);
+    final var bean = new TestTarget();
+
+    final var function1 = builder.createStageFunction(
+        annotation, Map.of("value", ResolvableType.forClass(String.class)), method, bean);
+    final var function2 = builder.createStageFunction(
+        annotation, Map.of("value", ResolvableType.forClass(String.class)), method, bean);
+    final var otherBinding = builder.createStageFunction(
+        annotation, Map.of("value", ResolvableType.forClass(Integer.class)), method, bean);
+
+    assertNotSame(function1, function2);
+    assertSame(function1.getClass(), function2.getClass());
+    assertNotSame(function1.getClass(), otherBinding.getClass());
+  }
+
+
+  @Test
   @DisplayName("Parameter binding equality is symmetric and takes the parameter type into account")
   void parameterBindingEquality() throws ReflectiveOperationException
   {
@@ -126,6 +147,7 @@ class StageFunctionBuilderImplTest
   }
 
 
+  @SuppressWarnings("SameParameterValue")
   private Object nameWithQualifier(String name, StageFunctionBuilderImpl.TypeQualifier qualifier)
       throws ReflectiveOperationException
   {
@@ -150,6 +172,7 @@ class StageFunctionBuilderImplTest
   }
 
 
+  @SuppressWarnings("SameParameterValue")
   private TypeDescriptor parameterTypeOf(String methodName, Class<?> parameterClass) throws NoSuchMethodException {
     return new TypeDescriptor(new MethodParameter(TestTarget.class.getMethod(methodName, parameterClass), 0));
   }
