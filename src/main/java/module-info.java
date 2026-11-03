@@ -22,9 +22,9 @@
  * executed, the functions are invoked in stage order, allowing callers to inspect progress and share data through the
  * {@link de.sayayi.lib.stagerunner.StageContext stage context}.
  * <p>
- * Runner instances are obtained from a {@link de.sayayi.lib.stagerunner.StageRunnerFactory} and are intended to be used
- * once. A {@link de.sayayi.lib.stagerunner.StageRunnerCallback} may be supplied to observe or influence the execution
- * flow.
+ * Runner instances are obtained from a {@link de.sayayi.lib.stagerunner.StageRunnerFactory} and can be run any number
+ * of times. A {@link de.sayayi.lib.stagerunner.StageRunnerCallback} may be supplied to observe or influence the
+ * execution flow.
  * <p>
  * The module exports the following packages:
  * <ul>

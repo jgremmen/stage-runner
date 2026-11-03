@@ -67,14 +67,15 @@ dependencies {
 | `StageFunction<S>`                                         | Functional interface implemented by each unit of work. Receives a `StageContext`.                  |
 | `StageFunctionConfigurer<S>`                               | API for registering stage functions with a stage, order, and optional description.                 |
 | `StageFunctionConfigurer.Named<S>`                         | Extension for registering *named* stage functions that can be enabled at runtime.                  |
-| `StageRunnerFactory<S>`                                    | Creates fresh, single-use `StageRunner` instances.                                                 |
-| `StageRunner<S>`                                           | Executes the configured stage functions once, using an input data map.                             |
+| `StageRunnerFactory<S>`                                    | Creates `StageRunner` instances.                                                                   |
+| `StageRunner<S>`                                           | Executes the configured stage functions, using an input data map.                                  |
 | `StageContext<S>`                                          | Runtime view: current stage, processed/remaining stages, shared data, abort, dynamic registration. |
 | `StageRunnerCallback<S>`                                   | Optional hook interface with pre/post callbacks and an exception handler.                          |
 | `DefaultStageRunnerFactory<S>`                             | Ready-to-use factory backed by `AbstractStageRunner`.                                              |
 | `AbstractStageRunnerFactory<S>` / `AbstractStageRunner<S>` | Base classes for custom factories/runners.                                                         |
 
-Runner instances are **single-use** — obtain a new one from the factory for every execution.
+Runner instances can be run any number of times. Each run uses its own `StageContext`, so runs share nothing but the
+stage functions configured on the factory.
 
 ## Quick start
 
@@ -170,14 +171,15 @@ runner.run(data, new StageRunnerCallback<MyStage>() {
 
   @Override public void stageExceptionHandler(StageContext<MyStage> ctx, Throwable exception) {
     log.warn("stage {} failed", ctx.getCurrentStage(), exception);
-    // rethrow to abort, or swallow to continue with remaining functions
+    // throw to end the run, or return normally to continue with the remaining functions
     StageRunnerCallback.super.stageExceptionHandler(ctx, exception);
   }
 });
 ```
 
-The default callback wraps exceptions in `StageRunnerException` and aborts the run. An `Error` thrown by a stage
-function is never passed to the exception handler; it terminates the run and is rethrown unchanged.
+The default exception handler wraps the exception in a `StageRunnerException` and throws it, which ends the run:
+`run` throws instead of returning `false`, and `postStageCallback` is not invoked for the failed stage. An `Error`
+thrown by a stage function is never passed to the exception handler; it terminates the run and is rethrown unchanged.
 
 ### Custom factories
 
@@ -222,18 +224,17 @@ public @interface StageDef
 
 ### 2. Define a runner interface
 
-The interface's single non-`default`, non-`@Transient` method describes the input parameters that will be
-passed as the shared data map. Use `@Data` to override a parameter's data-map name.
+The interface's single abstract method describes the input parameters that will be passed as the shared data map.
+Default, static and private methods, as well as redeclared `Object` methods, are ignored. The method must return
+`boolean` or `void`. Use `@Data` to override a parameter's data-map name.
 
 ```java
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 
-import java.beans.Transient;
 import java.util.List;
 
 public interface MyRunner 
 {
-  @Transient
   boolean run(String task, @Data("map") List<Integer> params, int count);
 }
 ```
@@ -262,7 +263,7 @@ performed by parameter name (or by `@Data` value) and by type via Spring's `Conv
 public class StageConfiguration 
 {
   @Bean
-  StageRunnerFactoryProcessor<MyRunner> stageRunnerProcessor() {
+  static StageRunnerFactoryProcessor<MyRunner> stageRunnerProcessor() {
     return new StageRunnerFactoryProcessor<>(MyRunner.class, StageDef.class);
   }
 }
@@ -288,8 +289,8 @@ myRunner.run("import-users", List.of(1, 67, -4), 56);
 - `de.sayayi.lib.stagerunner` — public API: `StageRunner`, `StageRunnerFactory`, `StageContext`,
   `StageFunction`, `StageFunctionConfigurer`, `StageRunnerCallback`.
 - `de.sayayi.lib.stagerunner.exception` — `StageRunnerException`, `StageRunnerConfigurationException`.
-- `de.sayayi.lib.stagerunner.spi` — reusable base implementations (`AbstractStageRunnerFactory`,
-  `AbstractStageRunner`, `DefaultStageRunnerFactory`, `StageContextImpl`, ...).
+- `de.sayayi.lib.stagerunner.spi` — base implementations (`AbstractStageRunnerFactory`, `AbstractStageRunner`,
+  `DefaultStageRunnerFactory`).
 - `de.sayayi.lib.stagerunner.spring` — Spring integration (`StageRunnerFactoryProcessor`,
   `StageFunctionBuilder`, `StageRunnerProxyBuilder`, `StageFunctionFilter`, `StageFunctionAnnotation`).
 - `de.sayayi.lib.stagerunner.spring.annotation` — annotation building blocks (`StageDefinition`, `Data`).

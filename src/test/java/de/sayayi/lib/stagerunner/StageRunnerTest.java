@@ -460,6 +460,23 @@ class StageRunnerTest
   }
 
 
+  @Test
+  @DisplayName("Stage runner can be run multiple times")
+  void runnerIsReusable()
+  {
+    val factory = new MyStageRunnerFactory();
+    val executed = new ArrayList<>();
+
+    factory.addStageFunction(START, ctx -> executed.add(ctx.getData("run")));
+
+    val runner = factory.createRunner();
+
+    assertTrue(runner.run(singletonMap("run", 1)));
+    assertTrue(runner.run(singletonMap("run", 2)));
+    assertEquals(asList(1, 2), executed);
+  }
+
+
   private static List<String> states(List<StageContext.Function<TestStage>> functions)
   {
     val states = new ArrayList<String>();

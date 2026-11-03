@@ -26,8 +26,8 @@ import static de.sayayi.lib.stagerunner.StageRunnerCallback.DEFAULT;
 /**
  * Executes the stage functions of a stage runner factory in stage order.
  * <p>
- * A new instance can be {@link StageRunnerFactory#createRunner() created} by the stage runner factory and is intended
- * to be run only once.
+ * A new instance can be {@link StageRunnerFactory#createRunner() created} by the stage runner factory. The runners
+ * provided by this library can be run any number of times; each run uses its own {@link StageContext stage context}.
  *
  * @param <S>  Stage enum type
  *
