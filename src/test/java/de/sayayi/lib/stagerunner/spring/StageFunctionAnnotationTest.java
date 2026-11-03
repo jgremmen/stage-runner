@@ -16,16 +16,23 @@
 package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.TestStage;
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.spring.annotation.StageDefinition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import java.lang.annotation.Annotation;
+import java.lang.annotation.Retention;
+
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
  * Tests {@link StageFunctionAnnotation#buildFrom(Class)}.
  * <p>
- * Covers the detection of all stage definition properties of a fully specified stage function annotation.
+ * Covers the detection of the stage definition properties of a fully and a minimally specified stage function
+ * annotation, and the rejection of malformed annotations.
  *
  * @since 0.3.0
  */
@@ -44,5 +51,105 @@ class StageFunctionAnnotationTest
     assertEquals("stage", sfa.getStageProperty());
     assertEquals("priority", sfa.getOrderProperty());
     assertEquals("comment", sfa.getDescriptionProperty());
+  }
+
+
+  @Test
+  @DisplayName("Annotation with a stage property only")
+  void stageOnly()
+  {
+    final var sfa = StageFunctionAnnotation.buildFrom(StageOnly.class);
+
+    assertEquals(TestStage.class, sfa.getStageType());
+    assertEquals("value", sfa.getStageProperty());
+    assertNull(sfa.getNameProperty());
+    assertNull(sfa.getOrderProperty());
+    assertNull(sfa.getDescriptionProperty());
+  }
+
+
+  @Test
+  @DisplayName("Malformed function annotations are rejected")
+  void malformedAnnotations()
+  {
+    assertRejected(NoStage.class, "No @Stage annotation found for ");
+    assertRejected(StageNotEnum.class, "Stage type is not an enum for ");
+    assertRejected(DuplicateStage.class, "Duplicate @Stage annotation for ");
+    assertRejected(OrderNotInt.class, "Order type is not an int for ");
+    assertRejected(NameNotString.class, "Stage function name is not a String for ");
+    assertRejected(DescriptionNotString.class, "Description type is not a String for ");
+  }
+
+
+  private static void assertRejected(Class<? extends Annotation> annotationType, String messagePrefix)
+  {
+    final var exception = assertThrows(StageRunnerConfigurationException.class,
+        () -> StageFunctionAnnotation.buildFrom(annotationType));
+
+    assertTrue(exception.getMessage().startsWith(messagePrefix), exception.getMessage());
+  }
+
+
+
+
+  @Retention(RUNTIME)
+  @interface StageOnly {
+    @StageDefinition.Stage TestStage value();
+  }
+
+
+
+
+  @Retention(RUNTIME)
+  @SuppressWarnings("unused")
+  @interface NoStage {
+    @StageDefinition.Order int order();
+  }
+
+
+
+
+  @Retention(RUNTIME)
+  @interface StageNotEnum {
+    @StageDefinition.Stage String stage();
+  }
+
+
+
+
+  @Retention(RUNTIME)
+  @SuppressWarnings("unused")
+  @interface DuplicateStage {
+    @StageDefinition.Stage TestStage stage1();
+    @StageDefinition.Stage TestStage stage2();
+  }
+
+
+
+
+  @Retention(RUNTIME)
+  @SuppressWarnings("unused")
+  @interface OrderNotInt {
+    @StageDefinition.Stage TestStage stage();
+    @StageDefinition.Order long order();
+  }
+
+
+
+
+  @Retention(RUNTIME)
+  @interface NameNotString {
+    @StageDefinition.Stage TestStage stage();
+    @StageDefinition.Name int name();
+  }
+
+
+
+
+  @Retention(RUNTIME)
+  @SuppressWarnings("unused")
+  @interface DescriptionNotString {
+    @StageDefinition.Stage TestStage stage();
+    @StageDefinition.Description int description();
   }
 }

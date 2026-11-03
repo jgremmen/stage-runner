@@ -18,6 +18,7 @@ package de.sayayi.lib.stagerunner.spring;
 import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.TestStage;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,16 +28,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Component;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
 
+import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
  * Tests the {@link StageRunnerFactoryProcessor} within a Spring application context.
  * <p>
  * Covered aspects are the detection of the functional method of the stage runner interface and running the generated
- * stage runner proxy, including a {@code null} data value.
+ * stage runner proxy, including the conversion and boxing of the bound values and a {@code null} data value.
  *
  * @since 0.3.0
  */
@@ -45,6 +47,14 @@ class StageRunnerFactoryProcessorTest
 {
   @SuppressWarnings("SpringJavaInjectionPointsAutowiringInspection")
   @Autowired MyRunnerInterface myRunnerInterface;
+
+  @Autowired MyBean myBean;
+
+
+  @BeforeEach
+  void clearLog() {
+    myBean.log.clear();
+  }
 
 
   @Test
@@ -59,15 +69,29 @@ class StageRunnerFactoryProcessorTest
 
 
   @Test
-  void testInterface() {
-    myRunnerInterface.run("important-task", List.of(1, 67, -4), 56);
+  @DisplayName("Stage functions receive the converted and boxed interface method arguments")
+  void runInterface()
+  {
+    assertTrue(myRunnerInterface.run("important-task", List.of(1, 67, -4), 56));
+
+    assertEquals(4, myBean.log.size());
+    assertInstanceOf(StageContext.class, myBean.log.get(0));
+
+    // List<Integer> converted to List<Long>
+    assertEquals(List.of(1L, 67L, -4L), myBean.log.get(1));
+    assertEquals("important-task", myBean.log.get(2));
+    assertEquals(56, myBean.log.get(3));
   }
 
 
   @Test
   @DisplayName("Null data value must not throw NullPointerException")
-  void testInterfaceWithNullDataValue() {
-    myRunnerInterface.run("important-task", null, 56);
+  void runInterfaceWithNullDataValue()
+  {
+    assertTrue(myRunnerInterface.run("important-task", null, 56));
+
+    assertEquals(4, myBean.log.size());
+    assertNull(myBean.log.get(1));
   }
 
 
@@ -78,7 +102,7 @@ class StageRunnerFactoryProcessorTest
   static class StageConfiguration
   {
     @Bean
-    StageRunnerFactoryProcessor<MyRunnerInterface> processor() {
+    static StageRunnerFactoryProcessor<MyRunnerInterface> processor() {
       return new StageRunnerFactoryProcessor<>(MyRunnerInterface.class, StageDef.class);
     }
   }
@@ -90,17 +114,27 @@ class StageRunnerFactoryProcessorTest
   @SuppressWarnings("unused")
   public static class MyBean
   {
+    final List<Object> log = new ArrayList<>();
+
+
     @StageDef(stage = TestStage.INIT, comment = "Initialize")
-    public void init(StageContext<TestStage> context, List<Long> map) {
+    public void init(StageContext<TestStage> context, List<Long> map)
+    {
+      log.add(context);
+      log.add(map);
     }
 
 
     public void start() {
+      log.add("start");
     }
 
 
     @StageDef(stage = TestStage.PROCESS, comment = "Process task")
-    public void task(String task, @Data(name = "count") int n) {
+    public void task(String task, @Data(name = "count") int n)
+    {
+      log.add(task);
+      log.add(n);
     }
   }
 }

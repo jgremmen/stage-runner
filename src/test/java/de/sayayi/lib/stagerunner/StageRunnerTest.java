@@ -477,6 +477,123 @@ class StageRunnerTest
   }
 
 
+  @Test
+  @DisplayName("Abort in a stage function ends the run unsuccessfully after the function returns")
+  void abortInStageFunction()
+  {
+    val factory = new MyStageRunnerFactory();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
+    val aborted = new ArrayList<Boolean>();
+
+    factory.addStageFunction(START, "S", ctx -> {
+      assertFalse(ctx.isAborted());
+      ctx.abort();
+      aborted.add(ctx.isAborted());
+    });
+    factory.addStageFunction(START, "S2", ctx -> fail());
+    factory.addStageFunction(END, "E", ctx -> fail());
+
+    val runner = factory.createRunner();
+
+    assertFalse(runner.run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+        functions.addAll(stageContext.getFunctions());
+      }
+
+      @Override
+      public void postStageCallback(@NotNull StageContext<TestStage> stageContext, @NotNull TestStage stage) {
+        fail("aborted stage must not be completed");
+      }
+    }));
+
+    assertEquals(singletonList(true), aborted);
+    assertEquals(asList("S:PROCESSED", "S2:WAITING", "E:WAITING"), states(functions));
+  }
+
+
+  @Test
+  @DisplayName("Exception handler returning normally continues the run")
+  void exceptionHandledByCallback()
+  {
+    val factory = new MyStageRunnerFactory();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
+    val handled = new ArrayList<String>();
+
+    factory.addStageFunction(START, "S", ctx -> { throw new IllegalStateException("boom"); });
+    factory.addStageFunction(END, "E", ctx -> {});
+
+    assertTrue(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void stageExceptionHandler(@NotNull StageContext<TestStage> stageContext, @NotNull Throwable exception) {
+        handled.add(stageContext.getCurrentStage() + ":" + exception.getMessage());
+      }
+
+      @Override
+      public void postStageCallback(@NotNull StageContext<TestStage> stageContext, @NotNull TestStage stage)
+      {
+        if (stage == END)
+          functions.addAll(stageContext.getFunctions());
+      }
+    }));
+
+    assertEquals(singletonList("START:boom"), handled);
+    assertEquals(asList("S:FAILED", "E:PROCESSED"), states(functions));
+  }
+
+
+  @Test
+  @DisplayName("Default exception handler wraps exceptions and rethrows stage runner exceptions unchanged")
+  void defaultExceptionHandler()
+  {
+    val factory = new MyStageRunnerFactory();
+    val cause = new IllegalStateException("boom");
+
+    factory.addStageFunction(START, ctx -> { throw cause; });
+
+    val wrapped = assertThrows(StageRunnerException.class, () -> factory.createRunner().run(emptyMap()));
+    assertEquals("boom", wrapped.getMessage());
+    assertSame(cause, wrapped.getCause());
+
+    val factory2 = new MyStageRunnerFactory();
+    val exception = new StageRunnerException("direct");
+
+    factory2.addStageFunction(START, ctx -> { throw exception; });
+
+    assertSame(exception, assertThrows(StageRunnerException.class, () -> factory2.createRunner().run(emptyMap())));
+  }
+
+
+  @Test
+  @DisplayName("Configuration exceptions are passed to the configuration exception handler")
+  void configurationExceptionHandler()
+  {
+    val factory = new MyStageRunnerFactory();
+    val handled = new ArrayList<StageRunnerConfigurationException>();
+    val other = new ArrayList<Throwable>();
+    val exception = new StageRunnerConfigurationException("config");
+
+    factory.addStageFunction(START, ctx -> { throw exception; });
+    factory.addStageFunction(END, ctx -> {});
+
+    assertTrue(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void stageExceptionHandler(@NotNull StageContext<TestStage> stageContext, @NotNull Throwable ex) {
+        other.add(ex);
+      }
+
+      @Override
+      public void stageConfigurationExceptionHandler(@NotNull StageContext<TestStage> stageContext,
+                                                     @NotNull StageRunnerConfigurationException ex) {
+        handled.add(ex);
+      }
+    }));
+
+    assertEquals(singletonList(exception), handled);
+    assertEquals(emptyList(), other);
+  }
+
+
   private static List<String> states(List<StageContext.Function<TestStage>> functions)
   {
     val states = new ArrayList<String>();

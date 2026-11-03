@@ -15,7 +15,9 @@
  */
 package de.sayayi.lib.stagerunner.spring.builder;
 
+import de.sayayi.lib.stagerunner.TestStage;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory;
 import de.sayayi.lib.stagerunner.spring.StageDef;
 import de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation;
 import org.junit.jupiter.api.DisplayName;
@@ -25,7 +27,7 @@ import org.springframework.core.ResolvableType;
 import org.springframework.core.convert.TypeDescriptor;
 import org.springframework.core.convert.support.DefaultConversionService;
 
-import java.lang.reflect.Parameter;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -35,8 +37,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests the resolution of stage function parameters by type in {@link StageFunctionBuilderImpl}.
  * <p>
- * Covered aspects are the selection of the strongest match independent of the data map iteration order and the
- * detection of ambiguous matches.
+ * Covered aspects are the selection of the strongest match independent of the data map iteration order, the detection
+ * of ambiguous matches and the caching of generated classes, all through the public builder API. The equality of the
+ * internal parameter bindings, which the class cache relies on, is tested directly.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0
@@ -51,17 +54,13 @@ class StageFunctionBuilderImplTest
   @DisplayName("Best (strongest) match is picked regardless of data map iteration order")
   void bestMatchIsSelectedIndependentOfMapOrder() throws ReflectiveOperationException
   {
-    final var parameterType = parameterTypeOf("process", CharSequence.class);
-
     // insertion order deliberately puts the weaker (ASSIGNABLE) match before the stronger (IDENTICAL) one;
     // a HashMap could easily iterate in this same order, which used to make the buggy code pick the wrong entry
     final var dataNameTypeMap = new LinkedHashMap<String,ResolvableType>();
     dataNameTypeMap.put("weak", ResolvableType.forClass(StringBuilder.class));
     dataNameTypeMap.put("strong", ResolvableType.forClass(CharSequence.class));
 
-    final var nameWithQualifier = invokeFindNameWithQualifierByParameterType(parameterType, dataNameTypeMap);
-
-    assertEquals("strong", nameField(nameWithQualifier));
+    assertEquals("strong", boundCharSequence(dataNameTypeMap));
   }
 
 
@@ -69,16 +68,12 @@ class StageFunctionBuilderImplTest
   @DisplayName("Best (strongest) match is picked regardless of data map iteration order (reversed insertion)")
   void bestMatchIsSelectedIndependentOfMapOrderReversed() throws ReflectiveOperationException
   {
-    final var parameterType = parameterTypeOf("process", CharSequence.class);
-
     // now insert the strongest match first: the outcome must not depend on this either
     final var dataNameTypeMap = new LinkedHashMap<String,ResolvableType>();
     dataNameTypeMap.put("strong", ResolvableType.forClass(CharSequence.class));
     dataNameTypeMap.put("weak", ResolvableType.forClass(StringBuilder.class));
 
-    final var nameWithQualifier = invokeFindNameWithQualifierByParameterType(parameterType, dataNameTypeMap);
-
-    assertEquals("strong", nameField(nameWithQualifier));
+    assertEquals("strong", boundCharSequence(dataNameTypeMap));
   }
 
 
@@ -86,21 +81,15 @@ class StageFunctionBuilderImplTest
   @DisplayName("Two equally strong matches are reported as ambiguous")
   void ambiguousMatchesThrow() throws ReflectiveOperationException
   {
-    final var parameterType = parameterTypeOf("process", CharSequence.class);
     final var dataNameTypeMap = new LinkedHashMap<String,ResolvableType>();
 
     dataNameTypeMap.put("a", ResolvableType.forClass(StringBuilder.class));
     dataNameTypeMap.put("b", ResolvableType.forClass(StringBuffer.class));
 
-    final var method = StageFunctionBuilderImpl.class.getDeclaredMethod(
-        "findNameWithQualifierByParameterType", Parameter.class, TypeDescriptor.class, Map.class);
-    method.setAccessible(true);
+    final var method = TestTarget.class.getMethod("process", CharSequence.class);
 
-    final var parameter = TestTarget.class.getMethod("process", CharSequence.class).getParameters()[0];
-    final var exception = assertThrows(java.lang.reflect.InvocationTargetException.class,
-        () -> method.invoke(builder, parameter, parameterType, dataNameTypeMap));
-
-    assertEquals(StageRunnerConfigurationException.class, exception.getCause().getClass());
+    assertThrows(StageRunnerConfigurationException.class, () -> builder.createStageFunction(
+        StageFunctionAnnotation.buildFrom(StageDef.class), dataNameTypeMap, method, new TestTarget()));
   }
 
 
@@ -178,25 +167,27 @@ class StageFunctionBuilderImplTest
   }
 
 
-  private Object invokeFindNameWithQualifierByParameterType(
-      TypeDescriptor parameterType, Map<String,ResolvableType> dataNameTypeMap) throws ReflectiveOperationException
+  /**
+   * Builds a stage function for {@link TestTarget#process(CharSequence)} with the given data types, runs it with data
+   * values named after their entry ({@code "weak"} is a {@link StringBuilder}, all others are strings) and returns the
+   * value bound to the parameter.
+   */
+  private String boundCharSequence(Map<String,ResolvableType> dataNameTypeMap) throws ReflectiveOperationException
   {
-    final var method = StageFunctionBuilderImpl.class.getDeclaredMethod(
-        "findNameWithQualifierByParameterType", Parameter.class, TypeDescriptor.class, Map.class);
-    method.setAccessible(true);
+    final var bean = new TestTarget();
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var data = new HashMap<String,Object>();
 
-    final var parameter = TestTarget.class.getMethod("process", CharSequence.class).getParameters()[0];
+    factory.addStageFunction(TestStage.INIT, builder.createStageFunction(
+        StageFunctionAnnotation.buildFrom(StageDef.class), dataNameTypeMap,
+        TestTarget.class.getMethod("process", CharSequence.class), bean));
 
-    return method.invoke(builder, parameter, parameterType, dataNameTypeMap);
-  }
+    for(var name: dataNameTypeMap.keySet())
+      data.put(name, "weak".equals(name) ? new StringBuilder(name) : name);
 
+    assertTrue(factory.createRunner().run(data));
 
-  private String nameField(Object nameWithQualifier) throws ReflectiveOperationException
-  {
-    final var field = nameWithQualifier.getClass().getDeclaredField("name");
-    field.setAccessible(true);
-
-    return (String)field.get(nameWithQualifier);
+    return bean.value.toString();
   }
 
 
@@ -205,7 +196,11 @@ class StageFunctionBuilderImplTest
   @SuppressWarnings("unused")
   private static class TestTarget
   {
+    CharSequence value;
+
+
     public void process(CharSequence value) {
+      this.value = value;
     }
 
 
