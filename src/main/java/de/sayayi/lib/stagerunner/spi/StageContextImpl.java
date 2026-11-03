@@ -283,6 +283,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    *
    * @throws StageRunnerException  if the context is currently running
    * @throws RuntimeException      any exception thrown by one of the {@code callback} methods
+   * @throws Error                 any error thrown by a stage function, rethrown unchanged
    */
   boolean run(@NotNull StageRunnerCallback<S> callback)
   {
@@ -324,6 +325,10 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
           stageFunctionEntry.function.process(this);
         } catch(Throwable ex) {
           functionArray.executionState[functionIndex] = FAILED;
+
+          if (ex instanceof Error error)
+            throw error;
+
           if (ex instanceof StageRunnerConfigurationException stageRunnerConfigurationException)
             callback.stageConfigurationExceptionHandler(this, stageRunnerConfigurationException);
           else

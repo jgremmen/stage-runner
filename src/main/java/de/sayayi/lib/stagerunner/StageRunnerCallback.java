@@ -127,9 +127,9 @@ public interface StageRunnerCallback<S extends Enum<S>>
    * Handles an exception thrown by the stage function currently being processed.
    * <p>
    * This handler is not invoked for a {@link StageRunnerConfigurationException}; those are passed to
-   * {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)} instead. If the
-   * handler returns normally, the exception is considered handled and the execution continues with the next stage
-   * function.
+   * {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)} instead. It is not
+   * invoked for an {@link Error} either; errors terminate the execution and are rethrown unchanged. If the handler
+   * returns normally, the exception is considered handled and the execution continues with the next stage function.
    * <p>
    * The default implementation rethrows a {@link StageRunnerException} as is and wraps any other exception inside a
    * {@link StageRunnerException}.

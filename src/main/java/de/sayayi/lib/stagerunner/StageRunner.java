@@ -15,6 +15,7 @@
  */
 package de.sayayi.lib.stagerunner;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
@@ -46,7 +47,8 @@ public interface StageRunner<S extends Enum<S>>
    * @return  {@code true} if the stage runner ran successfully, {@code false} if it has been
    *          {@link StageContext#abort() aborted}
    *
-   * @throws de.sayayi.lib.stagerunner.exception.StageRunnerException  if a stage function has failed
+   * @throws StageRunnerException  if a stage function has failed
+   * @throws Error                 any error thrown by a stage function, rethrown unchanged
    */
   @SuppressWarnings("unchecked")
   default boolean run(@NotNull Map<String,Object> data) {
@@ -64,8 +66,9 @@ public interface StageRunner<S extends Enum<S>>
    *          {@link StageContext#abort() aborted}
    *
    * @throws RuntimeException  any exception thrown by one of the {@code callback} methods, such as the
-   *                           {@link de.sayayi.lib.stagerunner.exception.StageRunnerException StageRunnerException}
+   *                           {@link StageRunnerException StageRunnerException}
    *                           thrown by the default exception handler
+   * @throws Error             any error thrown by a stage function, rethrown unchanged
    */
   boolean run(@NotNull Map<String,Object> data, @NotNull StageRunnerCallback<S> callback);
 }

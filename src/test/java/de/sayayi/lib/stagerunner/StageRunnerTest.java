@@ -19,12 +19,10 @@ import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spi.AbstractStageRunner;
 import de.sayayi.lib.stagerunner.spi.AbstractStageRunnerFactory;
-import lombok.SneakyThrows;
 import lombok.val;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.opentest4j.AssertionFailedError;
 
 import java.util.*;
 
@@ -240,6 +238,7 @@ class StageRunnerTest
 
   @Test
   @DisplayName("Stage functions reported by stage context are unmodifiable")
+  @SuppressWarnings("DataFlowIssue")
   void functionsAreUnmodifiable()
   {
     val factory = new MyStageRunnerFactory();
@@ -274,6 +273,37 @@ class StageRunnerTest
     assertThrows(StageRunnerException.class, () -> runner.run(emptyMap()));
     assertEquals(asList(">START", ">fn", "<fn", "<START", ">PROCESS", ">fn", "<fn"), runner.log);
     assertEquals(singleton(START), context.getFirst().getProcessedStages());
+  }
+
+
+  @Test
+  @DisplayName("Error thrown by a stage function is rethrown unchanged without invoking the exception handler")
+  void errorIsRethrownUnchanged()
+  {
+    val factory = new MyStageRunnerFactory();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
+    val handled = new ArrayList<Throwable>();
+    val error = new StackOverflowError();
+
+    factory.addStageFunction(START, "S", ctx -> { throw error; });
+    factory.addStageFunction(END, "E", ctx -> {});
+
+    assertSame(error, assertThrows(StackOverflowError.class,
+        () -> factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+          @Override
+          public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+            functions.addAll(stageContext.getFunctions());
+          }
+
+          @Override
+          public void stageExceptionHandler(@NotNull StageContext<TestStage> stageContext,
+                                            @NotNull Throwable exception) {
+            handled.add(exception);  // swallowing handler must not be able to continue the run
+          }
+        })));
+
+    assertEquals(emptyList(), handled);
+    assertEquals(asList("S:FAILED", "E:WAITING"), states(functions));
   }
 
 
@@ -344,17 +374,6 @@ class StageRunnerTest
     @Override
     public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
       log.add("<fn");
-    }
-
-
-    @Override
-    @SneakyThrows
-    public void stageExceptionHandler(@NotNull StageContext<TestStage> stageContext, @NotNull Throwable exception)
-    {
-      if (exception instanceof AssertionFailedError)
-        throw exception;
-
-      StageRunnerCallback.super.stageExceptionHandler(stageContext, exception);
     }
   }
 }

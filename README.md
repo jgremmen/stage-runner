@@ -176,7 +176,8 @@ runner.run(data, new StageRunnerCallback<MyStage>() {
 });
 ```
 
-The default callback wraps exceptions in `StageRunnerException` and aborts the run.
+The default callback wraps exceptions in `StageRunnerException` and aborts the run. An `Error` thrown by a stage
+function is never passed to the exception handler; it terminates the run and is rethrown unchanged.
 
 ### Custom factories
 

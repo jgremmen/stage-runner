@@ -36,7 +36,8 @@ public interface StageFunction<S extends Enum<S>>
    * Executes this stage function.
    * <p>
    * Any exception thrown by this method is passed to the exception handlers of the {@link StageRunnerCallback} used for
-   * the current execution.
+   * the current execution. An {@link Error} is not passed to the exception handlers; it terminates the execution and is
+   * rethrown unchanged.
    *
    * @param stageContext  stage runner context, never {@code null}
    */
