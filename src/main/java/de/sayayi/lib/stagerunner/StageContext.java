@@ -19,6 +19,7 @@ import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Unmodifiable;
 
 import java.util.List;
 import java.util.Map;
@@ -178,14 +179,14 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    * Returns all stage functions of this execution in execution order, including processed, failed and waiting ones.
    * Each function provides the {@link FunctionState state} it is in.
    * <p>
-   * The returned list is a snapshot taken at the time of invocation and must not be modified.
+   * The returned list is an unmodifiable snapshot taken at the time of invocation.
    *
    * @return  list of all stage functions, never {@code null}
    *
    * @since 0.3.0
    */
   @Contract(pure = true)
-  @NotNull List<Function> getFunctions();
+  @NotNull @Unmodifiable List<Function> getFunctions();
 
 
 

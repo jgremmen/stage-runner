@@ -354,12 +354,12 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public @NotNull List<Function> getFunctions()
   {
-    var functions = new Function[functionArray.size];
+    final var functions = new Function[functionArray.size];
 
-    for(int n = 0; n < functionArray.size; n++)
+    for(var n = 0; n < functionArray.size; n++)
       functions[n] = new FunctionAdapter(functionArray.executionState[n], functionArray.functions[n]);
 
-    return Arrays.asList(functions);
+    return List.of(functions);
   }
 
 

@@ -15,6 +15,7 @@
  */
 package de.sayayi.lib.stagerunner.spring.builder;
 
+import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.scaffold.InstrumentedType;
 import net.bytebuddy.implementation.Implementation;
@@ -23,12 +24,14 @@ import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
+import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Type;
 
 
 /**
  * Common base class for the ByteBuddy based builders in this package. It provides a shared random string generator
- * for producing unique generated class names as well as small helpers for describing loaded and parameterized types.
+ * for producing unique generated class names, a lookup for defining generated classes in the package of a host class,
+ * as well as small helpers for describing loaded and parameterized types.
  *
  * @author Jeroen Gremmen
  * @since 0.3.0
@@ -42,6 +45,38 @@ abstract class AbstractBuilder
    * @since 0.3.2
    */
   protected final RandomString randomString = new RandomString(5);
+
+
+  /**
+   * Returns a lookup with full privilege access on {@code hostClass}.
+   * <p>
+   * Generated classes are defined through this lookup, so they are placed in the package, class loader and module of
+   * {@code hostClass}. This gives the generated class access to package-private types of that package and avoids
+   * injecting classes into foreign packages or class loaders.
+   *
+   * @param hostClass  class in whose package the generated class is defined, not {@code null}
+   *
+   * @return  private lookup on {@code hostClass}, never {@code null}
+   *
+   * @throws StageRunnerConfigurationException  if the package of {@code hostClass} is not open to this library
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected static @NotNull MethodHandles.Lookup hostLookup(@NotNull Class<?> hostClass)
+  {
+    final var lookup = MethodHandles.lookup();
+    final var libraryModule = lookup.lookupClass().getModule();
+
+    libraryModule.addReads(hostClass.getModule());
+
+    try {
+      return MethodHandles.privateLookupIn(hostClass, lookup);
+    } catch(IllegalAccessException ex) {
+      throw new StageRunnerConfigurationException("failed to access package " + hostClass.getPackageName() +
+          " for generating a class for " + hostClass.getName() + "; the package must be open to " + libraryModule, ex);
+    }
+  }
 
 
   /**

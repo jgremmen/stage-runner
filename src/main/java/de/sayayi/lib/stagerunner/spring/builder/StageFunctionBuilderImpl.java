@@ -211,37 +211,6 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
   /**
-   * Returns a lookup with full privilege access on {@code hostClass}. It is used to define the generated stage function
-   * class in the package and class loader of {@code hostClass}, giving the generated class access to package-private
-   * bean classes and parameter types.
-   *
-   * @param hostClass  class declaring the stage function method, not {@code null}
-   *
-   * @return  private lookup on {@code hostClass}, never {@code null}
-   *
-   * @throws StageRunnerConfigurationException  if the package of {@code hostClass} is not open to this library
-   *
-   * @since 0.4.0
-   */
-  @Contract(pure = true)
-  private static @NotNull MethodHandles.Lookup hostLookup(@NotNull Class<?> hostClass)
-  {
-    final var lookup = MethodHandles.lookup();
-    final var libraryModule = lookup.lookupClass().getModule();
-
-    libraryModule.addReads(hostClass.getModule());
-
-    try {
-      return MethodHandles.privateLookupIn(hostClass, lookup);
-    } catch(IllegalAccessException ex) {
-      throw new StageRunnerConfigurationException("failed to access package " + hostClass.getPackageName() +
-          " for generating a stage function for " + hostClass.getName() +
-          "; the package must be open to " + libraryModule, ex);
-    }
-  }
-
-
-  /**
    * Builds a stage function instance for a method whose parameters do not require any value conversion. The generated
    * class extends {@link AbstractStageFunction}.
    *
@@ -611,16 +580,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     @Override
     public boolean equals(Object o)
     {
-      if (this == o)
-        return true;
-
-      if (!(o instanceof NameWithQualifierAndType that))
-        return false;
-
       return
-          qualifier == that.qualifier &&
-          name.equals(that.name) &&
-          type.getResolvableType().equals(that.type.getResolvableType());
+          super.equals(o) &&
+          type.getResolvableType().equals(((NameWithQualifierAndType)o).type.getResolvableType());
     }
 
 
@@ -678,13 +640,16 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     @Override
     public int compareTo(@NotNull NameWithQualifier o)
     {
-      int cmp = qualifier.compareTo(o.qualifier);
+      final var cmp = qualifier.compareTo(o.qualifier);
       return cmp == 0 ? name.compareTo(o.name) : cmp;
     }
 
 
     /**
      * {@inheritDoc}
+     * <p>
+     * Only instances of the exact same class are equal, which keeps this relation symmetric with respect to the
+     * {@link NameWithQualifierAndType} subclass.
      */
     @Override
     public boolean equals(Object o)
@@ -692,8 +657,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       if (this == o)
         return true;
 
-      if (!(o instanceof NameWithQualifier that))
+      if (o == null || o.getClass() != getClass())
         return false;
+
+      final var that = (NameWithQualifier)o;
 
       return qualifier == that.qualifier && name.equals(that.name);
     }

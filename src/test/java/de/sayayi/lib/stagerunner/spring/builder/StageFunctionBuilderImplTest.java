@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 
@@ -103,6 +104,52 @@ class StageFunctionBuilderImplTest
   }
 
 
+  @Test
+  @DisplayName("Parameter binding equality is symmetric and takes the parameter type into account")
+  void parameterBindingEquality() throws ReflectiveOperationException
+  {
+    final var charSequenceType = parameterTypeOf("process", CharSequence.class);
+    final var stringType = parameterTypeOf("process", String.class);
+
+    final var nameWithQualifier = nameWithQualifier("value", StageFunctionBuilderImpl.TypeQualifier.IDENTICAL);
+    final var binding = nameWithQualifierAndType(nameWithQualifier, charSequenceType);
+    final var sameBinding = nameWithQualifierAndType(nameWithQualifier, charSequenceType);
+    final var otherTypeBinding = nameWithQualifierAndType(nameWithQualifier, stringType);
+
+    // symmetric, also between super and subclass
+    assertNotEquals(nameWithQualifier, binding);
+    assertNotEquals(binding, nameWithQualifier);
+
+    assertEquals(binding, sameBinding);
+    assertEquals(binding.hashCode(), sameBinding.hashCode());
+    assertNotEquals(binding, otherTypeBinding);
+  }
+
+
+  private Object nameWithQualifier(String name, StageFunctionBuilderImpl.TypeQualifier qualifier)
+      throws ReflectiveOperationException
+  {
+    final var constructor = Class
+        .forName(StageFunctionBuilderImpl.class.getName() + "$NameWithQualifier")
+        .getDeclaredConstructor(String.class, StageFunctionBuilderImpl.TypeQualifier.class);
+    constructor.setAccessible(true);
+
+    return constructor.newInstance(name, qualifier);
+  }
+
+
+  private Object nameWithQualifierAndType(Object nameWithQualifier, TypeDescriptor type)
+      throws ReflectiveOperationException
+  {
+    final var constructor = Class
+        .forName(StageFunctionBuilderImpl.class.getName() + "$NameWithQualifierAndType")
+        .getDeclaredConstructor(nameWithQualifier.getClass(), TypeDescriptor.class);
+    constructor.setAccessible(true);
+
+    return constructor.newInstance(nameWithQualifier, type);
+  }
+
+
   private TypeDescriptor parameterTypeOf(String methodName, Class<?> parameterClass) throws NoSuchMethodException {
     return new TypeDescriptor(new MethodParameter(TestTarget.class.getMethod(methodName, parameterClass), 0));
   }
@@ -136,6 +183,10 @@ class StageFunctionBuilderImplTest
   private static class TestTarget
   {
     public void process(CharSequence value) {
+    }
+
+
+    public void process(String value) {
     }
   }
 }

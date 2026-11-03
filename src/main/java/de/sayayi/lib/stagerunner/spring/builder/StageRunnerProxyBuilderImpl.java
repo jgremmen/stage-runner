@@ -26,6 +26,7 @@ import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.method.MethodDescription.SignatureToken;
 import net.bytebuddy.description.method.ParameterDescription;
 import net.bytebuddy.description.type.TypeDescription;
+import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.FieldAccessor;
 import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.Implementation;
@@ -49,7 +50,6 @@ import static net.bytebuddy.description.method.MethodDescription.CONSTRUCTOR_INT
 import static net.bytebuddy.description.modifier.FieldManifestation.FINAL;
 import static net.bytebuddy.description.modifier.Visibility.PRIVATE;
 import static net.bytebuddy.description.modifier.Visibility.PUBLIC;
-import static net.bytebuddy.dynamic.loading.ClassLoadingStrategy.Default.INJECTION;
 import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Default.NO_CONSTRUCTORS;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
@@ -92,7 +92,11 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
   /**
    * {@inheritDoc}
    * <p>
-   * The proxy class is generated in the class loader of {@code stageRunnerInterfaceType}.
+   * The proxy class is defined through a private lookup on {@code stageRunnerInterfaceType}, in the package and class
+   * loader of the interface. This way package-private stage runner interfaces are supported as well.
+   *
+   * @throws StageRunnerConfigurationException  if the package of {@code stageRunnerInterfaceType} is not open to this
+   *                                            library or the proxy cannot be created
    */
   @Override
   public @NotNull <R,S extends Enum<S>> R createProxy(@NotNull Class<S> stageType,
@@ -101,11 +105,12 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
                                                       @NotNull String[] dataNames,
                                                       @NotNull StageRunnerFactory<S> stageRunnerFactory)
   {
-    var stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
-    var method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
-    var proxyClassName = stageRunnerInterfaceType.getName() +
+    final var stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
+    final var method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
+    final var proxyClassName = stageRunnerInterfaceType.getName() +
         '$' + stageType.getSimpleName() +
         '$' + randomString.nextString();
+    final var hostLookup = hostLookup(stageRunnerInterfaceType);
 
     try {
       //noinspection resource
@@ -125,7 +130,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           .method(isToString())
               .intercept(FixedValue.value("Proxy implementation for interface " + stageRunnerInterfaceType.getName()))
           .make()
-          .load(stageRunnerInterfaceType.getClassLoader(), INJECTION)
+          .load(stageRunnerInterfaceType.getClassLoader(), ClassLoadingStrategy.UsingLookup.of(hostLookup))
           .getLoaded()
           .getDeclaredConstructor(StageRunnerFactory.class)
           .newInstance(stageRunnerFactory);

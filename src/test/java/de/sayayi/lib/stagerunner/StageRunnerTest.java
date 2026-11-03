@@ -237,6 +237,23 @@ class StageRunnerTest
   }
 
 
+  @Test
+  @DisplayName("Stage functions reported by stage context are unmodifiable")
+  void functionsAreUnmodifiable()
+  {
+    val factory = new MyStageRunnerFactory();
+
+    factory.addStageFunction(START, "S", ctx -> {
+      val functions = ctx.getFunctions();
+
+      assertThrows(UnsupportedOperationException.class, () -> functions.set(0, functions.getFirst()));
+      assertThrows(UnsupportedOperationException.class, functions::removeFirst);
+    });
+
+    assertTrue(factory.createRunner().run(emptyMap()));
+  }
+
+
   private static List<String> states(List<StageContext.Function> functions)
   {
     val states = new ArrayList<String>();
