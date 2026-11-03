@@ -23,8 +23,11 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-import static java.lang.annotation.RetentionPolicy.RUNTIME;
+import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.RetentionPolicy.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 
@@ -78,6 +81,21 @@ class StageFunctionAnnotationTest
     assertRejected(OrderNotInt.class, "Order type is not an int for ");
     assertRejected(NameNotString.class, "Stage function name is not a String for ");
     assertRejected(DescriptionNotString.class, "Description type is not a String for ");
+    assertRejected(NoRetention.class, "Annotation must have runtime retention: ");
+    assertRejected(ClassRetention.class, "Annotation must have runtime retention: ");
+    assertRejected(SourceRetention.class, "Annotation must have runtime retention: ");
+    assertRejected(FieldTarget.class, "Annotation must be applicable to methods or annotation types: ");
+  }
+
+
+  @Test
+  @DisplayName("Annotation applicable to annotation types only is accepted as meta-annotation")
+  void annotationTypeTarget()
+  {
+    final var sfa = StageFunctionAnnotation.buildFrom(MetaOnly.class);
+
+    assertEquals(TestStage.class, sfa.getStageType());
+    assertEquals("stage", sfa.getStageProperty());
   }
 
 
@@ -151,5 +169,46 @@ class StageFunctionAnnotationTest
   @interface DescriptionNotString {
     @StageDefinition.Stage TestStage stage();
     @StageDefinition.Description int description();
+  }
+
+
+
+
+  @interface NoRetention {
+    @StageDefinition.Stage TestStage stage();
+  }
+
+
+
+
+  @Retention(CLASS)
+  @interface ClassRetention {
+    @StageDefinition.Stage TestStage stage();
+  }
+
+
+
+
+  @Retention(SOURCE)
+  @interface SourceRetention {
+    @StageDefinition.Stage TestStage stage();
+  }
+
+
+
+
+  @Target(FIELD)
+  @Retention(RUNTIME)
+  @interface FieldTarget {
+    @StageDefinition.Stage TestStage stage();
+  }
+
+
+
+
+  @Target(ANNOTATION_TYPE)
+  @Retention(RUNTIME)
+  @interface MetaOnly {
+    @StageDefinition.Stage TestStage stage();
   }
 }

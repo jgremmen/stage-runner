@@ -446,11 +446,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     dataNameTypeMap.forEach((name, type) -> {
       var q = qualifyParameterType(parameterType, type);
       if (q != null)
-      {
-        var nwq = new NameWithQualifier(name, q);
-        if (!nameQualifiers.contains(nwq))
-          nameQualifiers.add(nwq);
-      }
+        nameQualifiers.add(new NameWithQualifier(name, q));
     });
 
     NameWithQualifier nameWithQualifier = null;

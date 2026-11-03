@@ -216,6 +216,30 @@ class StageRunnerTest
 
 
   @Test
+  @DisplayName("Function remains waiting if preStageFunctionCallback fails")
+  void failingPreStageFunctionCallbackKeepsFunctionWaiting()
+  {
+    val factory = new MyStageRunnerFactory();
+    val contexts = new ArrayList<StageContext<TestStage>>();
+    val exception = new IllegalStateException("callback failed");
+
+    factory.addStageFunction(START, "S", ctx -> fail());
+    factory.addStageFunction(END, "E", ctx -> fail());
+
+    assertSame(exception, assertThrows(IllegalStateException.class,
+        () -> factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+          @Override
+          public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext, String description)
+          {
+            contexts.add(stageContext);
+            throw exception;
+          }
+        })));
+    assertEquals(asList("S:WAITING", "E:WAITING"), states(contexts.get(0).getFunctions()));
+  }
+
+
+  @Test
   @DisplayName("Rejected named stage function prevents enabling any accepted function")
   void rejectedNamedFunctionEnablesNone()
   {

@@ -22,9 +22,15 @@ import org.jetbrains.annotations.NotNull;
 import org.springframework.core.annotation.AnnotationAttributes;
 
 import java.lang.annotation.Annotation;
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
+import java.util.Arrays;
 import java.util.Objects;
 
 import static de.sayayi.lib.stagerunner.StageFunctionConfigurer.DEFAULT_ORDER;
+import static java.lang.annotation.ElementType.ANNOTATION_TYPE;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import static org.springframework.util.StringUtils.hasLength;
 
 
@@ -224,19 +230,39 @@ public final class StageFunctionAnnotation
    * {@link StageDefinition.Order @Order}, {@link StageDefinition.Description @Description} and
    * {@link StageDefinition.Name @Name}. A {@code @Stage} property is mandatory; all others are optional. Each meta
    * annotation may occur at most once and its property must have a compatible return type.
+   * <p>
+   * The annotation must have {@link java.lang.annotation.RetentionPolicy#RUNTIME runtime} retention. If it declares a
+   * {@link Target @Target}, the target must include {@link java.lang.annotation.ElementType#METHOD METHOD} or, for use
+   * as meta-annotation of a composed annotation, {@link java.lang.annotation.ElementType#ANNOTATION_TYPE
+   * ANNOTATION_TYPE}.
    *
    * @param stageFunctionAnnotation  the annotation type to analyze, not {@code null}
    *
    * @return  a descriptor for the given annotation, never {@code null}
    *
-   * @throws StageRunnerConfigurationException  if the annotation is malformed, for example when the mandatory
-   *                                            {@code @Stage} property is missing, when a meta annotation is declared
-   *                                            more than once or when a property has an unsupported return type
+   * @throws StageRunnerConfigurationException  if the annotation is malformed, for example when it is not retained at
+   *                                            run time, cannot be applied to methods, the mandatory {@code @Stage}
+   *                                            property is missing, a meta annotation is declared more than once or
+   *                                            a property has an unsupported return type
    */
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
   public static @NotNull StageFunctionAnnotation buildFrom(@NotNull Class<? extends Annotation> stageFunctionAnnotation)
   {
+    // without runtime retention the annotation is invisible at run time and no stage function would ever be found
+    final var retention = stageFunctionAnnotation.getAnnotation(Retention.class);
+    if (retention == null || retention.value() != RUNTIME)
+      throw new StageRunnerConfigurationException("Annotation must have runtime retention: " + stageFunctionAnnotation);
+
+    // the annotation must be applicable to methods, either directly or as meta-annotation of a composed annotation
+    final var target = stageFunctionAnnotation.getAnnotation(Target.class);
+    if (target != null &&
+        Arrays.stream(target.value()).noneMatch(elementType -> elementType == METHOD || elementType == ANNOTATION_TYPE))
+    {
+      throw new StageRunnerConfigurationException("Annotation must be applicable to methods or annotation types: " +
+          stageFunctionAnnotation);
+    }
+
     Class<?> stageType = null;
     String stagePropertyName = null;
     String orderPropertyName = null;

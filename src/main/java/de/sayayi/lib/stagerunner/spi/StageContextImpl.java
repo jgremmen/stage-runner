@@ -126,6 +126,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   /**
    * {@inheritDoc}
    */
+  @Override
   @Contract(pure = true)
   public boolean isAborted() {
     return aborted;
@@ -378,7 +379,14 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         }
 
         functionArray.executionState[functionIndex] = EXECUTING;
-        callback.preStageFunctionCallback(this, stageFunctionEntry.description);
+        try {
+          callback.preStageFunctionCallback(this, stageFunctionEntry.description);
+        } catch(Throwable ex) {
+          // the stage function has not been executed
+          functionArray.executionState[functionIndex] = WAITING;
+          throw ex;
+        }
+
         try {
           if (aborted)
             functionArray.executionState[functionIndex] = WAITING;
