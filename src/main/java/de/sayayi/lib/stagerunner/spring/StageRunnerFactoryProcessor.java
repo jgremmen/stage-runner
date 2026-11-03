@@ -81,9 +81,11 @@ import static org.springframework.util.ReflectionUtils.isObjectMethod;
  * <p>
  * The functional method of the stage runner interface must return {@code boolean} or {@code void}. Its parameters are
  * passed to the stage runner as data, named by the {@link Data @Data} annotation or the parameter name. A parameter of
- * type {@link StageRunnerCallback} is not passed as data but used as callback for the execution; it must not be
- * annotated with {@code @Data}. If the callback is {@code null}, the {@link StageRunnerCallback#DEFAULT default
- * callback} is used. The binding of stage function parameters is described by {@link Data @Data}.
+ * type {@link StageRunnerCallback} (or a subtype) is not passed as data but used as callback for the execution. At most
+ * one callback parameter is allowed; it must not be annotated with {@code @Data} and its stage type, if specified, must
+ * match the stage type of the stage function annotation. If the callback is {@code null}, the
+ * {@link StageRunnerCallback#DEFAULT default callback} is used. The binding of stage function parameters is described
+ * by {@link Data @Data}.
  * <p>
  * The processor is registered as a bean, for example through a {@code static} bean method in a Spring configuration
  * class:
@@ -176,8 +178,9 @@ public class StageRunnerFactoryProcessor<R>
    * @throws StageRunnerConfigurationException  if the stage function annotation is malformed, the stage runner
    *                                            interface is not a valid functional interface, one of its method
    *                                            parameters is annotated with {@link Data @Data} without name, the
-   *                                            callback parameter is annotated with {@code @Data}, or a data name
-   *                                            cannot be determined or is used for more than one parameter
+   *                                            callback parameter is annotated with {@code @Data} or declares a
+   *                                            different stage type, more than one callback parameter is declared, or a
+   *                                            data name cannot be determined or is used for more than one parameter
    */
   public StageRunnerFactoryProcessor(@NotNull Class<R> stageRunnerInterfaceType,
                                      @NotNull Class<? extends Annotation> stageFunctionAnnotationType)
@@ -199,19 +202,37 @@ public class StageRunnerFactoryProcessor<R>
     final var tmpDataNameTypeMap = new HashMap<String,ResolvableType>();
     final var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageType);
     final var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
-    ResolvableType resolvableType;
+    var callbackParameterFound = false;
 
     for(var p = 0; p < parameterCount; p++)
     {
       final var dataAnnotation = findMergedAnnotation(parameters[p], Data.class);
+      final var resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p);
 
-      if (callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
+      // the callback is identified by its erased type, consistent with the proxy builder
+      if (StageRunnerCallback.class.isAssignableFrom(parameters[p].getType()))
       {
         if (dataAnnotation != null)
         {
           throw new StageRunnerConfigurationException("@Data is not allowed for callback parameter " + (p + 1) +
               " in stage runner function " + stageRunnerInterfaceMethod);
         }
+
+        if (callbackParameterFound)
+        {
+          throw new StageRunnerConfigurationException("duplicate callback parameter " + (p + 1) +
+              " in stage runner function " + stageRunnerInterfaceMethod);
+        }
+
+        // a raw or wildcard typed callback is accepted, a callback for a different stage type is not
+        if (!callbackType.isAssignableFrom(resolvableType) &&
+            !resolvableType.as(StageRunnerCallback.class).hasUnresolvableGenerics())
+        {
+          throw new StageRunnerConfigurationException("callback parameter " + (p + 1) + " in stage runner function " +
+              stageRunnerInterfaceMethod + " must be a " + callbackType);
+        }
+
+        callbackParameterFound = true;
       }
       else
       {

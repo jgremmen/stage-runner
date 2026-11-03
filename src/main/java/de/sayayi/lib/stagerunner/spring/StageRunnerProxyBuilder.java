@@ -40,8 +40,10 @@ public interface StageRunnerProxyBuilder
    * and use {@code stageRunnerFactory} for creating new stage runner instances.
    * <p>
    * The {@code dataNames} array contains the data map key name for the corresponding
-   * {@code stageRunnerInterfaceMethod} parameter. If the value in {@code dataNames} is {@code null}, it is not required
-   * to store its parameter value in the data map.
+   * {@code stageRunnerInterfaceMethod} parameter. A {@code null} value marks the
+   * {@link de.sayayi.lib.stagerunner.StageRunnerCallback StageRunnerCallback} parameter, which is not stored in the
+   * data map but used as callback for the execution. At most one entry is {@code null}, and only for a parameter whose
+   * type is assignable to {@code StageRunnerCallback}.
    *
    * @param stageType                   stage enumeration type, not {@code null}
    * @param stageRunnerInterfaceType    stage runner interface type, not {@code null}

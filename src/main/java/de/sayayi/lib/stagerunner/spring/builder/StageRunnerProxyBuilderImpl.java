@@ -24,7 +24,6 @@ import de.sayayi.lib.stagerunner.spring.StageRunnerProxyBuilder;
 import net.bytebuddy.ByteBuddy;
 import net.bytebuddy.description.method.MethodDescription;
 import net.bytebuddy.description.method.MethodDescription.SignatureToken;
-import net.bytebuddy.description.method.ParameterDescription;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
 import net.bytebuddy.implementation.FieldAccessor;
@@ -101,7 +100,8 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
    * loader of the interface. This way package-private stage runner interfaces are supported as well.
    *
    * @throws StageRunnerConfigurationException  if the package of {@code stageRunnerInterfaceType} is not open to this
-   *                                            library or the proxy cannot be created
+   *                                            library, {@code dataNames} does not match the parameters of
+   *                                            {@code stageRunnerInterfaceMethod} or the proxy cannot be created
    */
   @Override
   public @NotNull <R,S extends Enum<S>> R createProxy(@NotNull Class<S> stageType,
@@ -110,6 +110,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
                                                       @NotNull String[] dataNames,
                                                       @NotNull StageRunnerFactory<S> stageRunnerFactory)
   {
+    final var callbackParameterIndex = findCallbackParameterIndex(stageRunnerInterfaceMethod, dataNames);
     final var stageRunnerFactoryType = parameterizedType(StageRunnerFactory.class, stageType);
     final var method = new MethodDescription.ForLoadedMethod(stageRunnerInterfaceMethod);
     final var proxyClassName = stageRunnerInterfaceType.getName() +
@@ -128,7 +129,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
               .withParameters(stageRunnerFactoryType)
               .intercept(new ProxyConstructorImplementation())
           .define(stageRunnerInterfaceMethod)
-              .intercept(new ProxyMethodImplementation(method, dataNames))
+              .intercept(new ProxyMethodImplementation(method, dataNames, callbackParameterIndex))
               .annotateMethod(copyInterfaceMethodAnnotations ? method.getDeclaredAnnotations() : List.of())
           .method(named("getStageRunnerFactory"))
               .intercept(FieldAccessor.ofField(FACTORY_FIELD_NAME))
@@ -143,6 +144,56 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
       throw new StageRunnerConfigurationException("failed to create proxy for stage runner interface " +
           stageRunnerInterfaceType, ex);
     }
+  }
+
+
+  /**
+   * Returns the index of the callback parameter, which is marked by a {@code null} entry in {@code dataNames}.
+   *
+   * @param stageRunnerInterfaceMethod  stage runner interface method, not {@code null}
+   * @param dataNames                   data names indexed by parameter position, not {@code null}
+   *
+   * @return  index of the callback parameter or {@code -1} if the method has no callback parameter
+   *
+   * @throws StageRunnerConfigurationException  if the number of data names does not match the number of parameters, or
+   *                                            a {@code null} entry does not belong to a single
+   *                                            {@link StageRunnerCallback} parameter
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  private static int findCallbackParameterIndex(@NotNull Method stageRunnerInterfaceMethod,
+                                                @NotNull String[] dataNames)
+  {
+    final var parameterTypes = stageRunnerInterfaceMethod.getParameterTypes();
+
+    if (dataNames.length != parameterTypes.length)
+    {
+      throw new StageRunnerConfigurationException("expected " + parameterTypes.length + " data names for " +
+          stageRunnerInterfaceMethod + " but got " + dataNames.length);
+    }
+
+    var callbackParameterIndex = -1;
+
+    for(var p = 0; p < dataNames.length; p++)
+      if (dataNames[p] == null)
+      {
+        if (!StageRunnerCallback.class.isAssignableFrom(parameterTypes[p]))
+        {
+          throw new StageRunnerConfigurationException("missing data name for parameter " + (p + 1) + " of " +
+              stageRunnerInterfaceMethod);
+        }
+
+        if (callbackParameterIndex != -1)
+        {
+          throw new StageRunnerConfigurationException("duplicate callback parameter " + (p + 1) + " in " +
+              stageRunnerInterfaceMethod);
+        }
+
+        callbackParameterIndex = p;
+      }
+
+    return callbackParameterIndex;
   }
 
 
@@ -197,18 +248,24 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
     /** Data names indexed by parameter position. */
     private final String[] dataNames;
 
+    /** Index of the callback parameter or {@code -1} if there is none. */
+    private final int callbackParameterIndex;
+
 
     /**
      * Creates a new implementation for the given interface method.
      *
-     * @param method     stage runner interface method, not {@code null}
-     * @param dataNames  data names indexed by parameter position, with {@code null} for parameters which are not passed
-     *                   as data, not {@code null}
+     * @param method                  stage runner interface method, not {@code null}
+     * @param dataNames               data names indexed by parameter position, with {@code null} for the callback
+     *                                parameter, not {@code null}
+     * @param callbackParameterIndex  index of the callback parameter or {@code -1} if there is none
      */
-    private ProxyMethodImplementation(@NotNull MethodDescription method, @NotNull String[] dataNames)
+    private ProxyMethodImplementation(@NotNull MethodDescription method, @NotNull String[] dataNames,
+                                      int callbackParameterIndex)
     {
       this.method = method;
       this.dataNames = dataNames;
+      this.callbackParameterIndex = callbackParameterIndex;
     }
 
 
@@ -241,7 +298,9 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           : buildMapNoDataNames());
 
       // param2 = callback (optional), Objects.requireNonNullElse(callback, StageRunnerCallback.DEFAULT)
-      var stageRunnerCallbackParameter = findCallbackParameter();
+      var stageRunnerCallbackParameter = callbackParameterIndex == -1
+          ? null
+          : method.getParameters().get(callbackParameterIndex);
       if (stageRunnerCallbackParameter != null)
       {
         var stageRunnerCallbackType = typeDescription(StageRunnerCallback.class);
@@ -349,25 +408,6 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
               .getDeclaredMethods()
               .filter(named("of").and(takesNoArguments()))
               .getOnly()));
-    }
-
-
-    /**
-     * Returns the first parameter of the interface method whose type is assignable to {@link StageRunnerCallback}, or
-     * {@code null} when the interface method does not accept a callback.
-     *
-     * @return  the callback parameter, or {@code null} if none is present
-     */
-    @Contract(pure = true)
-    private ParameterDescription findCallbackParameter()
-    {
-      var stageRunnerCallbackType = typeDescription(StageRunnerCallback.class);
-
-      for(var parameter: method.getParameters())
-        if (stageRunnerCallbackType.isAssignableFrom(parameter.getType().asErasure()))
-          return parameter;
-
-      return null;
     }
   }
 }
