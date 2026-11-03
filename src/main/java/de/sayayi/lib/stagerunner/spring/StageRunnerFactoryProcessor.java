@@ -15,6 +15,7 @@
  */
 package de.sayayi.lib.stagerunner.spring;
 
+import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.StageRunner;
 import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
@@ -29,6 +30,7 @@ import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.InitializingBean;
@@ -79,8 +81,9 @@ import static org.springframework.util.ReflectionUtils.isObjectMethod;
  * <p>
  * The functional method of the stage runner interface must return {@code boolean} or {@code void}. Its parameters are
  * passed to the stage runner as data, named by the {@link Data @Data} annotation or the parameter name. A parameter of
- * type {@link StageRunnerCallback} is not passed as data but used as callback for the execution. If the callback is
- * {@code null}, the {@link StageRunnerCallback#DEFAULT default callback} is used.
+ * type {@link StageRunnerCallback} is not passed as data but used as callback for the execution; it must not be
+ * annotated with {@code @Data}. If the callback is {@code null}, the {@link StageRunnerCallback#DEFAULT default
+ * callback} is used. The binding of stage function parameters is described by {@link Data @Data}.
  * <p>
  * The processor is registered as a bean, for example through a {@code static} bean method in a Spring configuration
  * class:
@@ -96,60 +99,59 @@ import static org.springframework.util.ReflectionUtils.isObjectMethod;
  * @author Jeroen Gremmen
  * @since 0.3.0
  */
-@SuppressWarnings("rawtypes")
 public class StageRunnerFactoryProcessor<R>
     implements BeanDefinitionRegistryPostProcessor, BeanFactoryAware, InitializingBean, SmartInitializingSingleton
 {
   /** Logger used by this processor. */
-  protected final Log logger = LogFactory.getLog(StageRunnerFactoryProcessor.class);
+  private final Log logger = LogFactory.getLog(StageRunnerFactoryProcessor.class);
 
   /** Stage runner interface implemented by the registered proxy bean. */
-  protected final Class<R> stageRunnerInterfaceType;
+  private final Class<R> stageRunnerInterfaceType;
 
   /** Descriptor of the stage function annotation marking the bean methods to register. */
-  protected final StageFunctionAnnotation stageFunctionAnnotation;
+  private final StageFunctionAnnotation stageFunctionAnnotation;
 
   /** Stage runner factory populated with the discovered stage functions and used by the proxy. */
-  protected final DefaultStageRunnerFactory stageRunnerFactory;
+  private final DefaultStageRunnerFactory<?> stageRunnerFactory;
 
   /** Functional method of the stage runner interface. */
-  protected final Method stageRunnerInterfaceMethod;
+  private final Method stageRunnerInterfaceMethod;
 
   /**
    * Data names for the parameters of {@link #stageRunnerInterfaceMethod}, indexed by parameter position. An entry is
    * {@code null} for a callback parameter.
    */
-  protected final String[] dataNames;
+  private final String[] dataNames;
 
   /** Unmodifiable mapping of data names to the types of the corresponding interface method parameters. */
-  protected final Map<String,ResolvableType> dataNameTypeMap;
+  private final Map<String,ResolvableType> dataNameTypeMap;
 
   /** Bean factory owning this processor. */
-  protected BeanFactory beanFactory;
+  private BeanFactory beanFactory;
 
   /** Conversion service used by the default stage function builder, or {@code null} if not yet determined. */
-  protected ConversionService conversionService;
+  private ConversionService conversionService;
 
   /** Builder for the stage runner proxy, or {@code null} to use the default implementation. */
-  protected StageRunnerProxyBuilder stageRunnerProxyBuilder;
+  private StageRunnerProxyBuilder stageRunnerProxyBuilder;
 
   /**
    * Builder for stage functions, or {@code null} to use the default implementation. Access it through
    * {@link #getStageFunctionBuilder()}, which creates the default implementation on first use.
    */
-  protected StageFunctionBuilder stageFunctionBuilder;
+  private StageFunctionBuilder stageFunctionBuilder;
 
   /** Whether annotations of the interface method are copied to the generated proxy method. */
-  protected boolean copyInterfaceMethodAnnotations;
+  private boolean copyInterfaceMethodAnnotations;
 
   /** Generator providing the stage function name for an annotated method, or {@code null} for unnamed functions. */
-  protected BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator;
+  private BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator;
 
   /** Whether the stage functions of all singleton beans have been discovered and registered. */
   private volatile boolean stageFunctionsDiscovered;
 
   /** Filter deciding which discovered stage functions are registered; accepts all functions by default. */
-  protected StageFunctionFilter stageFunctionFilter = (bean, stage, order, name) -> true;
+  private StageFunctionFilter stageFunctionFilter = (bean, stage, order, name) -> true;
 
 
   /**
@@ -158,12 +160,12 @@ public class StageRunnerFactoryProcessor<R>
    * @param stageRunnerInterfaceType      stage runner interface type, not {@code null}
    * @param stageFunctionAnnotationType   stage function annotation type, not {@code null}
    *
-   * @throws StageRunnerConfigurationException  if the stage function annotation is malformed or the stage runner
-   *                                            interface is not a valid functional interface
-   * @throws StageRunnerException               if a data name cannot be determined or is used for more than one
-   *                                            parameter of the interface method
+   * @throws StageRunnerConfigurationException  if the stage function annotation is malformed, the stage runner
+   *                                            interface is not a valid functional interface, one of its method
+   *                                            parameters is annotated with {@link Data @Data} without name, the
+   *                                            callback parameter is annotated with {@code @Data}, or a data name
+   *                                            cannot be determined or is used for more than one parameter
    */
-  @SuppressWarnings("unchecked")
   public StageRunnerFactoryProcessor(@NotNull Class<R> stageRunnerInterfaceType,
                                      @NotNull Class<? extends Annotation> stageFunctionAnnotationType)
   {
@@ -171,9 +173,69 @@ public class StageRunnerFactoryProcessor<R>
         (stageFunctionAnnotation = StageFunctionAnnotation.buildFrom(stageFunctionAnnotationType)).getStageType();
     logger.debug("stage type = " + stageType);
 
-    this.stageRunnerFactory = new DefaultStageRunnerFactory(stageType) {
+    this.stageRunnerInterfaceType = stageRunnerInterfaceType;
+    this.stageRunnerFactory = createStageRunnerFactory(stageType);
+    this.stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
+    logger.debug("stage runner interface method = " + stageRunnerInterfaceMethod);
+
+    final var parameters = stageRunnerInterfaceMethod.getParameters();
+    final var parameterCount = parameters.length;
+
+    dataNames = new String[parameterCount];
+
+    final var tmpDataNameTypeMap = new HashMap<String,ResolvableType>();
+    final var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageType);
+    final var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
+    ResolvableType resolvableType;
+
+    for(var p = 0; p < parameterCount; p++)
+    {
+      final var dataAnnotation = findMergedAnnotation(parameters[p], Data.class);
+
+      if (callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
+      {
+        if (dataAnnotation != null)
+        {
+          throw new StageRunnerConfigurationException("@Data is not allowed for callback parameter " + (p + 1) +
+              " in stage runner function " + stageRunnerInterfaceMethod);
+        }
+      }
+      else
+      {
+        final var dataName = getDataNameForParameter(dataAnnotation, parameterNames, p);
+
+        if (tmpDataNameTypeMap.put(dataNames[p] = dataName, resolvableType) != null)
+        {
+          throw new StageRunnerConfigurationException("duplicate data name '" + dataName + "' for parameter #" +
+              (p + 1) + " in stage runner function " + stageRunnerInterfaceMethod);
+        }
+      }
+    }
+
+    dataNameTypeMap = Map.copyOf(tmpDataNameTypeMap);
+    logger.debug("stage runner data = " + dataNameTypeMap);
+
+    stageFunctionNameGenerator = (stageFunctionAnnotationAttributes,method) ->
+        stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
+  }
+
+
+  /**
+   * Creates the internal stage runner factory. Its runners can only be created after the stage functions of all
+   * singleton beans have been discovered.
+   *
+   * @param stageType  stage enumeration type, not {@code null}
+   *
+   * @return  stage runner factory, never {@code null}
+   *
+   * @param <S>  stage enumeration type
+   */
+  @SuppressWarnings("unchecked")
+  private <S extends Enum<S>> @NotNull DefaultStageRunnerFactory<S> createStageRunnerFactory(@NotNull Class<?> stageType)
+  {
+    return new DefaultStageRunnerFactory<>((Class<S>)stageType) {
       @Override
-      public @NotNull StageRunner createRunner()
+      public @NotNull StageRunner<S> createRunner()
       {
         // running before discovery has completed would silently execute an incomplete set of stage functions
         if (!stageFunctionsDiscovered)
@@ -185,44 +247,15 @@ public class StageRunnerFactoryProcessor<R>
         return super.createRunner();
       }
     };
-    this.stageRunnerInterfaceType = stageRunnerInterfaceType;
-    this.stageRunnerInterfaceMethod = findFunctionalInterfaceMethod(stageRunnerInterfaceType);
-    logger.debug("stage runner interface method = " + stageRunnerInterfaceMethod);
-
-    var parameters = stageRunnerInterfaceMethod.getParameters();
-    var parameterCount = parameters.length;
-
-    dataNames = new String[parameterCount];
-
-    var tmpDataNameTypeMap = new HashMap<String,ResolvableType>();
-    var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageType);
-    var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
-    ResolvableType resolvableType;
-
-    for(int p = 0; p < parameterCount; p++)
-      if (!callbackType.isAssignableFrom(resolvableType = forMethodParameter(stageRunnerInterfaceMethod, p)))
-      {
-        var dataName =
-            getDataNameForParameter(findMergedAnnotation(parameters[p], Data.class), parameterNames, p);
-
-        if (tmpDataNameTypeMap.put(dataNames[p] = dataName, resolvableType) != null)
-        {
-          throw new StageRunnerException("duplicate data name '" + dataName + "' for parameter #" + (p + 1) +
-              " in stage runner function " + stageRunnerInterfaceMethod);
-        }
-      }
-
-    dataNameTypeMap = Map.copyOf(tmpDataNameTypeMap);
-    logger.debug("stage runner data = " + dataNameTypeMap);
-
-    stageFunctionNameGenerator = (stageFunctionAnnotationAttributes,method) ->
-        stageFunctionAnnotation.getName(stageFunctionAnnotationAttributes);
   }
 
 
   /**
    * Resolves the data name for a parameter of the stage runner interface method. The name is taken from the
    * {@link Data @Data} annotation when present, otherwise the reflected parameter name is used.
+   * <p>
+   * A {@code @Data} annotation without name is rejected. Parameters of the stage runner interface method are never
+   * assigned the stage context, so the annotation would have no effect.
    *
    * @param dataAnnotation  optional {@link Data @Data} annotation on the parameter, may be {@code null}
    * @param parameterNames  reflected parameter names of the stage runner interface method, may be {@code null}
@@ -230,20 +263,30 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @return  the resolved data name, never {@code null}
    *
-   * @throws StageRunnerException  if no name can be derived for the parameter
+   * @throws StageRunnerConfigurationException  if the parameter is annotated with {@code @Data} without name or no name
+   *                                            can be derived for the parameter
    */
   @Contract(pure = true)
   protected @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
                                                     @Nullable String[] parameterNames,
                                                     int p)
   {
-    var parameterName = dataAnnotation != null ? dataAnnotation.name() : "";
-    if (parameterName.isEmpty() && parameterNames != null)
-      parameterName = parameterNames[p];
+    if (dataAnnotation != null)
+    {
+      if (dataAnnotation.name().isEmpty())
+      {
+        throw new StageRunnerConfigurationException("@Data without name is not allowed for parameter " + (p + 1) +
+            " in stage runner function " + stageRunnerInterfaceMethod);
+      }
+
+      return dataAnnotation.name();
+    }
+
+    var parameterName = parameterNames != null ? parameterNames[p] : null;
 
     if (parameterName == null || parameterName.isEmpty())
     {
-      throw new StageRunnerException("unable to detect data name for parameter " + (p + 1) +
+      throw new StageRunnerConfigurationException("unable to detect data name for parameter " + (p + 1) +
           " in stage runner function " + stageRunnerInterfaceMethod + "; please specify @Data");
     }
 
@@ -319,12 +362,16 @@ public class StageRunnerFactoryProcessor<R>
    * {@inheritDoc}
    * <p>
    * Discovers the stage functions of all singleton beans and registers them with the internal stage runner factory.
-   * This happens once, after all non lazy singletons have been instantiated, so the result does not depend on the order
+   * This happens once, after all non-lazy singletons have been instantiated, so the result does not depend on the order
    * in which beans are created:
    * <ul>
-   *   <li>Singletons which already exist are analysed using their instance.</li>
-   *   <li>Singletons which have not been created yet, like lazy-init singletons or objects created by factory beans,
-   *       are analyzed by type. They are only created if they declare stage functions.</li>
+   *   <li>
+   *     Singletons which already exist are analyzed using their instance.
+   *   </li>
+   *   <li>
+   *     Singletons which have not been created yet, like lazy-init singletons or objects created by factory beans, are
+   *     analyzed by type. They are only created if they declare stage functions.
+   *   </li>
    * </ul>
    * Non singleton beans are skipped. Until this method has completed, running the stage runner fails with a
    * {@link StageRunnerException}.
@@ -444,24 +491,23 @@ public class StageRunnerFactoryProcessor<R>
    * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function or the function
    *                                            name is not unique
    */
-  @SuppressWarnings("unchecked")
   protected void registerStageFunction(@NotNull AnnotationAttributes stageFunctionAnnotationAttributes,
                                        @NotNull Method method,
                                        @NotNull Object bean)
   {
-    var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
-    var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
-    var name = stageFunctionNameGenerator.apply(stageFunctionAnnotationAttributes, method);
+    final var stageEnum = stageFunctionAnnotation.getStage(stageFunctionAnnotationAttributes);
+    final var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
+    final var name = stageFunctionNameGenerator.apply(stageFunctionAnnotationAttributes, method);
 
     if (stageFunctionFilter.filter(bean, stageEnum, order, name))
     {
-      var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
-      var function = getStageFunctionBuilder()
+      final var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
+      final var function = getStageFunctionBuilder()
           .createStageFunction(stageFunctionAnnotation, dataNameTypeMap, method, bean);
 
       if (logger.isDebugEnabled())
       {
-        var msg = new StringBuilder();
+        final var msg = new StringBuilder();
 
         if (name == null)
           msg.append("add stage function");
@@ -478,11 +524,33 @@ public class StageRunnerFactoryProcessor<R>
         logger.debug(msg.toString());
       }
 
-      if (name != null)
-        stageRunnerFactory.namedStageFunction(name, stageEnum, order, description, function);
-      else
-        stageRunnerFactory.addStageFunction(stageEnum, order, description, function);
+      addStageFunction(stageRunnerFactory, name, stageEnum, order, description, function);
     }
+  }
+
+
+  /**
+   * Adds a regular stage function or, if {@code name} is not {@code null}, registers a named stage function with the
+   * given factory.
+   *
+   * @param factory      stage runner factory, not {@code null}
+   * @param name         stage function name or {@code null} for a regular stage function
+   * @param stage        stage, which must be a constant of the factory's stage type, not {@code null}
+   * @param order        order within the stage
+   * @param description  stage function description or {@code null}
+   * @param function     stage function for the factory's stage type, not {@code null}
+   *
+   * @param <S>  stage enumeration type
+   */
+  @SuppressWarnings("unchecked")
+  private static <S extends Enum<S>> void addStageFunction(@NotNull DefaultStageRunnerFactory<S> factory, String name,
+                                                           @NotNull Enum<?> stage, int order, String description,
+                                                           @NotNull StageFunction<?> function)
+  {
+    if (name != null)
+      factory.namedStageFunction(name, (S)stage, order, description, (StageFunction<S>)function);
+    else
+      factory.addStageFunction((S)stage, order, description, (StageFunction<S>)function);
   }
 
 
@@ -497,14 +565,14 @@ public class StageRunnerFactoryProcessor<R>
   @Override
   public void postProcessBeanDefinitionRegistry(@NotNull BeanDefinitionRegistry beanDefinitionRegistry)
   {
-    var bean = new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
+    final var bean = new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
 
     bean.setTargetType(ResolvableType.forClass(stageRunnerInterfaceType));
     bean.setLazyInit(true);
     bean.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.getStageType().getName());
     bean.setPrimary(true);
 
-    var name = stageRunnerInterfaceType.getName();
+    final var name = stageRunnerInterfaceType.getName();
 
     logger.trace("register singleton bean: " + name);
 
@@ -594,6 +662,142 @@ public class StageRunnerFactoryProcessor<R>
     return method1.getName().equals(method2.getName()) &&
            method1.getReturnType() == method2.getReturnType() &&
            Arrays.equals(method1.getParameterTypes(), method2.getParameterTypes());
+  }
+
+
+  /**
+   * Returns the stage runner interface implemented by the registered proxy bean.
+   *
+   * @return  stage runner interface type, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected @NotNull Class<R> getStageRunnerInterfaceType() {
+    return stageRunnerInterfaceType;
+  }
+
+
+  /**
+   * Returns the functional method of the stage runner interface.
+   *
+   * @return  stage runner interface method, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected @NotNull Method getStageRunnerInterfaceMethod() {
+    return stageRunnerInterfaceMethod;
+  }
+
+
+  /**
+   * Returns the descriptor of the stage function annotation marking the bean methods to register.
+   *
+   * @return  stage function annotation descriptor, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected @NotNull StageFunctionAnnotation getStageFunctionAnnotation() {
+    return stageFunctionAnnotation;
+  }
+
+
+  /**
+   * Returns the internal stage runner factory, which is populated with the discovered stage functions and used by the
+   * stage runner proxy.
+   *
+   * @return  stage runner factory, never {@code null}
+   *
+   * @param <S>  stage enumeration type, as returned by {@link StageFunctionAnnotation#getStageType()}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  @SuppressWarnings("unchecked")
+  protected <S extends Enum<S>> @NotNull DefaultStageRunnerFactory<S> getStageRunnerFactory() {
+    return (DefaultStageRunnerFactory<S>)stageRunnerFactory;
+  }
+
+
+  /**
+   * Returns the data names for the parameters of the stage runner interface method, indexed by parameter position.
+   * An entry is {@code null} for a callback parameter.
+   *
+   * @return  copy of the data names, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(value = "-> new", pure = true)
+  protected @NotNull String[] getDataNames() {
+    return dataNames.clone();
+  }
+
+
+  /**
+   * Returns the mapping of data names to the types of the corresponding stage runner interface method parameters.
+   *
+   * @return  unmodifiable data name to type mapping, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected @NotNull @Unmodifiable Map<String,ResolvableType> getDataNameTypeMap() {
+    return dataNameTypeMap;
+  }
+
+
+  /**
+   * Returns the bean factory owning this processor.
+   *
+   * @return  bean factory, or {@code null} if it has not been set yet
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected BeanFactory getBeanFactory() {
+    return beanFactory;
+  }
+
+
+  /**
+   * Returns the stage runner proxy builder.
+   *
+   * @return  stage runner proxy builder, or {@code null} if neither a builder has been set nor
+   *          {@link #afterPropertiesSet()} has been invoked yet
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected StageRunnerProxyBuilder getStageRunnerProxyBuilder() {
+    return stageRunnerProxyBuilder;
+  }
+
+
+  /**
+   * Returns the filter deciding which discovered stage functions are registered.
+   *
+   * @return  stage function filter, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected @NotNull StageFunctionFilter getStageFunctionFilter() {
+    return stageFunctionFilter;
+  }
+
+
+  /**
+   * Returns the generator providing the stage function name for an annotated method.
+   *
+   * @return  stage function name generator, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected @NotNull BiFunction<AnnotationAttributes,Method,String> getStageFunctionNameGenerator() {
+    return stageFunctionNameGenerator;
   }
 
 

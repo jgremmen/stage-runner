@@ -74,7 +74,8 @@ class CallbackParameterTest
       // the default exception handler wraps the exception
       final var exception = assertThrows(StageRunnerException.class,
           () -> runner.run("fail", null));
-      assertEquals("boom", exception.getMessage());
+      assertEquals("stage function failed in stage INIT: java.lang.IllegalStateException: boom",
+          exception.getMessage());
     }
   }
 

@@ -552,7 +552,7 @@ class StageRunnerTest
     factory.addStageFunction(START, ctx -> { throw cause; });
 
     val wrapped = assertThrows(StageRunnerException.class, () -> factory.createRunner().run(emptyMap()));
-    assertEquals("boom", wrapped.getMessage());
+    assertEquals("stage function failed in stage START: java.lang.IllegalStateException: boom", wrapped.getMessage());
     assertSame(cause, wrapped.getCause());
 
     val factory2 = new MyStageRunnerFactory();
@@ -561,6 +561,21 @@ class StageRunnerTest
     factory2.addStageFunction(START, ctx -> { throw exception; });
 
     assertSame(exception, assertThrows(StageRunnerException.class, () -> factory2.createRunner().run(emptyMap())));
+  }
+
+
+  @Test
+  @DisplayName("Default exception handler message names the stage for an exception without message")
+  void defaultExceptionHandlerWithoutMessage()
+  {
+    val factory = new MyStageRunnerFactory();
+
+    factory.addStageFunction(START, ctx -> {});
+    factory.addStageFunction(PROCESS, ctx -> { throw new UnsupportedOperationException(); });
+
+    val wrapped = assertThrows(StageRunnerException.class, () -> factory.createRunner().run(emptyMap()));
+    assertEquals("stage function failed in stage PROCESS: java.lang.UnsupportedOperationException",
+        wrapped.getMessage());
   }
 
 

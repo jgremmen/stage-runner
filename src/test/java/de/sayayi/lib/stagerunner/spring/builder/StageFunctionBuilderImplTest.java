@@ -15,11 +15,13 @@
  */
 package de.sayayi.lib.stagerunner.spring.builder;
 
+import de.sayayi.lib.stagerunner.StageContext;
 import de.sayayi.lib.stagerunner.TestStage;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory;
 import de.sayayi.lib.stagerunner.spring.StageDef;
 import de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation;
+import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.core.MethodParameter;
@@ -115,6 +117,66 @@ class StageFunctionBuilderImplTest
 
 
   @Test
+  @DisplayName("Named data entry with an incompatible type is rejected as configuration error")
+  void incompatibleDataType() throws ReflectiveOperationException
+  {
+    final var annotation = StageFunctionAnnotation.buildFrom(StageDef.class);
+    final var dataNameTypeMap = Map.of(
+        "value", ResolvableType.forClass(Thread.class),
+        "other", ResolvableType.forClass(Thread.class));
+
+    // matched by parameter name
+    final var byName = TestTarget.class.getMethod("process", CharSequence.class);
+    final var byNameException = assertThrows(StageRunnerConfigurationException.class,
+        () -> builder.createStageFunction(annotation, dataNameTypeMap, byName, new TestTarget()));
+
+    assertEquals("Data 'value' of type java.lang.Thread cannot be supplied to parameter " +
+        byName.getParameters()[0] + " of method " + byName, byNameException.getMessage());
+
+    // matched by @Data annotation
+    final var byAnnotation = TestTarget.class.getMethod("annotated", CharSequence.class);
+    final var byAnnotationException = assertThrows(StageRunnerConfigurationException.class,
+        () -> builder.createStageFunction(annotation, dataNameTypeMap, byAnnotation, new TestTarget()));
+
+    assertEquals("Data 'other' of type java.lang.Thread cannot be supplied to parameter " +
+        byAnnotation.getParameters()[0] + " of method " + byAnnotation, byAnnotationException.getMessage());
+  }
+
+
+  @Test
+  @DisplayName("@Data without name is rejected for a parameter which cannot be assigned the stage context")
+  void unnamedDataOnNonContextParameter() throws ReflectiveOperationException
+  {
+    final var method = TestTarget.class.getMethod("unnamed", CharSequence.class);
+    final var exception = assertThrows(
+        StageRunnerConfigurationException.class,
+        () -> builder.createStageFunction(
+            StageFunctionAnnotation.buildFrom(StageDef.class),
+            Map.of("value", ResolvableType.forClass(String.class)),
+            method, new TestTarget()));
+
+    assertEquals("@Data without name is only allowed for a parameter which can be assigned the stage context: " +
+        "parameter " + method.getParameters()[0] + " of method " + method, exception.getMessage());
+  }
+
+
+  @Test
+  @DisplayName("@Data without name prevents a stage context parameter from being assigned the stage context")
+  void unnamedDataOnContextParameter() throws ReflectiveOperationException
+  {
+    final var method = TestTarget.class.getMethod("unnamedContext", StageContext.class);
+
+    // resolved like an unannotated data parameter; there is no matching data, so the binding fails
+    final var exception = assertThrows(
+        StageRunnerConfigurationException.class,
+        () -> builder.createStageFunction(StageFunctionAnnotation.buildFrom(StageDef.class), Map.of(),
+            method, new TestTarget()));
+
+    assertTrue(exception.getMessage().startsWith("Unknown data type for parameter "), exception.getMessage());
+  }
+
+
+  @Test
   @DisplayName("Parameter binding equality is symmetric and takes the parameter type into account")
   void parameterBindingEquality() throws ReflectiveOperationException
   {
@@ -205,6 +267,18 @@ class StageFunctionBuilderImplTest
 
 
     public void process(String value) {
+    }
+
+
+    public void annotated(@Data("other") CharSequence value) {
+    }
+
+
+    public void unnamed(@Data CharSequence value) {
+    }
+
+
+    public void unnamedContext(@Data StageContext<TestStage> context) {
     }
   }
 }

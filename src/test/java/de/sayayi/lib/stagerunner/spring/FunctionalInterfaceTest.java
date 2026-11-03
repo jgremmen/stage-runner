@@ -15,8 +15,10 @@
  */
 package de.sayayi.lib.stagerunner.spring;
 
+import de.sayayi.lib.stagerunner.StageRunnerCallback;
 import de.sayayi.lib.stagerunner.TestStage;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -83,7 +85,7 @@ class FunctionalInterfaceTest
   @DisplayName("Abstract method inherited from multiple super-interfaces is counted once")
   void diamondMethod()
   {
-    final var method = processor(DiamondRunner.class).stageRunnerInterfaceMethod;
+    final var method = processor(DiamondRunner.class).getStageRunnerInterfaceMethod();
 
     assertEquals("run", method.getName());
     assertArrayEquals(new Class<?>[] { String.class }, method.getParameterTypes());
@@ -111,6 +113,43 @@ class FunctionalInterfaceTest
 
 
   @Test
+  @DisplayName("@Data without name on a stage runner interface parameter is rejected")
+  void unnamedDataParameter()
+  {
+    var exception = assertThrows(StageRunnerConfigurationException.class, () -> processor(UnnamedDataRunner.class));
+
+    assertTrue(exception.getMessage().startsWith(
+        "@Data without name is not allowed for parameter 1 in stage runner function "), exception.getMessage());
+  }
+
+
+  @Test
+  @DisplayName("@Data on the callback parameter of a stage runner interface is rejected")
+  void dataOnCallbackParameter()
+  {
+    var exception = assertThrows(
+        StageRunnerConfigurationException.class,
+        () -> processor(DataCallbackRunner.class));
+
+    assertTrue(exception.getMessage().startsWith(
+        "@Data is not allowed for callback parameter 2 in stage runner function "), exception.getMessage());
+  }
+
+
+  @Test
+  @DisplayName("Duplicate data name in a stage runner interface is rejected")
+  void duplicateDataName()
+  {
+    var exception = assertThrows(
+        StageRunnerConfigurationException.class,
+        () -> processor(DuplicateDataRunner.class));
+
+    assertTrue(exception.getMessage().startsWith(
+        "duplicate data name 'foo' for parameter #2 in stage runner function "), exception.getMessage());
+  }
+
+
+  @Test
   @DisplayName("Stage runner with an inherited functional method is executed")
   void runInheritedMethod()
   {
@@ -122,7 +161,7 @@ class FunctionalInterfaceTest
 
 
   private static void assertFunctionalMethod(Class<?> interfaceType, Object expectedMethod) {
-    assertEquals(expectedMethod, processor(interfaceType).stageRunnerInterfaceMethod);
+    assertEquals(expectedMethod, processor(interfaceType).getStageRunnerInterfaceMethod());
   }
 
 
@@ -213,8 +252,30 @@ class FunctionalInterfaceTest
 
 
 
+  interface UnnamedDataRunner {
+    boolean run(@Data String foo);
+  }
+
+
+
+
+  interface DataCallbackRunner {
+    boolean run(String foo, @Data("callback") StageRunnerCallback<TestStage> callback);
+  }
+
+
+
+
+  interface DuplicateDataRunner {
+    boolean run(String foo, @Data("foo") String bar);
+  }
+
+
+
+
   interface StaticOnlyRunner
   {
+    @SuppressWarnings("unused")
     static boolean run(String foo) {
       return true;
     }

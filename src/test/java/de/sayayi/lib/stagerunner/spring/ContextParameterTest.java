@@ -48,11 +48,12 @@ class ContextParameterTest
 
       final var log = context.getBean(ContextBean.class).log;
 
-      assertEquals(4, log.size());
+      assertEquals(5, log.size());
       assertInstanceOf(StageContext.class, log.get(0));
       assertInstanceOf(StageContext.class, log.get(1));
       assertEquals("bar", log.get(2));
       assertEquals("bar", log.get(3));
+      assertEquals("bar", log.get(4));
     }
   }
 
@@ -67,6 +68,7 @@ class ContextParameterTest
 
 
 
+  @SuppressWarnings("unused")
   static class ContextBean
   {
     final List<Object> log = new ArrayList<>();
@@ -91,8 +93,14 @@ class ContextParameterTest
     }
 
 
-    @StageDef(stage = TestStage.END, comment = "Named object")
+    @StageDef(stage = TestStage.CLEANUP, comment = "Named object")
     public void namedObject(Object foo) {
+      log.add(foo);
+    }
+
+
+    @StageDef(stage = TestStage.END, comment = "Unnamed @Data object")
+    public void unnamedDataObject(@Data Object foo) {
       log.add(foo);
     }
   }

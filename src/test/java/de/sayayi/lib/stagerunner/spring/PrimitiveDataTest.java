@@ -57,7 +57,8 @@ class PrimitiveDataTest
       final var runner = context.getBean(PrimitiveRunner.class);
       final var exception = assertThrows(StageRunnerException.class, () -> runner.run(null));
 
-      assertEquals("Data value 'count' must not be null", exception.getMessage());
+      assertEquals("stage function failed in stage INIT: java.lang.NullPointerException: " +
+          "Data value 'count' must not be null", exception.getMessage());
       assertEquals(List.of(), context.getBean(PrimitiveBean.class).log);
     }
   }

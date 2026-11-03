@@ -76,8 +76,8 @@ import static org.springframework.util.StringUtils.hasLength;
  * function annotation into an executable {@link StageFunction}.
  * <p>
  * For every unique combination of target method and parameter binding a dedicated {@link StageFunction} class is
- * generated at runtime using ByteBuddy and cached. Method parameters are matched to entries of the stage runner data
- * map by name (either through a {@link Data @Data} annotation or the parameter name) or by type. Parameters that
+ * generated at runtime using ByteBuddy and cached. Method parameters receive the stage context or an entry of the stage
+ * runner data map, matched by name or by type, as described by the {@link Data @Data} annotation. Parameters that
  * require type conversion are converted using a configurable {@link ConversionService}.
  * <p>
  * The generated classes implement {@link StageFunction} directly and only refer to types of exported packages, Spring
@@ -130,13 +130,17 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * {@inheritDoc}
    * <p>
    * A parameter of type {@link StageContext}, which is not annotated with {@link Data @Data}, receives the stage
-   * context itself. If the method is static, {@code bean} is ignored.
+   * context itself. A {@code @Data} annotation without name is only allowed on a parameter which can be assigned the
+   * stage context; it prevents the stage context from being bound and the parameter is resolved as if it was not
+   * annotated. If the method is static, {@code bean} is ignored.
    * <p>
    * Parameters are bound using {@code stageFunction} as declared on the target class. If {@code bean} is a JDK dynamic
    * proxy, the generated stage function invokes the corresponding interface method on the proxy instead.
    *
    * @throws StageRunnerConfigurationException  if {@code bean} is a JDK dynamic proxy which does not expose
-   *                                            {@code stageFunction} through one of its interfaces
+   *                                            {@code stageFunction} through one of its interfaces, or if a parameter
+   *                                            which cannot be assigned the stage context is annotated wit
+   *                                            {@code @Data} without name
    */
   @Override
   public @NotNull <S extends Enum<S>> StageFunction<S> createStageFunction(
@@ -153,10 +157,19 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     for(var p = 0; p < methodParameters.length; p++)
     {
       final var parameterType = new TypeDescriptor(new MethodParameter(stageFunction, p));
+      final var dataAnnotation = findMergedAnnotation(methodParameters[p], Data.class);
+      final var acceptsStageContext = parameterType.getResolvableType().isAssignableFrom(stageContextType);
+
+      // @Data without a name only serves to prevent the stage context from being bound to the parameter
+      if (dataAnnotation != null && !hasLength(dataAnnotation.name()) && !acceptsStageContext)
+      {
+        throw new StageRunnerConfigurationException(
+            "@Data without name is only allowed for a parameter which can be assigned the stage context: parameter " +
+            methodParameters[p] + " of method " + stageFunction);
+      }
+
       final var isStageContext =
-          parameterType.getType() == StageContext.class &&
-          parameterType.getResolvableType().isAssignableFrom(stageContextType) &&
-          findMergedAnnotation(methodParameters[p], Data.class) == null;
+          dataAnnotation == null && parameterType.getType() == StageContext.class && acceptsStageContext;
 
       parameters[p] = new NameWithQualifierAndType(
           isStageContext
@@ -321,8 +334,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
   /**
-   * Resolves the data name and type qualifier for {@code parameter}. Resolution is first attempted by name (through
-   * {@link Data @Data} or the parameter name) and falls back to matching by type.
+   * Resolves the data name and type qualifier for {@code parameter}. A parameter annotated with a named
+   * {@link Data @Data} is resolved by that name only. Otherwise, resolution is attempted by the parameter name and
+   * falls back to matching by type if no entry with that name exists.
    *
    * @param parameter        method parameter, not {@code null}
    * @param parameterType    type descriptor of the method parameter, not {@code null}
@@ -360,12 +374,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * @param parameterType    type descriptor of the method parameter, not {@code null}
    * @param dataNameTypeMap  mapping of data names to their types, not {@code null}
    *
-   * @return  the resolved data name and qualifier, or {@code null} if the parameter is not annotated with {@code @Data}
-   *          and no data entry matches the parameter name
+   * @return  the resolved data name and qualifier, or {@code null} if the parameter is not annotated with a named
+   *          {@code @Data} and no data entry matches the parameter name
    *
-   * @throws StageRunnerConfigurationException  if the {@code @Data} name is empty or unknown
-   * @throws IllegalStateException              if the named data entry has a type which cannot be supplied to the
-   *                                            parameter
+   * @throws StageRunnerConfigurationException  if the {@code @Data} name is unknown, or if the named data entry has a
+   *                                            type which cannot be supplied to the parameter
    */
   @Contract(pure = true)
   private NameWithQualifier findNameWithQualifierByParameterName(@NotNull Parameter parameter,
@@ -375,21 +388,25 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     ResolvableType dataType;
 
     var dataAnnotation = findMergedAnnotation(parameter, Data.class);
-    if (dataAnnotation != null)
+    if (dataAnnotation != null && hasLength(dataAnnotation.name()))
     {
       var dataName = dataAnnotation.name();
-      if (!hasLength(dataName))
-        throw new StageRunnerConfigurationException("@Data name must not be empty for parameter " + parameter);
 
       if ((dataType = dataNameTypeMap.get(dataName)) != null)
-        return new NameWithQualifier(dataName, qualifyParameterTypeOrFail(parameterType, dataType));
+      {
+        return new NameWithQualifier(dataName,
+            qualifyParameterTypeOrFail(parameter, parameterType, dataName, dataType));
+      }
 
       throw new StageRunnerConfigurationException("Unknown @Data name '" + dataName + "' for parameter " + parameter);
     }
 
     var parameterName = parameter.getName();
     if (hasLength(parameterName) && (dataType = dataNameTypeMap.get(parameterName)) != null)
-      return new NameWithQualifier(parameterName, qualifyParameterTypeOrFail(parameterType, dataType));
+    {
+      return new NameWithQualifier(parameterName,
+          qualifyParameterTypeOrFail(parameter, parameterType, parameterName, dataType));
+    }
 
     return null;
   }
@@ -480,23 +497,30 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
   /**
-   * Variant of {@link #qualifyParameterType} that throws an {@link IllegalStateException} instead of returning
-   * {@code null} when the parameter type cannot be supplied from a value of {@code dataType}.
+   * Variant of {@link #qualifyParameterType} that throws a {@link StageRunnerConfigurationException} instead of
+   * returning {@code null} when the parameter type cannot be supplied from a value of {@code dataType}.
    *
+   * @param parameter      method parameter, not {@code null}
    * @param parameterType  type descriptor of the method parameter, not {@code null}
+   * @param dataName       name of the data map entry, not {@code null}
    * @param dataType       type of the data map value, not {@code null}
    *
    * @return  the {@link TypeQualifier} describing the match strength, never {@code null}
    *
-   * @throws IllegalStateException  if there is no match
+   * @throws StageRunnerConfigurationException  if there is no match
    */
   @Contract(pure = true)
-  private @NotNull TypeQualifier qualifyParameterTypeOrFail(@NotNull TypeDescriptor parameterType,
+  private @NotNull TypeQualifier qualifyParameterTypeOrFail(@NotNull Parameter parameter,
+                                                            @NotNull TypeDescriptor parameterType,
+                                                            @NotNull String dataName,
                                                             @NotNull ResolvableType dataType)
   {
     var qualifier = qualifyParameterType(parameterType, dataType);
     if (qualifier == null)
-      throw new IllegalStateException("Unsupported parameter type: " + parameterType);
+    {
+      throw new StageRunnerConfigurationException("Data '" + dataName + "' of type " + dataType +
+          " cannot be supplied to parameter " + parameter + " of method " + parameter.getDeclaringExecutable());
+    }
 
     return qualifier;
   }

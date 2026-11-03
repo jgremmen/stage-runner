@@ -99,7 +99,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     }
     else
     {
-      processedStages = EnumSet.noneOf(stageRunnerFactory.stageEnumType);
+      processedStages = EnumSet.noneOf(stageRunnerFactory.getStageEnumType());
       state = IDLE;
     }
 
@@ -151,7 +151,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   public @NotNull Set<S> getProcessedStages()
   {
     return processedStages.isEmpty()
-        ? EnumSet.noneOf(stageRunnerFactory.stageEnumType)
+        ? EnumSet.noneOf(stageRunnerFactory.getStageEnumType())
         : EnumSet.copyOf(processedStages);
   }
 
@@ -162,7 +162,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public @NotNull Set<S> getRemainingStages()
   {
-    var remainingStages = EnumSet.noneOf(stageRunnerFactory.stageEnumType);
+    var remainingStages = EnumSet.noneOf(stageRunnerFactory.getStageEnumType());
 
     if (!state.isTerminated())
     {

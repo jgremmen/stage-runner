@@ -52,7 +52,7 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
     implements StageRunnerFactory<S>, StageFunctionConfigurer<S>, StageFunctionConfigurer.Named<S>
 {
   /** Stage enum class of the stages handled by this factory, never {@code null}. */
-  protected final Class<S> stageEnumType;
+  private final Class<S> stageEnumType;
 
   /** Regular stage functions, executed for every stage runner execution. */
   private final StageOrderFunctionArray<S> functionArray;
@@ -75,6 +75,19 @@ public abstract class AbstractStageRunnerFactory<S extends Enum<S>>
 
     functionArray = new StageOrderFunctionArray<>();
     namedStageFunctions = new LinkedHashMap<>();
+  }
+
+
+  /**
+   * Returns the stage enum class of the stages handled by this factory.
+   *
+   * @return  stage enum class, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected @NotNull Class<S> getStageEnumType() {
+    return stageEnumType;
   }
 
 

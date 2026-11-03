@@ -226,7 +226,8 @@ public @interface StageDef
 
 The interface's single abstract method describes the input parameters that will be passed as the shared data map.
 Default, static and private methods, as well as redeclared `Object` methods, are ignored. The method must return
-`boolean` or `void`. Use `@Data` to override a parameter's data-map name.
+`boolean` or `void`. Use `@Data` to override a parameter's data-map name. A `StageRunnerCallback` parameter is used
+as callback for the execution instead of being passed as data.
 
 ```java
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
@@ -253,8 +254,16 @@ public class MyBean
 }
 ```
 
-Stage function method parameters may include a `StageContext` and any values from the data map; matching is
-performed by parameter name (or by `@Data` value) and by type via Spring's `ConversionService`.
+Stage function method parameters may include a `StageContext` and any values from the data map:
+
+- a parameter annotated with `@Data("name")` receives the data entry with that name, which must exist;
+- an unannotated `StageContext` parameter receives the stage context;
+- any other parameter receives the data entry named like the parameter or, if there is none, the entry matching its
+  type.
+
+Values are converted to the parameter type with Spring's `ConversionService` where necessary. `@Data` without a name
+is only allowed on a parameter which could receive the stage context; it keeps the stage context away from that
+parameter. Invalid bindings are rejected at startup. See the `@Data` Javadoc for the complete rules.
 
 ### 4. Register the factory processor
 

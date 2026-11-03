@@ -145,7 +145,8 @@ public interface StageRunnerCallback<S extends Enum<S>>
    * returns normally, the exception is considered handled and the execution continues with the next stage function.
    * <p>
    * The default implementation rethrows a {@link StageRunnerException} as is and wraps any other exception inside a
-   * {@link StageRunnerException}.
+   * {@link StageRunnerException}. Its message names the current stage and the wrapped exception, for example
+   * {@code "stage function failed in stage PROCESS: java.lang.IllegalStateException: boom"}.
    * <p>
    * Any exception thrown by this handler will lead to exiting the stage runner. On its way out, callback
    * {@link #postStageFunctionCallback(StageContext)} will be invoked.
@@ -159,8 +160,9 @@ public interface StageRunnerCallback<S extends Enum<S>>
   {
     if (exception instanceof StageRunnerException)
       throw (StageRunnerException)exception;
-    else
-      throw new StageRunnerException(exception.getMessage(), exception);
+
+    throw new StageRunnerException("stage function failed in stage " + stageContext.getCurrentStage() + ": " +
+        exception, exception);
   }
 
 
