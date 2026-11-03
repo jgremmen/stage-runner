@@ -270,7 +270,8 @@ public class StageConfiguration
 
 At startup the processor:
 
-- scans Spring managed beans for methods annotated with `@StageDef`,
+- scans the public methods of Spring managed beans for methods annotated with `@StageDef` (also when the annotation
+  is inherited from an overridden or implemented method, or present on a composed annotation),
 - turns each matching method into a `StageFunction` (using `StageFunctionBuilder`),
 - optionally filters candidates through a `StageFunctionFilter`,
 - creates a proxy implementing `MyRunner` (using `StageRunnerProxyBuilder`), and
