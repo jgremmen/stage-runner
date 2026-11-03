@@ -144,12 +144,7 @@ public class StageRunnerFactoryProcessor<R>
   private volatile boolean stageFunctionsDiscovered;
 
   /** Filter deciding which discovered stage functions are registered; accepts all functions by default. */
-  protected StageFunctionFilter stageFunctionFilter = new StageFunctionFilter() {
-    @Override
-    public <B,S extends Enum<S>> boolean filter(@NotNull B bean, @NotNull S stage, int order, String name) {
-      return true;
-    }
-  };
+  protected StageFunctionFilter stageFunctionFilter = (bean, stage, order, name) -> true;
 
 
   /**
@@ -446,7 +441,7 @@ public class StageRunnerFactoryProcessor<R>
     var order = stageFunctionAnnotation.getOrder(stageFunctionAnnotationAttributes);
     var name = stageFunctionNameGenerator.apply(stageFunctionAnnotationAttributes, method);
 
-    if (stageFunctionFilter.filter(bean, (Enum)stageEnum, order, name))
+    if (stageFunctionFilter.filter(bean, stageEnum, order, name))
     {
       var description = stageFunctionAnnotation.getDescription(stageFunctionAnnotationAttributes);
       var function = getStageFunctionBuilder()

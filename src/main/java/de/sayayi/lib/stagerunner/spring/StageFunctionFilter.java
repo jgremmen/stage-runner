@@ -43,10 +43,7 @@ public interface StageFunctionFilter
    * @param name   resolved stage function name, or {@code null} if the function is unnamed
    *
    * @return  {@code true} to register the stage function, {@code false} to skip it
-   *
-   * @param <B>  bean type
-   * @param <S>  stage enumeration type
    */
   @Contract(pure = true)
-  <B,S extends Enum<S>> boolean filter(@NotNull B bean, @NotNull S stage, int order, String name);
+  boolean filter(@NotNull Object bean, @NotNull Enum<?> stage, int order, String name);
 }

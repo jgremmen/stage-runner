@@ -352,12 +352,13 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    * {@inheritDoc}
    */
   @Override
-  public @NotNull List<Function> getFunctions()
+  @SuppressWarnings("unchecked")
+  public @NotNull List<Function<S>> getFunctions()
   {
-    final var functions = new Function[functionArray.size];
+    final var functions = (Function<S>[])new Function[functionArray.size];
 
     for(var n = 0; n < functionArray.size; n++)
-      functions[n] = new FunctionAdapter(functionArray.executionState[n], functionArray.functions[n]);
+      functions[n] = new FunctionAdapter<>(functionArray.executionState[n], functionArray.functions[n]);
 
     return List.of(functions);
   }
@@ -403,15 +404,17 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   /**
    * Adapter exposing a {@link StageOrderFunction} together with its current execution state through the public
    * {@link Function} view returned by {@link StageContext#getFunctions()}.
+   *
+   * @param <S>  stage enumeration type
    */
   @SuppressWarnings("ClassCanBeRecord")
-  private static final class FunctionAdapter implements Function
+  private static final class FunctionAdapter<S extends Enum<S>> implements Function<S>
   {
     /** Execution state of the function at the time of creation. */
     private final FunctionState functionState;
 
     /** Stage function descriptor. */
-    private final StageOrderFunction<?> stageFunction;
+    private final StageOrderFunction<S> stageFunction;
 
 
     /**
@@ -421,7 +424,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
      * @param stageFunction  stage function descriptor, not {@code null}
      */
     private FunctionAdapter(@NotNull FunctionState functionState,
-                            @NotNull StageOrderFunction<?> stageFunction)
+                            @NotNull StageOrderFunction<S> stageFunction)
     {
       this.functionState = functionState;
       this.stageFunction = stageFunction;
@@ -441,7 +444,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
      * {@inheritDoc}
      */
     @Override
-    public @NotNull Enum<?> getStage() {
+    public @NotNull S getStage() {
       return stageFunction.stage;
     }
 
@@ -470,7 +473,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     @Override
     public String toString()
     {
-      var s = new StringBuilder("Function(state=").append(getFunctionState())
+      final var s = new StringBuilder("Function(state=").append(getFunctionState())
           .append(",stage=").append(getStage().name()).append('#').append(getOrder());
 
       final var description = getDescription();

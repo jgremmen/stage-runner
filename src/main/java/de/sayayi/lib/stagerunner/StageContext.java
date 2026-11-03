@@ -186,7 +186,7 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    * @since 0.3.0
    */
   @Contract(pure = true)
-  @NotNull @Unmodifiable List<Function> getFunctions();
+  @NotNull @Unmodifiable List<Function<S>> getFunctions();
 
 
 
@@ -194,11 +194,13 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
   /**
    * Read only view of a stage function within a stage runner execution.
    *
+   * @param <S>  stage enumeration type
+   *
    * @see StageContext#getFunctions()
    *
    * @since 0.3.0
    */
-  interface Function
+  interface Function<S extends Enum<S>>
   {
     /**
      * Returns the execution state of this function.
@@ -215,7 +217,7 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
      * @return  stage enumeration, never {@code null}
      */
     @Contract(pure = true)
-    @NotNull Enum<?> getStage();
+    @NotNull S getStage();
 
 
     /**

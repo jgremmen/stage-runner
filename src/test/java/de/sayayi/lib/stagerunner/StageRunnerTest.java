@@ -179,7 +179,7 @@ class StageRunnerTest
   void rejectedFunctionIsNotAdded()
   {
     val factory = new MyStageRunnerFactory();
-    val functions = new ArrayList<StageContext.Function>();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
 
     factory.addStageFunction(START, "S", ctx -> {});
     factory.addStageFunction(PROCESS, "P", ctx -> {
@@ -200,7 +200,7 @@ class StageRunnerTest
   void rejectedFunctionMarksCurrentFunctionFailed()
   {
     val factory = new MyStageRunnerFactory();
-    val functions = new ArrayList<StageContext.Function>();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
 
     factory.addStageFunction(START, "S", ctx -> ctx.addStageFunction(INIT, "late", c -> {}));
     factory.addStageFunction(END, "E", ctx -> {});
@@ -221,7 +221,7 @@ class StageRunnerTest
   void rejectedNamedFunctionEnablesNone()
   {
     val factory = new MyStageRunnerFactory();
-    val functions = new ArrayList<StageContext.Function>();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
 
     factory.namedStageFunction("early", INIT, "early", ctx -> fail());
     factory.namedStageFunction("later", END, "later", ctx -> fail());
@@ -254,7 +254,7 @@ class StageRunnerTest
   }
 
 
-  private static List<String> states(List<StageContext.Function> functions)
+  private static List<String> states(List<StageContext.Function<TestStage>> functions)
   {
     val states = new ArrayList<String>();
 
