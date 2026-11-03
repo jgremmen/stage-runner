@@ -36,8 +36,8 @@ import net.bytebuddy.implementation.bytecode.Duplication;
 import net.bytebuddy.implementation.bytecode.Removal;
 import net.bytebuddy.implementation.bytecode.StackManipulation;
 import net.bytebuddy.implementation.bytecode.assign.TypeCasting;
-import net.bytebuddy.implementation.bytecode.collection.ArrayAccess;
 import net.bytebuddy.implementation.bytecode.assign.primitive.PrimitiveUnboxingDelegate;
+import net.bytebuddy.implementation.bytecode.collection.ArrayAccess;
 import net.bytebuddy.implementation.bytecode.constant.IntegerConstant;
 import net.bytebuddy.implementation.bytecode.constant.TextConstant;
 import net.bytebuddy.implementation.bytecode.member.FieldAccess;
@@ -57,11 +57,7 @@ import java.lang.invoke.MethodHandles;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Parameter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static net.bytebuddy.description.modifier.TypeManifestation.FINAL;
@@ -133,8 +129,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   /**
    * {@inheritDoc}
    * <p>
-   * A parameter whose type is assignable from {@link StageContext} receives the stage context itself. If the method is
-   * static, {@code bean} is ignored.
+   * A parameter of type {@link StageContext}, which is not annotated with {@link Data @Data}, receives the stage
+   * context itself. If the method is static, {@code bean} is ignored.
    * <p>
    * Parameters are bound using {@code stageFunction} as declared on the target class. If {@code bean} is a JDK dynamic
    * proxy, the generated stage function invokes the corresponding interface method on the proxy instead.
@@ -157,9 +153,13 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     for(var p = 0; p < methodParameters.length; p++)
     {
       final var parameterType = new TypeDescriptor(new MethodParameter(stageFunction, p));
+      final var isStageContext =
+          parameterType.getType() == StageContext.class &&
+          parameterType.getResolvableType().isAssignableFrom(stageContextType) &&
+          findMergedAnnotation(methodParameters[p], Data.class) == null;
 
       parameters[p] = new NameWithQualifierAndType(
-          parameterType.getResolvableType().isAssignableFrom(stageContextType)
+          isStageContext
               ? new NameWithQualifier("$context", TypeQualifier.ASSIGNABLE)
               : findNameWithQualifier(methodParameters[p], parameterType, dataNameTypeMap),
           parameterType);
