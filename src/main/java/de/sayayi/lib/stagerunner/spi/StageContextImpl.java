@@ -312,12 +312,18 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         {
           callback.preStageCallback(this);
           lastStage = currentStage;
+
+          if (aborted)
+            break;
         }
 
         functionArray.executionState[functionIndex] = EXECUTING;
         callback.preStageFunctionCallback(this, stageFunctionEntry.description);
         try {
-          stageFunctionEntry.function.process(this);
+          if (aborted)
+            functionArray.executionState[functionIndex] = WAITING;
+          else
+            stageFunctionEntry.function.process(this);
         } catch(Throwable ex) {
           functionArray.executionState[functionIndex] = FAILED;
 

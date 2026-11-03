@@ -65,6 +65,9 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
   /**
    * Notifies the callback at the beginning of a new stage, before its first stage function is executed.
+   * <p>
+   * If the execution is {@link StageContext#abort() aborted} by this method, no stage function of the stage is
+   * executed and no further callback methods are invoked.
    *
    * @param stageContext  stage context, not {@code null}
    */
@@ -74,6 +77,10 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
   /**
    * Notifies the callback before a stage function is executed.
+   * <p>
+   * If the execution is {@link StageContext#abort() aborted} by this method, the stage function is not executed and
+   * remains {@link StageContext.FunctionState#WAITING waiting}. {@link #postStageFunctionCallback(StageContext)} is
+   * still invoked.
    *
    * @param stageContext  stage context, not {@code null}
    * @param description   optional description for the stage function which was provided on

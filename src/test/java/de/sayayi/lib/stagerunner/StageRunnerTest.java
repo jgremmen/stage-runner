@@ -379,6 +379,87 @@ class StageRunnerTest
   }
 
 
+  @Test
+  @DisplayName("Abort in preStageCallback prevents the first function of the stage from running")
+  void abortInPreStageCallback()
+  {
+    val factory = new MyStageRunnerFactory();
+    val log = new ArrayList<String>();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
+
+    factory.addStageFunction(START, "S", ctx -> {});
+    factory.addStageFunction(PROCESS, "P", ctx -> fail());
+
+    assertFalse(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void preStageCallback(@NotNull StageContext<TestStage> stageContext)
+      {
+        log.add(">" + stageContext.getCurrentStage());
+
+        if (stageContext.getCurrentStage() == PROCESS)
+        {
+          stageContext.abort();
+          functions.addAll(stageContext.getFunctions());
+        }
+      }
+
+      @Override
+      public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext, String description) {
+        log.add(">fn(" + description + ')');
+      }
+
+      @Override
+      public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+        log.add("<fn");
+      }
+    }));
+
+    assertEquals(asList(">START", ">fn(S)", "<fn", ">PROCESS"), log);
+    assertEquals(asList("S:PROCESSED", "P:WAITING"), states(functions));
+  }
+
+
+  @Test
+  @DisplayName("Abort in preStageFunctionCallback skips the function")
+  void abortInPreStageFunctionCallback()
+  {
+    val factory = new MyStageRunnerFactory();
+    val log = new ArrayList<String>();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
+
+    factory.addStageFunction(START, "S", ctx -> {});
+    factory.addStageFunction(START, "A", ctx -> fail());
+    factory.addStageFunction(END, "E", ctx -> fail());
+
+    assertFalse(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext, String description)
+      {
+        log.add(">fn(" + description + ')');
+
+        if ("A".equals(description))
+          stageContext.abort();
+      }
+
+      @Override
+      public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext)
+      {
+        log.add("<fn");
+        functions.clear();
+        functions.addAll(stageContext.getFunctions());
+      }
+
+      @Override
+      public void postStageCallback(@NotNull StageContext<TestStage> stageContext, @NotNull TestStage stage) {
+        log.add("<" + stage);
+      }
+    }));
+
+    assertEquals(asList(">fn(S)", "<fn", ">fn(A)", "<fn"), log);
+    assertEquals(asList("S:PROCESSED", "A:WAITING", "E:WAITING"), states(functions));
+  }
+
+
   private static List<String> states(List<StageContext.Function<TestStage>> functions)
   {
     val states = new ArrayList<String>();

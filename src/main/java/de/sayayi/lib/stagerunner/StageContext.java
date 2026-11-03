@@ -116,7 +116,9 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    * Aborts the stage runner execution.
    * <p>
    * The stage function currently being executed is not interrupted, but no further stage functions are executed after
-   * it returns. The stage runner then reports an unsuccessful run.
+   * it returns. If invoked from {@link StageRunnerCallback#preStageCallback(StageContext) preStageCallback} or
+   * {@link StageRunnerCallback#preStageFunctionCallback(StageContext, String) preStageFunctionCallback}, the stage
+   * function about to be executed is not executed either. The stage runner then reports an unsuccessful run.
    *
    * @see #isAborted()
    */
