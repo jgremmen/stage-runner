@@ -32,6 +32,7 @@ import net.bytebuddy.implementation.FixedValue;
 import net.bytebuddy.implementation.Implementation;
 import net.bytebuddy.implementation.bytecode.*;
 import net.bytebuddy.implementation.bytecode.assign.Assigner;
+import net.bytebuddy.implementation.bytecode.assign.TypeCasting;
 import net.bytebuddy.implementation.bytecode.assign.primitive.PrimitiveBoxingDelegate;
 import net.bytebuddy.implementation.bytecode.constant.TextConstant;
 import net.bytebuddy.implementation.bytecode.member.FieldAccess;
@@ -181,7 +182,8 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
    * ByteBuddy {@link Implementation} for the generated stage runner interface method. It creates a new stage runner via
    * the factory, assembles the data map from the method parameters and invokes
    * {@link de.sayayi.lib.stagerunner.StageRunner#run run} on it. A {@link StageRunnerCallback} parameter, if declared
-   * on the interface method, is forwarded to the runner. The result of the run is returned if the interface method
+   * on the interface method, is forwarded to the runner; if its value is {@code null}, the
+   * {@link StageRunnerCallback#DEFAULT default callback} is used instead. The result of the run is returned if the interface method
    * returns {@code boolean}.
    */
   private static final class ProxyMethodImplementation extends AbstractImplementation
@@ -235,10 +237,25 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           ? buildMapWithDataNames()
           : buildMapNoDataNames());
 
-      // param2 = callback (optional)
+      // param2 = callback (optional), Objects.requireNonNullElse(callback, StageRunnerCallback.DEFAULT)
       var stageRunnerCallbackParameter = findCallbackParameter();
       if (stageRunnerCallbackParameter != null)
+      {
+        var stageRunnerCallbackType = typeDescription(StageRunnerCallback.class);
+
         stackManipulations.add(MethodVariableAccess.load(stageRunnerCallbackParameter));
+        stackManipulations.add(FieldAccess
+            .forField(stageRunnerCallbackType
+                .getDeclaredFields()
+                .filter(named("DEFAULT"))
+                .getOnly())
+            .read());
+        stackManipulations.add(MethodInvocation.invoke(typeDescription(Objects.class)
+            .getDeclaredMethods()
+            .filter(named("requireNonNullElse"))
+            .getOnly()));
+        stackManipulations.add(TypeCasting.to(stageRunnerCallbackType));
+      }
 
       stackManipulations.add(MethodInvocation.invoke(
           typeDescription(StageRunner.class)

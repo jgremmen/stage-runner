@@ -64,7 +64,7 @@ import static org.springframework.util.ReflectionUtils.isObjectMethod;
 /**
  * Spring post processor that binds a user defined stage runner interface to the beans in the application context.
  * <p>
- * On startup this processor registers a singleton bean implementing the stage runner interface. Once all non lazy
+ * On startup this processor registers a singleton bean implementing the stage runner interface. Once all non-lazy
  * singletons have been instantiated, it inspects every singleton bean for methods carrying the configured stage
  * function annotation. Matching methods are turned into stage functions and registered with an internal
  * {@link StageRunnerFactory} which the proxy delegates to. Only public methods, including inherited ones, are
@@ -79,7 +79,8 @@ import static org.springframework.util.ReflectionUtils.isObjectMethod;
  * <p>
  * The functional method of the stage runner interface must return {@code boolean} or {@code void}. Its parameters are
  * passed to the stage runner as data, named by the {@link Data @Data} annotation or the parameter name. A parameter of
- * type {@link StageRunnerCallback} is not passed as data but used as callback for the execution.
+ * type {@link StageRunnerCallback} is not passed as data but used as callback for the execution. If the callback is
+ * {@code null}, the {@link StageRunnerCallback#DEFAULT default callback} is used.
  * <p>
  * The processor is registered as a bean, for example through a {@code static} bean method in a Spring configuration
  * class:
@@ -536,8 +537,8 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Locates the single abstract method of the given functional interface and validates its return type. The return
-   * type must be either {@code boolean} or {@code void}.
+   * Locates the single abstract method of the given functional interface and validates its return type. The return type
+   * must be either {@code boolean} or {@code void}.
    * <p>
    * Abstract methods inherited from super-interfaces are taken into account, whereas default, static, private and
    * synthetic methods as well as abstract redeclarations of public {@link Object} methods are ignored. An abstract
