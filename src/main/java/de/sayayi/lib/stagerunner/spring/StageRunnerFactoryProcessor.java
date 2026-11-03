@@ -456,7 +456,7 @@ public class StageRunnerFactoryProcessor<R>
         else
           msg.append("register named stage function '").append(name).append("'");
 
-        msg.append(", stage {}").append(stageEnum).append('#').append(order);
+        msg.append(", stage ").append(stageEnum).append('#').append(order);
 
         if (description != null)
           msg.append(", description '").append(description).append('\'');
