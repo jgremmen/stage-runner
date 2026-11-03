@@ -273,7 +273,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
    * well as failures.
    * <p>
    * The context must be in {@link State#IDLE idle} state. When the method returns, the context is either
-   * {@link State#FINISHED finished} or {@link State#ABORTED aborted} and cannot be run again.
+   * {@link State#FINISHED finished} or {@link State#ABORTED aborted} and cannot be run again. A run terminated by an
+   * exception leaves the context aborted, without notifying
+   * {@link StageRunnerCallback#postStageCallback(StageContext, Enum) postStageCallback} for the stage being executed.
    *
    * @param callback  stage runner callback, not {@code null}
    *
@@ -285,12 +287,13 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   boolean run(@NotNull StageRunnerCallback<S> callback)
   {
     if (state.isTerminated())
-      return !aborted;
+      return state == FINISHED;
 
     if (state != IDLE)
       throw new StageRunnerException("stage runner must be in idle state");
 
     S lastStage = null;
+    var completed = false;
 
     state = RUNNING;
 
@@ -332,16 +335,19 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
           callback.postStageFunctionCallback(this);
         }
       }
+
+      completed = true;
     } finally {
       this.callback = null;
 
-      state = aborted ? ABORTED : FINISHED;
+      // a run terminated by an exception has not finished successfully
+      state = aborted || !completed ? ABORTED : FINISHED;
+    }
 
-      if (!aborted && lastStage != null)
-      {
-        processedStages.add(lastStage);
-        callback.postStageCallback(this, lastStage);
-      }
+    if (!aborted && lastStage != null)
+    {
+      processedStages.add(lastStage);
+      callback.postStageCallback(this, lastStage);
     }
 
     return !aborted;
@@ -381,8 +387,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     FINISHED,
 
     /**
-     * Context execution has been aborted, either by {@link StageContext#abort()} or by a configuration error occurring
-     * during the run.
+     * Context execution has been aborted, either by {@link StageContext#abort()}, by a configuration error occurring
+     * during the run or by an exception terminating the run.
      */
     ABORTED;
 

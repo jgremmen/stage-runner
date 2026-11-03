@@ -16,6 +16,7 @@
 package de.sayayi.lib.stagerunner;
 
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
+import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spi.AbstractStageRunner;
 import de.sayayi.lib.stagerunner.spi.AbstractStageRunnerFactory;
 import lombok.SneakyThrows;
@@ -251,6 +252,28 @@ class StageRunnerTest
     });
 
     assertTrue(factory.createRunner().run(emptyMap()));
+  }
+
+
+  @Test
+  @DisplayName("Stage of a failed function is neither completed nor processed")
+  void failedFunctionDoesNotCompleteStage()
+  {
+    val factory = new MyStageRunnerFactory();
+    val context = new ArrayList<StageContext<TestStage>>();
+
+    factory.addStageFunction(START, ctx -> {});
+    factory.addStageFunction(PROCESS, ctx -> {
+      context.add(ctx);
+      throw new IllegalStateException("boom");
+    });
+    factory.addStageFunction(END, ctx -> fail());
+
+    val runner = factory.createRunner();
+
+    assertThrows(StageRunnerException.class, () -> runner.run(emptyMap()));
+    assertEquals(asList(">START", ">fn", "<fn", "<START", ">PROCESS", ">fn", "<fn"), runner.log);
+    assertEquals(singleton(START), context.getFirst().getProcessedStages());
   }
 
 

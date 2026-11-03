@@ -29,14 +29,24 @@ import org.jetbrains.annotations.NotNull;
  * <p>
  * For a single stage function, the callback methods are invoked in this order:
  * <ul>
- *   <li>{@link #preStageCallback(StageContext)}, if the function is the first one of its stage</li>
- *   <li>{@link #preStageFunctionCallback(StageContext, String)}</li>
- *   <li>{@link #stageExceptionHandler(StageContext, Throwable)} or
- *       {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)}, if the
- *       function has failed</li>
- *   <li>{@link #postStageFunctionCallback(StageContext)}</li>
- *   <li>{@link #postStageCallback(StageContext, Enum)}, if the function is the last one of its stage and the
- *       execution has not been aborted</li>
+ *   <li>
+ *     {@link #preStageCallback(StageContext)}, if the function is the first one of its stage
+ *   </li>
+ *   <li>
+ *     {@link #preStageFunctionCallback(StageContext, String)}
+ *   </li>
+ *   <li>
+ *     {@link #stageExceptionHandler(StageContext, Throwable)} or
+ *     {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)}, if the function has
+ *     failed
+ *   </li>
+ *   <li>
+ *     {@link #postStageFunctionCallback(StageContext)}
+ *   </li>
+ *   <li>
+ *     {@link #postStageCallback(StageContext, Enum)}, if the function is the last one of its stage and the execution
+ *     has neither been aborted nor terminated by an exception
+ *   </li>
  * </ul>
  *
  * @param <S>  Stage enum type
