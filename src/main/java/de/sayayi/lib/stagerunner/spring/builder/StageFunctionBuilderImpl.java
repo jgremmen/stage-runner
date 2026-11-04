@@ -146,12 +146,16 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * <p>
    * Parameters are bound using {@code stageFunction} as declared on the target class. If {@code bean} is a JDK dynamic
    * proxy, the generated stage function invokes the corresponding interface method on the proxy instead.
+   * <p>
+   * The stage function class is defined in the class loader of the class declaring the invoked method. That class
+   * loader must be able to load the stage runner library and Spring.
    *
    * @throws StageRunnerConfigurationException  if {@code bean} is a JDK dynamic proxy which does not expose
    *                                            {@code stageFunction} through one of its interfaces, or if a parameter
    *                                            which cannot be assigned the stage context is annotated with
    *                                            {@code @Data} without name, or if a parameter cannot be bound to the
-   *                                            stage context or a data entry
+   *                                            stage context or a data entry, or if the stage function class cannot be
+   *                                            generated
    */
   @Override
   public @NotNull <S extends Enum<S>> StageFunction<S> createStageFunction(
@@ -208,6 +212,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     } catch(ReflectiveOperationException ex) {
       throw new StageRunnerConfigurationException(
           "failed to generate stage function for method " + methodDescription, ex);
+    } catch(LinkageError ex) {
+      throw linkageFailure("failed to generate stage function for method " + methodDescription,
+          invocableMethod.getDeclaringClass(), ex);
     }
   }
 

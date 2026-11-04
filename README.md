@@ -324,6 +324,11 @@ module my.app {
 }
 ```
 
+The generated classes are also defined in the class loader of the stage runner interface and of the classes
+declaring the stage functions. In hierarchical class loader setups, such as application servers or plugin systems,
+these class loaders must be able to load the stage runner library and Spring. Otherwise, the application fails at
+startup with a `StageRunnerConfigurationException` naming the class loader.
+
 ## Building from source
 
 The project uses the Gradle wrapper and a Java 21 toolchain.

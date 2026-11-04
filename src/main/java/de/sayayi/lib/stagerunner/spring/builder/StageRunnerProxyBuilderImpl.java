@@ -97,7 +97,8 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
    * {@inheritDoc}
    * <p>
    * The proxy class is defined through a private lookup on {@code stageRunnerInterfaceType}, in the package and class
-   * loader of the interface. This way package-private stage runner interfaces are supported as well.
+   * loader of the interface. This way package-private stage runner interfaces are supported as well. The class loader
+   * of the interface must therefore be able to load the stage runner library and Spring.
    *
    * @throws StageRunnerConfigurationException  if the package of {@code stageRunnerInterfaceType} is not open to this
    *                                            library, {@code dataNames} does not match the parameters of
@@ -142,6 +143,9 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           .newInstance(stageRunnerFactory);
     } catch(Exception ex) {
       throw new StageRunnerConfigurationException("failed to create proxy for stage runner interface " +
+          stageRunnerInterfaceType, ex);
+    } catch(LinkageError ex) {
+      throw linkageFailure("failed to create proxy for stage runner interface " + stageRunnerInterfaceType,
           stageRunnerInterfaceType, ex);
     }
   }

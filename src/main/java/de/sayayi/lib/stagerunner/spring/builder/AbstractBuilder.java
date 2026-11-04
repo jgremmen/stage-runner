@@ -80,6 +80,29 @@ abstract class AbstractBuilder
 
 
   /**
+   * Creates the exception reported when a generated class cannot be defined or linked in the class loader of
+   * {@code hostClass}. This happens if that class loader cannot load the stage runner library or Spring, for example if
+   * {@code hostClass} is located in a parent class loader of a hierarchical class loader setup.
+   *
+   * @param message    message describing the failed operation, not {@code null}
+   * @param hostClass  class in whose class loader the generated class is defined, not {@code null}
+   * @param error      linkage error, not {@code null}
+   *
+   * @return  configuration exception naming the class loader, never {@code null}
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  protected static @NotNull StageRunnerConfigurationException linkageFailure(@NotNull String message,
+                                                                            @NotNull Class<?> hostClass,
+                                                                            @NotNull LinkageError error)
+  {
+    return new StageRunnerConfigurationException(message + "; the class loader " + hostClass.getClassLoader() +
+        " of " + hostClass.getName() + " must be able to load the stage runner library and Spring", error);
+  }
+
+
+  /**
    * Returns a {@link TypeDescription} for the given loaded {@code type}.
    *
    * @param type  the class to describe, not {@code null}
