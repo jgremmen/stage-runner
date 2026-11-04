@@ -897,16 +897,26 @@ public class StageRunnerFactoryProcessor<R>
    * Sets the conversion service used to convert data map values to method parameter types. When no service is set
    * explicitly, the unique {@code ConversionService} bean is looked up when the first stage function is registered,
    * with the shared default conversion service as fallback.
+   * <p>
+   * The conversion service is only used by the default stage function builder, so it must be set before a stage
+   * function builder has been set or the default builder has been created.
    *
    * @param conversionService  conversion service, not {@code null}
    *
-   * @throws NullPointerException  if {@code conversionService} is {@code null}
+   * @throws NullPointerException   if {@code conversionService} is {@code null}
+   * @throws IllegalStateException  if the stage function builder already exists
    *
    * @since 0.3.1
    */
   @Contract(mutates = "this")
-  public void setConversionService(ConversionService conversionService) {
-    this.conversionService = requireNonNull(conversionService, "conversionService must not be null");
+  public synchronized void setConversionService(ConversionService conversionService)
+  {
+    requireNonNull(conversionService, "conversionService must not be null");
+
+    if (stageFunctionBuilder != null)
+      throw new IllegalStateException("conversion service must be set before the stage function builder exists");
+
+    this.conversionService = conversionService;
   }
 
 
@@ -957,13 +967,25 @@ public class StageRunnerFactoryProcessor<R>
   /**
    * Controls whether annotations declared on the stage runner interface method are copied to the generated proxy
    * method. The setting only applies to the default stage runner proxy builder and is disabled by default.
+   * <p>
+   * The setting must be changed before a stage runner proxy builder has been set or the default builder has been
+   * created in {@link #afterPropertiesSet()}.
    *
    * @param copyInterfaceMethodAnnotations  {@code true} to copy interface method annotations, {@code false} otherwise
+   *
+   * @throws IllegalStateException  if the stage runner proxy builder already exists
    *
    * @since 0.3.1
    */
   @Contract(mutates = "this")
-  public void setCopyInterfaceMethodAnnotations(boolean copyInterfaceMethodAnnotations) {
+  public void setCopyInterfaceMethodAnnotations(boolean copyInterfaceMethodAnnotations)
+  {
+    if (stageRunnerProxyBuilder != null)
+    {
+      throw new IllegalStateException(
+          "copy interface method annotations must be set before the stage runner proxy builder exists");
+    }
+
     this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
   }
 
