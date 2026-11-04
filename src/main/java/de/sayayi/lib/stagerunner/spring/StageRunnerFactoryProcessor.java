@@ -86,7 +86,7 @@ import static org.springframework.util.StringUtils.hasLength;
  * type {@link StageRunnerCallback} (or a subtype) is not passed as data but used as callback for the execution. At most
  * one callback parameter is allowed; it must not be annotated with {@code @Data} and its stage type, if specified, must
  * match the stage type of the stage function annotation. If the callback is {@code null}, the
- * {@link StageRunnerCallback#DEFAULT default callback} is used. The binding of stage function parameters is described
+ * {@link StageRunnerCallback#defaultCallback() default callback} is used. The binding of stage function parameters is described
  * by {@link Data @Data}.
  * <p>
  * The processor is registered as a bean, for example through a {@code static} bean method in a Spring configuration

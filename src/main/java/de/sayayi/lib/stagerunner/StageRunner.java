@@ -20,7 +20,7 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Map;
 
-import static de.sayayi.lib.stagerunner.StageRunnerCallback.DEFAULT;
+import static de.sayayi.lib.stagerunner.StageRunnerCallback.defaultCallback;
 
 
 /**
@@ -38,7 +38,7 @@ import static de.sayayi.lib.stagerunner.StageRunnerCallback.DEFAULT;
 public interface StageRunner<S extends Enum<S>>
 {
   /**
-   * Runs all stage functions using the {@link StageRunnerCallback#DEFAULT default callback}.
+   * Runs all stage functions using the {@link StageRunnerCallback#defaultCallback() default callback}.
    * <p>
    * The default callback stops the execution on the first exception thrown by a stage function.
    *
@@ -50,9 +50,8 @@ public interface StageRunner<S extends Enum<S>>
    * @throws StageRunnerException  if a stage function has failed
    * @throws Error                 any error thrown by a stage function, rethrown unchanged
    */
-  @SuppressWarnings("unchecked")
   default boolean run(@NotNull Map<String,Object> data) {
-    return run(data, (StageRunnerCallback<S>)DEFAULT);
+    return run(data, defaultCallback());
   }
 
 

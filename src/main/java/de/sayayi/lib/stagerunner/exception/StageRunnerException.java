@@ -22,7 +22,7 @@ import org.jetbrains.annotations.NotNull;
  * Base class for all exceptions thrown by the stage runner library.
  * <p>
  * It is thrown when a stage runner is used incorrectly and, by the
- * {@link de.sayayi.lib.stagerunner.StageRunnerCallback#DEFAULT default callback}, to wrap an exception thrown by a
+ * {@link de.sayayi.lib.stagerunner.StageRunnerCallback#defaultCallback() default callback}, to wrap an exception thrown by a
  * stage function.
  *
  * @author Jeroen Gremmen

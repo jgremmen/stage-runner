@@ -57,6 +57,22 @@ class StageRunnerTest
 
 
   @Test
+  @DisplayName("Typed default callback")
+  void typedDefaultCallback()
+  {
+    final StageRunnerCallback<TestStage> callback = StageRunnerCallback.defaultCallback();
+
+    assertSame(callback, StageRunnerCallback.<TestStage>defaultCallback());
+
+    val factory = new MyStageRunnerFactory();
+    factory.addStageFunction(INIT, ctx -> { throw new IllegalStateException("boom"); });
+
+    val ex = assertThrows(StageRunnerException.class, () -> factory.createRunner().run(emptyMap(), callback));
+    assertInstanceOf(IllegalStateException.class, ex.getCause());
+  }
+
+
+  @Test
   @DisplayName("Pre/post callback hooks")
   void callbackHooks()
   {

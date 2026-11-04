@@ -17,6 +17,7 @@ package de.sayayi.lib.stagerunner;
 
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
+import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 
@@ -57,11 +58,22 @@ import org.jetbrains.annotations.NotNull;
 public interface StageRunnerCallback<S extends Enum<S>>
 {
   /**
-   * Default callback instance which ignores all notifications and stops the stage runner execution by throwing a
-   * {@link StageRunnerException} in case of an exception.
+   * Returns the default callback for the requested stage type. The default callback ignores all notifications and
+   * stops the stage runner execution by throwing a {@link StageRunnerException} in case of an exception.
+   * <p>
+   * The default callback does not depend on the stage type, so the same instance is returned for every stage type.
+   *
+   * @return  default callback, never {@code null}
+   *
+   * @param <S>  stage enum type
+   *
+   * @since 0.4.0
    */
-  @SuppressWarnings("rawtypes")
-  StageRunnerCallback<?> DEFAULT = new StageRunnerCallback() {};
+  @Contract(pure = true)
+  @SuppressWarnings("unchecked")
+  static <S extends Enum<S>> @NotNull StageRunnerCallback<S> defaultCallback() {
+    return (StageRunnerCallback<S>)DefaultStageRunnerCallback.INSTANCE;
+  }
 
 
   /**

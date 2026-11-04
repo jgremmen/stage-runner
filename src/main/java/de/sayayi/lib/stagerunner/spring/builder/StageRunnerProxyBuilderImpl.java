@@ -237,7 +237,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
    * ByteBuddy {@link Implementation} for the generated stage runner interface method. It creates a new stage runner via
    * the factory, assembles the data map from the method parameters and invokes {@link StageRunner#run run} on it. A
    * {@link StageRunnerCallback} parameter, if declared on the interface method, is forwarded to the runner; if its
-   * value is {@code null}, the {@link StageRunnerCallback#DEFAULT default callback} is used instead. The result of the
+   * value is {@code null}, the {@link StageRunnerCallback#defaultCallback() default callback} is used instead. The result of the
    * run is returned if the interface method returns {@code boolean}.
    */
   private static final class ProxyMethodImplementation extends AbstractImplementation
@@ -297,7 +297,7 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
           ? buildMapWithDataNames()
           : buildMapNoDataNames());
 
-      // param2 = callback (optional), Objects.requireNonNullElse(callback, StageRunnerCallback.DEFAULT)
+      // param2 = callback (optional), Objects.requireNonNullElse(callback, StageRunnerCallback.defaultCallback())
       var stageRunnerCallbackParameter = callbackParameterIndex == -1
           ? null
           : method.getParameters().get(callbackParameterIndex);
@@ -306,12 +306,10 @@ public final class StageRunnerProxyBuilderImpl extends AbstractBuilder implement
         var stageRunnerCallbackType = typeDescription(StageRunnerCallback.class);
 
         stackManipulations.add(MethodVariableAccess.load(stageRunnerCallbackParameter));
-        stackManipulations.add(FieldAccess
-            .forField(stageRunnerCallbackType
-                .getDeclaredFields()
-                .filter(named("DEFAULT"))
-                .getOnly())
-            .read());
+        stackManipulations.add(MethodInvocation.invoke(stageRunnerCallbackType
+            .getDeclaredMethods()
+            .filter(named("defaultCallback"))
+            .getOnly()));
         stackManipulations.add(MethodInvocation.invoke(typeDescription(Objects.class)
             .getDeclaredMethods()
             .filter(named("requireNonNullElse"))
