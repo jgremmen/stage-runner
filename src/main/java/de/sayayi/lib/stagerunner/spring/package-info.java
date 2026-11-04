@@ -26,7 +26,8 @@
  *   <li>{@link de.sayayi.lib.stagerunner.spring.StageFunctionBuilder} turns an annotated method into an executable
  *       stage function.</li>
  *   <li>{@link de.sayayi.lib.stagerunner.spring.StageRunnerProxyBuilder} creates the proxy that implements the
- *       user defined stage runner interface.</li>
+ *       user defined stage runner interface. {@link de.sayayi.lib.stagerunner.spring.StageRunnerParameter} describes
+ *       how each parameter of the interface method is passed to the stage runner.</li>
  * </ul>
  * The stage function annotation itself is described by
  * {@link de.sayayi.lib.stagerunner.spring.StageFunctionAnnotation} and is built from the meta annotations in

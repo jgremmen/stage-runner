@@ -35,7 +35,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests {@link StageFunctionAnnotation#buildFrom(Class)}.
  * <p>
  * Covers the detection of the stage definition properties of a fully and a minimally specified stage function
- * annotation, and the rejection of malformed annotations.
+ * annotation, the rejection of malformed annotations, and accepting an annotation which is only applicable to
+ * annotation types for use as meta-annotation.
  *
  * @since 0.3.0
  */

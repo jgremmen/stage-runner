@@ -31,7 +31,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Tests the ordering of {@link StageOrderFunctionArray}.
  * <p>
  * Covered aspects are the insertion position of stage functions sorted by stage, by default order and by explicit
- * order, including insertion into a copied array.
+ * order, including insertion into a copied array, the calculation of an insertion index without modifying the array,
+ * and keeping a large number of functions sorted while the array grows.
  *
  * @author Jeroen Gremmen
  * @since 0.3.0

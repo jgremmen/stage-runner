@@ -40,7 +40,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *   MyStage stage();
  *
  *   &#x40;StageDefinition.Order
- *   int priority() default StageContext.DEFAULT_ORDER;
+ *   int priority() default StageFunctionConfigurer.DEFAULT_ORDER;
  *
  *   &#x40;StageDefinition.Description
  *   String comment();
@@ -85,6 +85,9 @@ public interface StageDefinition
 
   /**
    * Marks the annotation property which provides the stage function order. The property type must be {@code int}.
+   * <p>
+   * If the stage function annotation has no order property, stage functions are registered with
+   * {@link de.sayayi.lib.stagerunner.StageFunctionConfigurer#DEFAULT_ORDER the default order}.
    */
   @Target(METHOD)
   @Retention(RUNTIME)
@@ -95,6 +98,10 @@ public interface StageDefinition
   /**
    * Marks the annotation property which provides the stage function description. The property type must be
    * {@code String}.
+   * <p>
+   * The description is passed to
+   * {@link de.sayayi.lib.stagerunner.StageRunnerCallback#preStageFunctionCallback preStageFunctionCallback}. If the
+   * stage function annotation has no description property, stage functions are registered without description.
    */
   @Target(METHOD)
   @Retention(RUNTIME)

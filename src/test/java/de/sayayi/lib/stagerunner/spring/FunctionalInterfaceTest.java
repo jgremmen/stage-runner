@@ -34,6 +34,11 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests the detection of the functional method of a stage runner interface.
+ * <p>
+ * Covered aspects are ignoring default, static, private and redeclared {@link Object} methods, detecting a method
+ * inherited from one or more super-interfaces, rejecting interfaces without exactly one functional method, and
+ * validating the {@link de.sayayi.lib.stagerunner.spring.annotation.Data @Data} annotations and data names of the
+ * interface method parameters.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

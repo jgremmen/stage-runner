@@ -31,6 +31,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests that {@code null} arguments are rejected where they are passed to the stage runner API.
+ * <p>
+ * Covered are the stage runner factory (stage enum type, regular and named stage functions), the stage context (adding
+ * stage functions) and the stage runner (factory, data map and callback).
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

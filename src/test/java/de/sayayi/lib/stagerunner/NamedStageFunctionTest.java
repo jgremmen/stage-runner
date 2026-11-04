@@ -33,6 +33,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests the registration and enabling of named stage functions.
+ * <p>
+ * Covered aspects are the execution of enabled functions only, enabling by name and by predicate, the scope of an
+ * enabled function to a single execution, the callback notification, the position rules for enabling a function during
+ * an execution, and the rejection of empty and duplicate names.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

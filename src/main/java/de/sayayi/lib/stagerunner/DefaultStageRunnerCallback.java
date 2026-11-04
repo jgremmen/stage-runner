@@ -28,10 +28,17 @@ package de.sayayi.lib.stagerunner;
  */
 final class DefaultStageRunnerCallback
 {
+  /**
+   * Shared default callback instance. It only relies on the default methods of {@link StageRunnerCallback} and is
+   * therefore stateless, thread safe and usable for any stage type.
+   */
   @SuppressWarnings("rawtypes")
   static final StageRunnerCallback<?> INSTANCE = new StageRunnerCallback() {};
 
 
+  /**
+   * Prevents instantiation; this class only holds the {@link #INSTANCE default callback instance}.
+   */
   private DefaultStageRunnerCallback() {
   }
 }

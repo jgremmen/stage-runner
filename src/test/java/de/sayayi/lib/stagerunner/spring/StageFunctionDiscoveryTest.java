@@ -35,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests the discovery of stage functions on singleton beans independent of their creation time.
+ * <p>
+ * Covered aspects are the discovery on all kinds of singleton beans, not creating lazy-init singletons without stage
+ * functions, and rejecting a stage runner execution before the discovery has completed.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

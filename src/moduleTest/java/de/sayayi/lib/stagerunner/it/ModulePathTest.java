@@ -40,6 +40,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests the stage runner library with both the library and the application running as named modules on the module path.
+ * <p>
+ * Covered aspects are verifying that both run as named modules, running the core stage runner, and running the Spring
+ * integration with public and package-private stage function beans of the application module.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

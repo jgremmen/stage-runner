@@ -30,7 +30,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
- * Tests the generated stage runner proxy and static stage function methods.
+ * Tests the generated stage runner proxy.
+ * <p>
+ * Covered aspects are passing boxed primitive arguments of a {@code void} interface method to instance and static
+ * stage functions, and the result of a {@code boolean} interface method for an aborted run.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

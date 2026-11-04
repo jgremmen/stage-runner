@@ -39,6 +39,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests a stage runner interface method declaring a {@link StageRunnerCallback} parameter.
+ * <p>
+ * Covered aspects are passing the callback to the stage runner, the fallback to the default callback for {@code null},
+ * raw callbacks and callback subtypes, the rejection of a callback for a different stage type and of more than one
+ * callback parameter, and the validation of the parameter descriptions passed to the proxy builder.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

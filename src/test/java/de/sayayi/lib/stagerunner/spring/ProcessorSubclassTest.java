@@ -38,6 +38,9 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests that a {@link StageRunnerFactoryProcessor} subclass can customize the stage function registration using the
  * protected accessors.
+ * <p>
+ * It also covers the rejection of a stage type which does not match the stage function annotation when accessing the
+ * stage runner factory.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

@@ -37,6 +37,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Tests the use of a {@link ConversionService} bean by the {@link StageRunnerFactoryProcessor}.
+ * <p>
+ * Covered aspects are using a post-processed conversion service bean for parameter conversion, and falling back to the
+ * shared default conversion service if there is no unique conversion service bean.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

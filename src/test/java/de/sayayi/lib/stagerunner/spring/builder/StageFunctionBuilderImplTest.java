@@ -37,11 +37,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
- * Tests the resolution of stage function parameters by type in {@link StageFunctionBuilderImpl}.
+ * Tests the binding of stage function parameters in {@link StageFunctionBuilderImpl}.
  * <p>
- * Covered aspects are the selection of the strongest match independent of the data map iteration order, the detection
- * of ambiguous matches and the caching of generated classes, all through the public builder API. The equality of the
- * internal parameter bindings, which the class cache relies on, is tested directly.
+ * Covered aspects are the selection of the strongest type match independent of the data map iteration order, the
+ * detection of ambiguous matches, the rejection of a named data entry with an incompatible type, the handling of
+ * {@link de.sayayi.lib.stagerunner.spring.annotation.Data @Data} without name, and the caching of generated classes,
+ * all through the public builder API. The equality of the internal parameter bindings, which the class cache relies
+ * on, is tested directly.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

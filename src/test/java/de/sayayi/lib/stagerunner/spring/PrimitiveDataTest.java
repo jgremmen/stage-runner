@@ -31,6 +31,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests stage function parameters of a primitive type.
+ * <p>
+ * Covered aspects are unboxing the data value and failing for a {@code null} data value.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0

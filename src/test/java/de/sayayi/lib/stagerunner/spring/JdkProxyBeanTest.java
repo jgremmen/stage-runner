@@ -36,6 +36,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests stage functions declared on beans which are exposed as JDK dynamic proxies.
+ * <p>
+ * Covered aspects are invoking the stage function through the proxy interface, and rejecting a stage function at
+ * startup which is not exposed by the proxy interface.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0
