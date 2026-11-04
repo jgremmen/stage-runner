@@ -177,49 +177,62 @@ class StageFunctionBuilderImplTest
 
 
   @Test
-  @DisplayName("Parameter binding equality is symmetric and takes the parameter type into account")
+  @DisplayName("Parameter binding equality takes the parameter type into account")
   void parameterBindingEquality() throws ReflectiveOperationException
   {
     final var charSequenceType = parameterTypeOf("process", CharSequence.class);
     final var stringType = parameterTypeOf("process", String.class);
 
-    final var nameWithQualifier = nameWithQualifier("value", StageFunctionBuilderImpl.TypeQualifier.IDENTICAL);
-    final var binding = nameWithQualifierAndType(nameWithQualifier, charSequenceType);
-    final var sameBinding = nameWithQualifierAndType(nameWithQualifier, charSequenceType);
-    final var otherTypeBinding = nameWithQualifierAndType(nameWithQualifier, stringType);
-
-    // symmetric, also between super and subclass
-    assertNotEquals(nameWithQualifier, binding);
-    assertNotEquals(binding, nameWithQualifier);
+    final var binding = dataBinding("value", charSequenceType);
+    final var sameBinding = dataBinding("value", charSequenceType);
+    final var otherTypeBinding = dataBinding("value", stringType);
+    final var contextBinding = stageContextBinding();
 
     assertEquals(binding, sameBinding);
     assertEquals(binding.hashCode(), sameBinding.hashCode());
     assertNotEquals(binding, otherTypeBinding);
+    assertNotEquals(binding, contextBinding);
+    assertNotEquals(contextBinding, binding);
+    assertEquals(contextBinding, stageContextBinding());
+  }
+
+
+  @Test
+  @DisplayName("Data entry named like the former stage context marker is bound as data")
+  void dataNamedContext() throws ReflectiveOperationException
+  {
+    final var bean = new TestTarget();
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+
+    factory.addStageFunction(TestStage.INIT, builder.createStageFunction(
+        StageFunctionAnnotation.buildFrom(StageDef.class), Map.of("$context", ResolvableType.forClass(String.class)),
+        TestTarget.class.getMethod("contextNamed", CharSequence.class), bean));
+
+    assertTrue(factory.createRunner().run(Map.of("$context", "data")));
+    assertEquals("data", bean.value);
   }
 
 
   @SuppressWarnings("SameParameterValue")
-  private Object nameWithQualifier(String name, StageFunctionBuilderImpl.TypeQualifier qualifier)
-      throws ReflectiveOperationException
+  private Object dataBinding(String name, TypeDescriptor type) throws ReflectiveOperationException
   {
     final var constructor = Class
-        .forName(StageFunctionBuilderImpl.class.getName() + "$NameWithQualifier")
-        .getDeclaredConstructor(String.class, StageFunctionBuilderImpl.TypeQualifier.class);
+        .forName(StageFunctionBuilderImpl.class.getName() + "$DataBinding")
+        .getDeclaredConstructor(String.class, StageFunctionBuilderImpl.TypeQualifier.class, TypeDescriptor.class);
     constructor.setAccessible(true);
 
-    return constructor.newInstance(name, qualifier);
+    return constructor.newInstance(name, StageFunctionBuilderImpl.TypeQualifier.IDENTICAL, type);
   }
 
 
-  private Object nameWithQualifierAndType(Object nameWithQualifier, TypeDescriptor type)
-      throws ReflectiveOperationException
+  private Object stageContextBinding() throws ReflectiveOperationException
   {
     final var constructor = Class
-        .forName(StageFunctionBuilderImpl.class.getName() + "$NameWithQualifierAndType")
-        .getDeclaredConstructor(nameWithQualifier.getClass(), TypeDescriptor.class);
+        .forName(StageFunctionBuilderImpl.class.getName() + "$StageContextBinding")
+        .getDeclaredConstructor();
     constructor.setAccessible(true);
 
-    return constructor.newInstance(nameWithQualifier, type);
+    return constructor.newInstance();
   }
 
 
@@ -275,6 +288,11 @@ class StageFunctionBuilderImplTest
 
 
     public void unnamed(@Data CharSequence value) {
+    }
+
+
+    public void contextNamed(@Data("$context") CharSequence value) {
+      this.value = value;
     }
 
 

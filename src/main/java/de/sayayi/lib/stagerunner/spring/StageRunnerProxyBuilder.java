@@ -21,6 +21,7 @@ import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Method;
+import java.util.List;
 
 
 /**
@@ -39,17 +40,18 @@ public interface StageRunnerProxyBuilder
    * Creates and initializes a stage runner proxy. The generated proxy must implement {@code stageRunnerInterfaceType}
    * and use {@code stageRunnerFactory} for creating new stage runner instances.
    * <p>
-   * The {@code dataNames} array contains the data map key name for the corresponding
-   * {@code stageRunnerInterfaceMethod} parameter. A {@code null} value marks the
-   * {@link de.sayayi.lib.stagerunner.StageRunnerCallback StageRunnerCallback} parameter, which is not stored in the
-   * data map but used as callback for the execution. At most one entry is {@code null}, and only for a parameter whose
-   * type is assignable to {@code StageRunnerCallback}.
+   * The {@code parameters} list contains one entry for each parameter of {@code stageRunnerInterfaceMethod}, in
+   * declaration order. A {@link StageRunnerParameter.DataParameter DataParameter} is stored in the data map under its
+   * name. A {@link StageRunnerParameter.CallbackParameter CallbackParameter} is not stored in the data map but used as
+   * callback for the execution. At most one entry is a {@code CallbackParameter}, and only for a parameter whose type
+   * is assignable to {@link de.sayayi.lib.stagerunner.StageRunnerCallback StageRunnerCallback}.
    *
    * @param stageType                   stage enumeration type, not {@code null}
    * @param stageRunnerInterfaceType    stage runner interface type, not {@code null}
    * @param stageRunnerInterfaceMethod  functional interface method of {@code stageRunnerInterfaceType}, not
    *                                    {@code null}
-   * @param dataNames                   data names array, not {@code null}
+   * @param parameters                  how each parameter of {@code stageRunnerInterfaceMethod} is passed to the stage
+   *                                    runner, not {@code null}
    * @param stageRunnerFactory          stage runner factory instance, not {@code null}
    *
    * @return  stage runner proxy instance, never {@code null}
@@ -63,7 +65,7 @@ public interface StageRunnerProxyBuilder
   <R,S extends Enum<S>> @NotNull R createProxy(@NotNull Class<S> stageType,
                                                @NotNull Class<R> stageRunnerInterfaceType,
                                                @NotNull Method stageRunnerInterfaceMethod,
-                                               @NotNull String[] dataNames,
+                                               @NotNull List<StageRunnerParameter> parameters,
                                                @NotNull StageRunnerFactory<S> stageRunnerFactory)
       throws StageRunnerConfigurationException;
 }

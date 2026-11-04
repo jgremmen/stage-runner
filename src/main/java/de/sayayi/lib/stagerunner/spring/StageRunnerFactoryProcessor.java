@@ -22,6 +22,8 @@ import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory;
+import de.sayayi.lib.stagerunner.spring.StageRunnerParameter.CallbackParameter;
+import de.sayayi.lib.stagerunner.spring.StageRunnerParameter.DataParameter;
 import de.sayayi.lib.stagerunner.spring.annotation.Data;
 import de.sayayi.lib.stagerunner.spring.builder.StageFunctionBuilderImpl;
 import de.sayayi.lib.stagerunner.spring.builder.StageRunnerProxyBuilderImpl;
@@ -29,7 +31,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.Unmodifiable;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
@@ -48,9 +49,7 @@ import org.springframework.util.ClassUtils;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.isAbstract;
@@ -86,8 +85,8 @@ import static org.springframework.util.StringUtils.hasLength;
  * type {@link StageRunnerCallback} (or a subtype) is not passed as data but used as callback for the execution. At most
  * one callback parameter is allowed; it must not be annotated with {@code @Data} and its stage type, if specified, must
  * match the stage type of the stage function annotation. If the callback is {@code null}, the
- * {@link StageRunnerCallback#defaultCallback() default callback} is used. The binding of stage function parameters is described
- * by {@link Data @Data}.
+ * {@link StageRunnerCallback#defaultCallback() default callback} is used. The binding of stage function parameters is
+ * described by {@link Data @Data}.
  * <p>
  * The processor is registered as a bean, for example through a {@code static} bean method in a Spring configuration
  * class:
@@ -122,10 +121,10 @@ public class StageRunnerFactoryProcessor<R>
   private final Method stageRunnerInterfaceMethod;
 
   /**
-   * Data names for the parameters of {@link #stageRunnerInterfaceMethod}, indexed by parameter position. An entry is
-   * {@code null} for a callback parameter.
+   * Unmodifiable list describing how each parameter of {@link #stageRunnerInterfaceMethod} is passed to the stage
+   * runner, indexed by parameter position.
    */
-  private final String[] dataNames;
+  private final List<StageRunnerParameter> stageRunnerParameters;
 
   /** Unmodifiable mapping of data names to the types of the corresponding interface method parameters. */
   private final Map<String,ResolvableType> dataNameTypeMap;
@@ -199,8 +198,7 @@ public class StageRunnerFactoryProcessor<R>
     final var parameters = stageRunnerInterfaceMethod.getParameters();
     final var parameterCount = parameters.length;
 
-    dataNames = new String[parameterCount];
-
+    final var tmpStageRunnerParameters = new ArrayList<StageRunnerParameter>(parameterCount);
     final var tmpDataNameTypeMap = new HashMap<String,ResolvableType>();
     final var callbackType = forClassWithGenerics(StageRunnerCallback.class, stageType);
     final var parameterNames = new DefaultParameterNameDiscoverer().getParameterNames(stageRunnerInterfaceMethod);
@@ -234,20 +232,24 @@ public class StageRunnerFactoryProcessor<R>
               stageRunnerInterfaceMethod + " must be a " + callbackType);
         }
 
+        tmpStageRunnerParameters.add(new CallbackParameter());
         callbackParameterFound = true;
       }
       else
       {
         final var dataName = getDataNameForParameter(dataAnnotation, parameterNames, p);
 
-        if (tmpDataNameTypeMap.put(dataNames[p] = dataName, resolvableType) != null)
+        if (tmpDataNameTypeMap.put(dataName, resolvableType) != null)
         {
           throw new StageRunnerConfigurationException("duplicate data name '" + dataName + "' for parameter #" +
               (p + 1) + " in stage runner function " + stageRunnerInterfaceMethod);
         }
+
+        tmpStageRunnerParameters.add(new DataParameter(dataName));
       }
     }
 
+    stageRunnerParameters = List.copyOf(tmpStageRunnerParameters);
     dataNameTypeMap = Map.copyOf(tmpDataNameTypeMap);
     logger.debug("stage runner data = " + dataNameTypeMap);
 
@@ -269,7 +271,8 @@ public class StageRunnerFactoryProcessor<R>
    * @since 0.4.0
    */
   @SuppressWarnings("unchecked")
-  private <S extends Enum<S>> @NotNull DefaultStageRunnerFactory<S> createStageRunnerFactory(@NotNull Class<?> stageType)
+  private <S extends Enum<S>> @NotNull DefaultStageRunnerFactory<S> createStageRunnerFactory(
+      @NotNull Class<?> stageType)
   {
     return new DefaultStageRunnerFactory<>((Class<S>)stageType) {
       @Override
@@ -305,24 +308,22 @@ public class StageRunnerFactoryProcessor<R>
    *                                            can be derived for the parameter
    */
   @Contract(pure = true)
-  protected @NotNull String getDataNameForParameter(@Nullable Data dataAnnotation,
-                                                    @Nullable String[] parameterNames,
-                                                    int p)
+  protected @NotNull String getDataNameForParameter(Data dataAnnotation, String[] parameterNames, int p)
   {
     if (dataAnnotation != null)
     {
-      if (dataAnnotation.name().isEmpty())
+      var dataName = dataAnnotation.name();
+      if (dataName.isEmpty())
       {
         throw new StageRunnerConfigurationException("@Data without name is not allowed for parameter " + (p + 1) +
             " in stage runner function " + stageRunnerInterfaceMethod);
       }
 
-      return dataAnnotation.name();
+      return dataName;
     }
 
     var parameterName = parameterNames != null ? parameterNames[p] : null;
-
-    if (parameterName == null || parameterName.isEmpty())
+    if (!hasLength(parameterName))
     {
       throw new StageRunnerConfigurationException("unable to detect data name for parameter " + (p + 1) +
           " in stage runner function " + stageRunnerInterfaceMethod + "; please specify @Data");
@@ -533,8 +534,8 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Registers a single annotated method as a stage function on the internal stage runner factory. Registration is
-   * skipped when the configured {@link StageFunctionFilter} rejects the function. If a non-empty name is provided by the
-   * name generator the function is registered as a named function, otherwise it is added anonymously.
+   * skipped when the configured {@link StageFunctionFilter} rejects the function. If a non-empty name is provided by
+   * the name generator the function is registered as a named function, otherwise it is added anonymously.
    *
    * @param stageFunctionAnnotationAttributes  merged attributes of the stage function annotation, not {@code null}
    * @param method                             the annotated method, not {@code null}
@@ -625,6 +626,7 @@ public class StageRunnerFactoryProcessor<R>
     final var bean = new RootBeanDefinition(stageRunnerInterfaceType, SCOPE_SINGLETON, this::createStageRunnerProxy);
 
     bean.setTargetType(ResolvableType.forClass(stageRunnerInterfaceType));
+    bean.setLenientConstructorResolution(false);
     bean.setLazyInit(true);
     bean.setDescription("Auto-detected StageRunner for " + stageFunctionAnnotation.getStageType().getName());
     bean.setPrimary(true);
@@ -656,7 +658,7 @@ public class StageRunnerFactoryProcessor<R>
         (Class<S>)stageFunctionAnnotation.getStageType(),
         stageRunnerInterfaceType,
         stageRunnerInterfaceMethod,
-        dataNames,
+        stageRunnerParameters,
         (StageRunnerFactory<S>)stageRunnerFactory);
   }
 
@@ -799,16 +801,16 @@ public class StageRunnerFactoryProcessor<R>
 
 
   /**
-   * Returns the data names for the parameters of the stage runner interface method, indexed by parameter position.
-   * An entry is {@code null} for a callback parameter.
+   * Returns how each parameter of the stage runner interface method is passed to the stage runner, indexed by
+   * parameter position.
    *
-   * @return  copy of the data names, never {@code null}
+   * @return  unmodifiable list of parameter descriptions, never {@code null}
    *
    * @since 0.4.0
    */
-  @Contract(value = "-> new", pure = true)
-  protected @NotNull String[] getDataNames() {
-    return dataNames.clone();
+  @Contract(pure = true)
+  protected @NotNull @Unmodifiable List<StageRunnerParameter> getStageRunnerParameters() {
+    return stageRunnerParameters;
   }
 
 

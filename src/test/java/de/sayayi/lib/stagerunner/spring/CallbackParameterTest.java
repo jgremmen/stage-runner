@@ -21,6 +21,8 @@ import de.sayayi.lib.stagerunner.TestStage;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
 import de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory;
+import de.sayayi.lib.stagerunner.spring.StageRunnerParameter.CallbackParameter;
+import de.sayayi.lib.stagerunner.spring.StageRunnerParameter.DataParameter;
 import de.sayayi.lib.stagerunner.spring.builder.StageRunnerProxyBuilderImpl;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
@@ -146,8 +148,8 @@ class CallbackParameterTest
 
 
   @Test
-  @DisplayName("Proxy builder rejects a missing data name for a non-callback parameter")
-  void proxyBuilderMissingDataName() throws Exception
+  @DisplayName("Proxy builder rejects a callback description for a non-callback parameter")
+  void proxyBuilderCallbackForNonCallbackParameter() throws Exception
   {
     final var method = CallbackRunner.class.getMethod("run", String.class, StageRunnerCallback.class);
     final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
@@ -155,9 +157,35 @@ class CallbackParameterTest
 
     final var exception = assertThrows(StageRunnerConfigurationException.class,
         () -> proxyBuilder.createProxy(TestStage.class, CallbackRunner.class, method,
-            new String[] { null, null }, factory));
+            List.of(new CallbackParameter(), new CallbackParameter()), factory));
 
-    assertTrue(exception.getMessage().startsWith("missing data name for parameter 1"));
+    assertTrue(exception.getMessage().startsWith("callback parameter 1 of"), exception.getMessage());
+  }
+
+
+  @Test
+  @DisplayName("Proxy builder rejects a parameter description count which does not match the method")
+  void proxyBuilderParameterCountMismatch() throws Exception
+  {
+    final var method = CallbackRunner.class.getMethod("run", String.class, StageRunnerCallback.class);
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var proxyBuilder = new StageRunnerProxyBuilderImpl(false);
+
+    final var exception = assertThrows(StageRunnerConfigurationException.class,
+        () -> proxyBuilder.createProxy(TestStage.class, CallbackRunner.class, method,
+            List.of(new DataParameter("text")), factory));
+
+    assertTrue(exception.getMessage().startsWith("expected 2 parameter descriptions"), exception.getMessage());
+  }
+
+
+  @Test
+  @DisplayName("Data parameter rejects an empty name")
+  @SuppressWarnings("DataFlowIssue")
+  void dataParameterEmptyName()
+  {
+    assertThrows(IllegalArgumentException.class, () -> new DataParameter(""));
+    assertThrows(NullPointerException.class, () -> new DataParameter(null));
   }
 
 

@@ -27,14 +27,15 @@ import org.springframework.core.convert.support.DefaultConversionService;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 
 /**
- * Tests that a class loader which cannot load the stage runner library is reported as configuration error when a
- * class is generated for a bean or stage runner interface loaded by that class loader.
+ * Tests that a class loader which cannot load the stage runner library is reported as configuration error when a class
+ * is generated for a bean or stage runner interface loaded by that class loader.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0
@@ -66,7 +67,7 @@ class IsolatedClassLoaderTest
     final var builder = new StageRunnerProxyBuilderImpl(false);
 
     final var ex = assertThrows(StageRunnerConfigurationException.class,
-        () -> builder.createProxy(TestStage.class, interfaceType, interfaceType.getMethod("run"), new String[0],
+        () -> builder.createProxy(TestStage.class, interfaceType, interfaceType.getMethod("run"), List.of(),
             new DefaultStageRunnerFactory<>(TestStage.class)));
 
     assertInstanceOf(LinkageError.class, ex.getCause());

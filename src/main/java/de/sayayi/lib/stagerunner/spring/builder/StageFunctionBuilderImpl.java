@@ -165,7 +165,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       @NotNull Object bean)
   {
     final var methodParameters = stageFunction.getParameters();
-    final var parameters = new NameWithQualifierAndType[methodParameters.length];
+    final var parameters = new ParameterBinding[methodParameters.length];
     final var stageContextType = forClassWithGenerics(
         StageContext.class, stageFunctionAnnotation.getStageType());
 
@@ -184,13 +184,13 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       }
 
       final var isStageContext =
-          dataAnnotation == null && parameterType.getType() == StageContext.class && acceptsStageContext;
+          acceptsStageContext &&
+          dataAnnotation == null &&
+          parameterType.getType() == StageContext.class;
 
-      parameters[p] = new NameWithQualifierAndType(
-          isStageContext
-              ? new NameWithQualifier("$context", TypeQualifier.ASSIGNABLE)
-              : findNameWithQualifier(methodParameters[p], parameterType, dataNameTypeMap),
-          parameterType);
+      parameters[p] = isStageContext
+          ? new StageContextBinding()
+          : new DataBinding(findNameWithQualifier(methodParameters[p], parameterType, dataNameTypeMap), parameterType);
     }
 
     var invocableMethod = stageFunction;
@@ -207,7 +207,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
           .getDeclaredConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
           .newInstance(bean, conversionService, Arrays
               .stream(parameters)
-              .map(p -> p.isConvertableQualifier() ? p.type : null)
+              .map(p -> p instanceof DataBinding db && db.isConvertable() ? db.type : null)
               .toArray(TypeDescriptor[]::new));
     } catch(ReflectiveOperationException ex) {
       throw new StageRunnerConfigurationException(
@@ -279,14 +279,14 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   @SuppressWarnings("unchecked")
   private @NotNull <S extends Enum<S>> Class<? extends StageFunction<S>> createStageFunctionType(
       @NotNull MethodDescription method,
-      @NotNull NameWithQualifierAndType[] parameters,
+      @NotNull ParameterBinding[] parameters,
       @NotNull StageFunctionAnnotation stageFunctionAnnotation,
       @NotNull MethodHandles.Lookup hostLookup)
   {
     return (Class<? extends StageFunction<S>>)stageFunctionClassCache
         .computeIfAbsent(
             new CacheKey(method, stageFunctionAnnotation.getStageType(), List.of(parameters)),
-            ck -> buildStageFunctionClass(method, parameters, stageFunctionAnnotation, hostLookup));
+            key -> buildStageFunctionClass(method, parameters, stageFunctionAnnotation, hostLookup));
   }
 
 
@@ -296,8 +296,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * <p>
    * The class is defined through {@code hostLookup} in the package and class loader of the class declaring
    * {@code method}. This way the generated class can access the declaring class and its parameter types, even if they
-   * are not public. The generated class does not extend a class of this library, as the library's internal packages
-   * are not accessible from an application module.
+   * are not public. The generated class does not extend a class of this library, as the library's internal packages are
+   * not accessible from an application module.
    * <p>
    * The generated class has a public constructor taking the bean (or {@code null} for a static method), the conversion
    * service and the target type for each method parameter, with {@code null} for parameters which do not require a
@@ -313,7 +313,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   @SuppressWarnings({"unchecked", "resource"})
   private @NotNull Class<? extends StageFunction<?>> buildStageFunctionClass(
       @NotNull MethodDescription method,
-      @NotNull NameWithQualifierAndType[] parameters,
+      @NotNull ParameterBinding[] parameters,
       @NotNull StageFunctionAnnotation stageFunctionAnnotation,
       @NotNull MethodHandles.Lookup hostLookup)
   {
@@ -409,7 +409,6 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     if (dataAnnotation != null && hasLength(dataAnnotation.name()))
     {
       var dataName = dataAnnotation.name();
-
       if ((dataType = dataNameTypeMap.get(dataName)) != null)
       {
         return new NameWithQualifier(dataName,
@@ -451,9 +450,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     var nameQualifiers = new ArrayList<NameWithQualifier>();
 
     dataNameTypeMap.forEach((name, type) -> {
-      var q = qualifyParameterType(parameterType, type);
-      if (q != null)
-        nameQualifiers.add(new NameWithQualifier(name, q));
+      var typeQualifier = qualifyParameterType(parameterType, type);
+      if (typeQualifier != null)
+        nameQualifiers.add(new NameWithQualifier(name, typeQualifier));
     });
 
     NameWithQualifier nameWithQualifier = null;
@@ -489,10 +488,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * @return  the {@link TypeQualifier} describing the match strength, or {@code null} when there is no match
    */
   @Contract(pure = true)
-  private TypeQualifier qualifyParameterType(@NotNull TypeDescriptor parameterType,
-                                             @NotNull ResolvableType dataType)
+  private TypeQualifier qualifyParameterType(@NotNull TypeDescriptor parameterType, @NotNull ResolvableType dataType)
   {
-    var parameterResolvableType = parameterType.getResolvableType();
+    final var parameterResolvableType = parameterType.getResolvableType();
 
     if (parameterResolvableType.getType().equals(dataType.getType()))
       return TypeQualifier.IDENTICAL;
@@ -543,26 +541,49 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
 
   /**
-   * A {@link NameWithQualifier} enriched with the resolved Spring {@link TypeDescriptor} of the associated method
-   * parameter. The type descriptor is used when a conversion is required at invocation time.
+   * Binding of a stage function parameter to the value it receives when the stage function is executed: either the
+   * stage context itself ({@link StageContextBinding}) or an entry of the data map ({@link DataBinding}).
+   *
+   * @since 0.4.0
    */
-  private static class NameWithQualifierAndType extends NameWithQualifier
+  private sealed interface ParameterBinding permits StageContextBinding, DataBinding {
+  }
+
+
+
+
+  /**
+   * Binding of a parameter which receives the stage context itself.
+   *
+   * @since 0.4.0
+   */
+  private record StageContextBinding() implements ParameterBinding {
+  }
+
+
+
+
+  /**
+   * Binding of a parameter which receives the data map entry {@code name}. The type descriptor of the method parameter
+   * is used when a conversion is required at invocation time.
+   *
+   * @param name       data map key, not {@code null}
+   * @param qualifier  match strength of the data value for the method parameter, not {@code null}
+   * @param type       type descriptor of the method parameter, not {@code null}
+   *
+   * @since 0.4.0
+   */
+  private record DataBinding(@NotNull String name, @NotNull TypeQualifier qualifier, @NotNull TypeDescriptor type)
+      implements ParameterBinding
   {
-    /** Type descriptor of the method parameter. */
-    final @NotNull TypeDescriptor type;
-
-
     /**
-     * Creates a new parameter binding.
+     * Creates a data binding for the resolved data name and qualifier.
      *
      * @param nameWithQualifier  data name and qualifier, not {@code null}
      * @param type               type descriptor of the method parameter, not {@code null}
      */
-    private NameWithQualifierAndType(@NotNull NameWithQualifier nameWithQualifier, @NotNull TypeDescriptor type)
-    {
-      super(nameWithQualifier.name, nameWithQualifier.qualifier);
-
-      this.type = type;
+    private DataBinding(@NotNull NameWithQualifier nameWithQualifier, @NotNull TypeDescriptor type) {
+      this(nameWithQualifier.name, nameWithQualifier.qualifier, type);
     }
 
 
@@ -573,20 +594,24 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
      * @return  {@code true} if a conversion is required, {@code false} otherwise
      */
     @Contract(pure = true)
-    public boolean isConvertableQualifier() {
+    boolean isConvertable() {
       return qualifier == TypeQualifier.CONVERTABLE;
     }
 
 
     /**
      * {@inheritDoc}
+     * <p>
+     * The parameter types are compared by their resolvable type, so annotations on the method parameter are ignored.
      */
     @Override
     public boolean equals(Object o)
     {
       return
-          super.equals(o) &&
-          type.getResolvableType().equals(((NameWithQualifierAndType)o).type.getResolvableType());
+          o instanceof DataBinding(var thatName, var thatQualifier, var thatType) &&
+          name.equals(thatName) &&
+          qualifier == thatQualifier &&
+          type.getResolvableType().equals(thatType.getResolvableType());
     }
 
 
@@ -595,16 +620,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
      */
     @Override
     public int hashCode() {
-      return super.hashCode() * 31 + type.hashCode();
-    }
-
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public String toString() {
-      return "NameWithQualifierAndType(name=" + name + ",qualifier=" + qualifier + ",type=" + type + ')';
+      return (name.hashCode() * 31 + qualifier.hashCode()) * 31 + type.hashCode();
     }
   }
 
@@ -615,29 +631,13 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * Pairing of a data map key ({@code name}) with the {@link TypeQualifier} describing how the associated data value
    * can be supplied to a method parameter. Instances have a natural order that favors stronger qualifiers so that the
    * best match can be picked when several candidates exist.
+   *
+   * @param name       data map key, not {@code null}
+   * @param qualifier  match strength of the data value for the method parameter, not {@code null}
    */
-  private static class NameWithQualifier implements Comparable<NameWithQualifier>
+  private record NameWithQualifier(@NotNull String name, @NotNull TypeQualifier qualifier)
+      implements Comparable<NameWithQualifier>
   {
-    /** Data map key, or {@code $context} for the stage context itself. */
-    final @NotNull String name;
-
-    /** Match strength of the data value for the method parameter. */
-    final @NotNull TypeQualifier qualifier;
-
-
-    /**
-     * Creates a new data name and qualifier pair.
-     *
-     * @param name       data map key, not {@code null}
-     * @param qualifier  match strength, not {@code null}
-     */
-    private NameWithQualifier(@NotNull String name, @NotNull TypeQualifier qualifier)
-    {
-      this.name = name;
-      this.qualifier = qualifier;
-    }
-
-
     /**
      * {@inheritDoc}
      */
@@ -646,45 +646,6 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     {
       final var cmp = qualifier.compareTo(o.qualifier);
       return cmp == 0 ? name.compareTo(o.name) : cmp;
-    }
-
-
-    /**
-     * {@inheritDoc}
-     * <p>
-     * Only instances of the exact same class are equal, which keeps this relation symmetric with respect to the
-     * {@link NameWithQualifierAndType} subclass.
-     */
-    @Override
-    public boolean equals(Object o)
-    {
-      if (this == o)
-        return true;
-
-      if (o == null || o.getClass() != getClass())
-        return false;
-
-      final var that = (NameWithQualifier)o;
-
-      return qualifier == that.qualifier && name.equals(that.name);
-    }
-
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public int hashCode() {
-      return name.hashCode() * 31 + qualifier.hashCode();
-    }
-
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public String toString() {
-      return "NameWithQualifier(name=" + name + ",qualifier=" + qualifier + ')';
     }
   }
 
@@ -727,7 +688,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    */
   private record CacheKey(@NotNull MethodDescription method,
                           @NotNull Class<?> stageType,
-                          @NotNull List<NameWithQualifierAndType> parameters) {
+                          @NotNull List<ParameterBinding> parameters) {
   }
 
 
@@ -735,7 +696,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
   /**
    * ByteBuddy {@link Implementation} for the generated {@code process(StageContext)} method. It loads each parameter
-   * value from the stage context data map (or the context itself for the special {@code $context} binding), applies a
+   * value from the stage context data map (or the context itself for a {@link StageContextBinding}), applies a
    * conversion where needed and finally invokes the target method on the stored bean.
    * <p>
    * The generated code only refers to the generated class itself, exported types of this library, Spring and the JDK.
@@ -786,7 +747,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     private final MethodDescription method;
 
     /** Resolved parameter bindings. */
-    private final NameWithQualifier[] parameters;
+    private final ParameterBinding[] parameters;
 
 
     /**
@@ -795,7 +756,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
      * @param method      target method, not {@code null}
      * @param parameters  resolved parameter bindings, not {@code null}
      */
-    private ProcessMethodImplementation(@NotNull MethodDescription method, @NotNull NameWithQualifier[] parameters)
+    private ProcessMethodImplementation(@NotNull MethodDescription method, @NotNull ParameterBinding[] parameters)
     {
       this.method = method;
       this.parameters = parameters;
@@ -821,14 +782,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
       for(int p = 0; p < parameters.length; p++)
       {
-        final var parameter = parameters[p];
-        final var dataName = parameter.name;
-
-        if ("$context".equals(dataName))
-          stackManipulations.add(MethodVariableAccess.REFERENCE.loadFrom(1));
-        else
+        if (parameters[p] instanceof DataBinding parameter)
         {
-          if (parameter.qualifier != TypeQualifier.CONVERTABLE)
+          final var dataName = parameter.name;
+
+          if (!parameter.isConvertable())
           {
             // context.getData(dataName)
             stackManipulations.add(MethodVariableAccess.REFERENCE.loadFrom(1));
@@ -854,6 +812,11 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
           }
 
           stackManipulations.addAll(castToParameterType(methodParameters.get(p).getType(), dataName));
+        }
+        else
+        {
+          // stage context binding
+          stackManipulations.add(MethodVariableAccess.REFERENCE.loadFrom(1));
         }
       }
 

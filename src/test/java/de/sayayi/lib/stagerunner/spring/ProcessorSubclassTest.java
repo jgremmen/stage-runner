@@ -18,6 +18,7 @@ package de.sayayi.lib.stagerunner.spring;
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.TestStage;
 import de.sayayi.lib.stagerunner.spi.DefaultStageRunnerFactory;
+import de.sayayi.lib.stagerunner.spring.StageRunnerParameter.DataParameter;
 import org.jetbrains.annotations.NotNull;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -55,7 +56,7 @@ class ProcessorSubclassTest
 
       assertEquals(SubclassRunner.class, processor.getStageRunnerInterfaceType());
       assertEquals("run", processor.getStageRunnerInterfaceMethod().getName());
-      assertArrayEquals(new String[] { "text" }, processor.getDataNames());
+      assertEquals(List.of(new DataParameter("text")), processor.getStageRunnerParameters());
       assertEquals(Set.of("text"), processor.getDataNameTypeMap().keySet());
       assertEquals(String.class, processor.getDataNameTypeMap().get("text").resolve());
       assertNotNull(processor.getBeanFactory());
