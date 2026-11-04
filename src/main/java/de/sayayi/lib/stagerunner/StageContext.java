@@ -42,9 +42,28 @@ import java.util.function.Predicate;
  * </ul>
  * <p>
  * Stage functions added through this context (see {@link StageFunctionConfigurer}) only apply to the current execution.
- * A function must be positioned after the function currently being executed; otherwise the function is not added, the
- * execution is aborted and a {@link StageRunnerConfigurationException StageRunnerConfigurationException} is thrown.
- * Adding functions after the execution has terminated also results in this exception.
+ * The position of a function, given by its stage and order, must not lie before the current stage function:
+ * <ul>
+ *   <li>
+ *     A function positioned after the current stage function can always be added, unless its stage has already been
+ *     processed.
+ *   </li>
+ *   <li>
+ *     A function positioned in front of the current stage function, which then becomes the next function to be
+ *     executed, can only be added from {@link StageRunnerCallback#preStageCallback(StageContext) preStageCallback}, and
+ *     only to the stage which is about to start. This is the latest point in time at which functions preceding the
+ *     first function of a stage can be added.
+ *   </li>
+ *   <li>
+ *     In particular, a function can not be positioned in front of the current stage function from
+ *     {@link StageRunnerCallback#preStageFunctionCallback(StageContext, String) preStageFunctionCallback}. That
+ *     callback belongs to the stage function about to be executed, which cannot be replaced by another function at
+ *     this point.
+ *   </li>
+ * </ul>
+ * If a function cannot be added at its position, the function is not added, the execution is aborted and a
+ * {@link StageRunnerConfigurationException StageRunnerConfigurationException} is thrown. Adding functions after the
+ * execution has terminated also results in this exception. The same rules apply to enabling named stage functions.
  * <p>
  * A stage context is bound to the thread executing the stage runner and is not thread safe.
  *

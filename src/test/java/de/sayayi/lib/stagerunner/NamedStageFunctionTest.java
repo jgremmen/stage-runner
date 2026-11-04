@@ -44,8 +44,8 @@ class NamedStageFunctionTest
   @DisplayName("Named stage functions are only executed if enabled")
   void onlyEnabledFunctionsAreExecuted()
   {
-    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
-    var executed = new ArrayList<String>();
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var executed = new ArrayList<String>();
 
     factory.namedStageFunction("a", PROCESS, ctx -> executed.add("a"));
     factory.namedStageFunction("b", PROCESS, ctx -> executed.add("b"));
@@ -60,8 +60,8 @@ class NamedStageFunctionTest
   @DisplayName("Enabling an unknown or already enabled stage function has no effect")
   void enableUnknownOrEnabledFunction()
   {
-    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
-    var executed = new ArrayList<String>();
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var executed = new ArrayList<String>();
 
     factory.namedStageFunction("a", PROCESS, ctx -> executed.add("a"));
     factory.addStageFunction(START, ctx -> {
@@ -80,8 +80,8 @@ class NamedStageFunctionTest
   @DisplayName("Enabling by predicate returns the enabled names")
   void enableByPredicate()
   {
-    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
-    var executed = new ArrayList<String>();
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var executed = new ArrayList<String>();
 
     factory.namedStageFunction("metrics.a", PROCESS, ctx -> executed.add("metrics.a"));
     factory.namedStageFunction("metrics.b", END, ctx -> executed.add("metrics.b"));
@@ -98,8 +98,8 @@ class NamedStageFunctionTest
   @DisplayName("Enabled stage functions only apply to the current execution")
   void enabledPerExecution()
   {
-    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
-    var executed = new ArrayList<String>();
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var executed = new ArrayList<String>();
 
     factory.namedStageFunction("a", PROCESS, ctx -> executed.add("a"));
     factory.addStageFunction(START, ctx -> {
@@ -107,7 +107,7 @@ class NamedStageFunctionTest
         ctx.enableNamedStageFunction("a");
     });
 
-    var runner = factory.createRunner();
+    final var runner = factory.createRunner();
 
     assertTrue(runner.run(Map.of("enable", true)));
     assertTrue(runner.run(Map.of("enable", false)));
@@ -119,8 +119,8 @@ class NamedStageFunctionTest
   @DisplayName("Enabling a named stage function by name notifies the callback")
   void enableNotifiesCallback()
   {
-    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
-    var added = new ArrayList<String>();
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var added = new ArrayList<String>();
 
     factory.namedStageFunction("a", PROCESS, 5, "named", ctx -> {});
     factory.addStageFunction(START, ctx -> assertTrue(ctx.enableNamedStageFunction("a")));
@@ -140,7 +140,7 @@ class NamedStageFunctionTest
   @DisplayName("Enabling a named stage function by name the execution has passed beyond is rejected")
   void enablePassedFunctionIsRejected()
   {
-    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
 
     factory.namedStageFunction("early", INIT, ctx -> fail());
     factory.addStageFunction(START, ctx -> {
@@ -157,10 +157,55 @@ class NamedStageFunctionTest
 
 
   @Test
+  @DisplayName("Named stage function enabled in front of the stage in preStageCallback is executed first")
+  void enableInFrontOfFirstFunctionInPreStageCallback()
+  {
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var log = new ArrayList<String>();
+
+    factory.namedStageFunction("early", PROCESS, 5, ctx -> log.add("early"));
+    factory.addStageFunction(PROCESS, 10, ctx -> log.add("P"));
+
+    assertTrue(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void preStageCallback(@NotNull StageContext<TestStage> stageContext) {
+        assertTrue(stageContext.enableNamedStageFunction("early"));
+      }
+    }));
+
+    assertEquals(List.of("early", "P"), log);
+  }
+
+
+  @Test
+  @DisplayName("Named stage function enabled in front of the next function in preStageFunctionCallback is rejected")
+  void enableInFrontOfNextFunctionInPreStageFunctionCallbackIsRejected()
+  {
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+
+    factory.namedStageFunction("early", PROCESS, 5, ctx -> fail());
+    factory.addStageFunction(PROCESS, 10, ctx -> fail());
+
+    assertFalse(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext, String description)
+      {
+        final var exception = assertThrows(StageRunnerConfigurationException.class,
+            () -> stageContext.enableNamedStageFunction("early"));
+
+        assertEquals("stage function 'early' for stage PROCESS and order 5 cannot be positioned in front of the " +
+            "current stage function; stage functions preceding it must be added in preStageCallback at the latest",
+            exception.getMessage());
+      }
+    }));
+  }
+
+
+  @Test
   @DisplayName("Duplicate and empty names are rejected")
   void invalidNames()
   {
-    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    final var factory = new DefaultStageRunnerFactory<>(TestStage.class);
 
     factory.namedStageFunction("a", PROCESS, ctx -> {});
 

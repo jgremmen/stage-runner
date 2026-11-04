@@ -80,6 +80,15 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   /** Whether the execution has been aborted. */
   private boolean aborted;
 
+  /**
+   * Whether {@link StageRunnerCallback#preStageCallback(StageContext) preStageCallback} is being invoked. Only then a
+   * stage function of the same stage may be inserted in front of the stage function at {@link #functionIndex}, which
+   * has not been started yet.
+   *
+   * @since 0.4.0
+   */
+  private boolean preStageCallbackActive;
+
 
   /**
    * Creates a new stage context for a single run, based on a snapshot of the factory's current stage function
@@ -187,12 +196,12 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   /**
    * {@inheritDoc}
    * <p>
-   * The stage function only applies to this execution. If it would be positioned before the stage function currently
-   * being executed, it is not added and the execution is aborted before the exception is thrown. If a callback is
-   * active, it is notified through {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)}.
+   * The stage function only applies to this execution. If it cannot be added at its position (see
+   * {@link StageContext}), it is not added and the execution is aborted before the exception is thrown. If a callback
+   * is active, it is notified through {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)}.
    *
-   * @throws StageRunnerConfigurationException  if the execution has terminated or has already passed beyond
-   *                                            {@code stage} and {@code order}
+   * @throws StageRunnerConfigurationException  if the execution has terminated or the stage function cannot be added at
+   *                                            the position given by {@code stage} and {@code order}
    * @throws NullPointerException               if {@code stage} or {@code function} is {@code null}
    */
   @Override
@@ -204,13 +213,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     final var stageFunction = new StageOrderFunction<>(stage, description, order, function);
     final var index = functionArray.insertionIndex(stageFunction);
 
-    if (state == RUNNING && (index <= functionIndex || processedStages.contains(stage)))
-    {
-      abort();
-      throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage +
-          " and order " + order);
-    }
-
+    validateInsertionIndex(stageFunction, index, null);
     functionArray.insert(index, stageFunction);
 
     if (callback != null)
@@ -221,9 +224,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   /**
    * {@inheritDoc}
    * <p>
-   * All accepted stage functions are validated before any of them is enabled. If an accepted stage function would be
-   * positioned before the stage function currently being executed, none of them is enabled and the execution is
-   * aborted before the exception is thrown. If a callback is active, it is notified through
+   * All accepted stage functions are validated before any of them is enabled. If an accepted stage function cannot be
+   * added at its position (see {@link StageContext}), none of them is enabled and the execution is aborted before the
+   * exception is thrown. If a callback is active, it is notified through
    * {@link StageRunnerCallback#addStageFunctionCallback(Enum, int, String)} for each enabled function.
    */
   @Override
@@ -238,8 +241,9 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     for(var stageFunctionEntry: stageRunnerFactory.namedStageFunctions().entrySet())
       if (!enabledStageFunctionNames.contains(name = stageFunctionEntry.getKey()) && nameFilter.test(name))
       {
-        // inserting accepted functions positioned after the current function does not move the current function,
-        // so validating each of them against the unmodified array is sufficient
+        // accepted functions are inserted at or after the current function index, which neither changes the stage at
+        // that index nor the position of earlier functions, so validating each of them against the unmodified array
+        // is sufficient
         validateNamedStageFunction(name, stageFunctionEntry.getValue());
         acceptedFunctions.add(stageFunctionEntry);
       }
@@ -282,26 +286,60 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
 
   /**
-   * Validates that the given named stage function can still be enabled for this execution. If the execution has already
-   * passed beyond its stage and order, the execution is aborted and an exception is thrown.
+   * Validates that the given named stage function can still be enabled for this execution. If it cannot be added at
+   * its position, the execution is aborted and an exception is thrown.
    *
    * @param name           stage function name, not {@code null}
    * @param stageFunction  named stage function, not {@code null}
    *
-   * @throws StageRunnerConfigurationException  if the execution has passed beyond the stage function
+   * @throws StageRunnerConfigurationException  if the stage function cannot be added at its position
    *
    * @since 0.4.0
    */
-  private void validateNamedStageFunction(@NotNull String name, @NotNull StageOrderFunction<S> stageFunction)
+  private void validateNamedStageFunction(@NotNull String name, @NotNull StageOrderFunction<S> stageFunction) {
+    validateInsertionIndex(stageFunction, functionArray.insertionIndex(stageFunction), name);
+  }
+
+
+  /**
+   * Validates that a stage function can be inserted at {@code index} while the execution is running. If it cannot, the
+   * execution is aborted and an exception is thrown.
+   * <p>
+   * A stage function can be inserted after the current stage function. It can be inserted at the position of the
+   * current stage function, i.e. in front of it, only while {@code preStageCallback} is being invoked and only if it
+   * belongs to the stage which is about to start. Stage functions of a processed stage are always rejected.
+   *
+   * @param stageFunction  stage function to insert, not {@code null}
+   * @param index          insertion index of {@code stageFunction}
+   * @param name           name of a named stage function or {@code null}, used in the exception message
+   *
+   * @throws StageRunnerConfigurationException  if the stage function cannot be inserted at {@code index}
+   *
+   * @since 0.4.0
+   */
+  private void validateInsertionIndex(@NotNull StageOrderFunction<S> stageFunction, int index, String name)
   {
-    if (state == RUNNING &&
-        (functionArray.insertionIndex(stageFunction) <= functionIndex ||
-         processedStages.contains(stageFunction.stage)))
+    if (state != RUNNING || index > functionIndex && !processedStages.contains(stageFunction.stage))
+      return;
+
+    final var currentStage = functionArray.functions[functionIndex].stage;
+
+    if (index == functionIndex && preStageCallbackActive && stageFunction.stage == currentStage)
+      return;
+
+    abort();
+
+    final var nameText = name == null ? "" : " '" + name + '\'';
+
+    if (index == functionIndex && stageFunction.stage == currentStage)
     {
-      abort();
-      throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stageFunction.stage +
-          " and order " + stageFunction.order + " for stage function '" + name + '\'');
+      throw new StageRunnerConfigurationException("stage function" + nameText + " for stage " + stageFunction.stage +
+          " and order " + stageFunction.order + " cannot be positioned in front of the current stage function; " +
+          "stage functions preceding it must be added in preStageCallback at the latest");
     }
+
+    throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stageFunction.stage +
+        " and order " + stageFunction.order + (name == null ? "" : " for stage function" + nameText));
   }
 
 
@@ -367,17 +405,25 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
 
       while(!aborted && ++functionIndex < functionArray.size)
       {
-        var stageFunctionEntry = functionArray.functions[functionIndex];
-        var currentStage = stageFunctionEntry.stage;
+        final var currentStage = functionArray.functions[functionIndex].stage;
 
         if (currentStage != lastStage)
         {
-          callback.preStageCallback(this);
+          preStageCallbackActive = true;
+          try {
+            callback.preStageCallback(this);
+          } finally {
+            preStageCallbackActive = false;
+          }
+
           lastStage = currentStage;
 
           if (aborted)
             break;
         }
+
+        // preStageCallback may have inserted stage functions of the current stage in front of the current function
+        final var stageFunctionEntry = functionArray.functions[functionIndex];
 
         functionArray.executionState[functionIndex] = EXECUTING;
 

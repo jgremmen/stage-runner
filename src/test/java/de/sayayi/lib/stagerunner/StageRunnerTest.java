@@ -211,6 +211,93 @@ class StageRunnerTest
 
 
   @Test
+  @DisplayName("Stage function added in front of the first function of a stage in preStageCallback is executed first")
+  void addInFrontOfFirstFunctionInPreStageCallback()
+  {
+    val factory = new MyStageRunnerFactory();
+    val log = new ArrayList<String>();
+
+    factory.addStageFunction(START, "S", ctx -> log.add("S"));
+    factory.addStageFunction(PROCESS, 10, "P", ctx -> log.add("P"));
+
+    assertTrue(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void preStageCallback(@NotNull StageContext<TestStage> stageContext)
+      {
+        if (stageContext.getCurrentStage() == PROCESS)
+          stageContext.addStageFunction(PROCESS, 5, "early", ctx -> log.add("early"));
+      }
+
+      @Override
+      public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext, String description) {
+        log.add(">" + description);
+      }
+    }));
+
+    assertEquals(asList(">S", "S", ">early", "early", ">P", "P"), log);
+  }
+
+
+  @Test
+  @DisplayName("Stage function added in front of the next function in preStageFunctionCallback is rejected")
+  void addInFrontOfNextFunctionInPreStageFunctionCallbackIsRejected()
+  {
+    val factory = new MyStageRunnerFactory();
+    val functions = new ArrayList<StageContext.Function<TestStage>>();
+    val exceptions = new ArrayList<StageRunnerConfigurationException>();
+
+    factory.addStageFunction(START, "S", ctx -> {});
+    factory.addStageFunction(PROCESS, 10, "P", ctx -> fail());
+
+    assertFalse(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void preStageFunctionCallback(@NotNull StageContext<TestStage> stageContext, String description)
+      {
+        if ("P".equals(description))
+        {
+          exceptions.add(assertThrows(StageRunnerConfigurationException.class,
+              () -> stageContext.addStageFunction(PROCESS, 5, "early", ctx -> fail())));
+          functions.addAll(stageContext.getFunctions());
+        }
+      }
+    }));
+
+    assertEquals(
+        "stage function for stage PROCESS and order 5 cannot be positioned in front of the current stage function; " +
+        "stage functions preceding it must be added in preStageCallback at the latest",
+        exceptions.getFirst().getMessage());
+    assertEquals(asList("S:PROCESSED", "P:EXECUTING"), states(functions));
+  }
+
+
+  @Test
+  @DisplayName("Stage function of a skipped stage added in preStageCallback is rejected")
+  void addToSkippedStageInPreStageCallbackIsRejected()
+  {
+    val factory = new MyStageRunnerFactory();
+    val exceptions = new ArrayList<StageRunnerConfigurationException>();
+
+    factory.addStageFunction(START, "S", ctx -> {});
+    factory.addStageFunction(END, "E", ctx -> fail());
+
+    assertFalse(factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+      @Override
+      public void preStageCallback(@NotNull StageContext<TestStage> stageContext)
+      {
+        // PROCESS has no functions and has been skipped; a function for it would precede the first function of END
+        if (stageContext.getCurrentStage() == END)
+        {
+          exceptions.add(assertThrows(StageRunnerConfigurationException.class,
+              () -> stageContext.addStageFunction(PROCESS, ctx -> fail())));
+        }
+      }
+    }));
+
+    assertEquals("stage runner has passed beyond stage PROCESS and order 1000", exceptions.getFirst().getMessage());
+  }
+
+
+  @Test
   @DisplayName("Function failing with a rejected stage function is marked as failed")
   void rejectedFunctionMarksCurrentFunctionFailed()
   {
