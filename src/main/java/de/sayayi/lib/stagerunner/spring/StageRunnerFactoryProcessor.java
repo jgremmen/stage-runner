@@ -766,16 +766,34 @@ public class StageRunnerFactoryProcessor<R>
   /**
    * Returns the internal stage runner factory, which is populated with the discovered stage functions and used by the
    * stage runner proxy.
+   * <p>
+   * The stage type must be passed explicitly so that a mismatch with the stage type of the stage function annotation is
+   * detected here, instead of failing later when the stage runner is executed.
+   *
+   * @param stageType  stage enumeration type, as returned by {@link StageFunctionAnnotation#getStageType()}, not
+   *                   {@code null}
    *
    * @return  stage runner factory, never {@code null}
    *
-   * @param <S>  stage enumeration type, as returned by {@link StageFunctionAnnotation#getStageType()}
+   * @param <S>  stage enumeration type
+   *
+   * @throws IllegalArgumentException  if {@code stageType} is not the stage type of the stage function annotation
+   * @throws NullPointerException      if {@code stageType} is {@code null}
    *
    * @since 0.4.0
    */
   @Contract(pure = true)
   @SuppressWarnings("unchecked")
-  protected <S extends Enum<S>> @NotNull DefaultStageRunnerFactory<S> getStageRunnerFactory() {
+  protected <S extends Enum<S>> @NotNull DefaultStageRunnerFactory<S> getStageRunnerFactory(@NotNull Class<S> stageType)
+  {
+    final var annotationStageType = stageFunctionAnnotation.getStageType();
+
+    if (requireNonNull(stageType, "stageType must not be null") != annotationStageType)
+    {
+      throw new IllegalArgumentException("stage type " + stageType.getName() + " does not match stage type " +
+          annotationStageType.getName() + " of the stage function annotation");
+    }
+
     return (DefaultStageRunnerFactory<S>)stageRunnerFactory;
   }
 

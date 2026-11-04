@@ -68,6 +68,24 @@ class ProcessorSubclassTest
   }
 
 
+  @Test
+  @DisplayName("Factory accessor rejects a foreign stage type")
+  void foreignStageType()
+  {
+    final var processor = new CustomProcessor();
+
+    assertNotNull(processor.getStageRunnerFactory(TestStage.class));
+    assertThrows(IllegalArgumentException.class, () -> processor.getStageRunnerFactory(ForeignStage.class));
+  }
+
+
+
+
+  enum ForeignStage {
+    OTHER
+  }
+
+
 
 
   @FunctionalInterface
@@ -96,7 +114,7 @@ class ProcessorSubclassTest
 
       if (getStageFunctionFilter().filter(bean, stage, 1, null))
       {
-        final DefaultStageRunnerFactory<TestStage> factory = getStageRunnerFactory();
+        final DefaultStageRunnerFactory<TestStage> factory = getStageRunnerFactory(TestStage.class);
         final StageFunction<TestStage> function = getStageFunctionBuilder()
             .createStageFunction(getStageFunctionAnnotation(), getDataNameTypeMap(), method, bean);
 
