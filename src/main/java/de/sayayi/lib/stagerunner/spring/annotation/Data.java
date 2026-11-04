@@ -54,9 +54,12 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  *     chosen; equally strong matches of different entries are rejected as ambiguous.
  *   </li>
  * </ol>
- * An annotation without name is only allowed on a parameter which can be assigned the stage context, like
- * {@code StageContext}, {@code StageFunctionConfigurer} or {@code Object}. It prevents the parameter from receiving the
- * stage context and continues with the last rule.
+ * Matching by parameter name requires the parameter names to be present in the class file, i.e. the class must be
+ * compiled with {@code -parameters}. Without them, the third rule matches by type only. The parameter names of the
+ * stage runner interface are required as well, unless every data parameter is annotated with a name. An annotation
+ * without name is only allowed on a parameter which can be assigned the stage context, like {@code StageContext},
+ * {@code StageFunctionConfigurer} or {@code Object}. It prevents the parameter from receiving the stage context and
+ * continues with the last rule.
  * <p>
  * All violations are detected at startup and rejected with a
  * {@link de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException StageRunnerConfigurationException}.

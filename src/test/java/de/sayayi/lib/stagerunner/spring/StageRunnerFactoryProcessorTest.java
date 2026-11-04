@@ -63,8 +63,7 @@ class StageRunnerFactoryProcessorTest
   {
     assertEquals(
         MyRunnerInterface.class.getMethod("run", String.class, List.class, int.class),
-        new StageRunnerFactoryProcessor<>(MyRunnerInterface.class, StageDef.class)
-            .findFunctionalInterfaceMethod(MyRunnerInterface.class));
+        StageRunnerFactoryProcessor.findFunctionalInterfaceMethod(MyRunnerInterface.class));
   }
 
 

@@ -354,7 +354,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   /**
    * Resolves the data name and type qualifier for {@code parameter}. A parameter annotated with a named
    * {@link Data @Data} is resolved by that name only. Otherwise, resolution is attempted by the parameter name and
-   * falls back to matching by type if no entry with that name exists.
+   * falls back to matching by type if no entry with that name exists. If the class has been compiled without
+   * {@code -parameters}, the parameter name is not available and the parameter is matched by type only.
    *
    * @param parameter        method parameter, not {@code null}
    * @param parameterType    type descriptor of the method parameter, not {@code null}
@@ -377,7 +378,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
         (nameWithQualifier = findNameWithQualifierByParameterType(parameter, parameterType, dataNameTypeMap)) == null)
     {
       throw new StageRunnerConfigurationException("Unknown data type for parameter " + parameter +
-          "; please specify @Data annotation and/or extend the conversion service");
+          "; please specify @Data annotation and/or extend the conversion service" +
+          missingParameterNameHint(parameter));
     }
 
     return nameWithQualifier;
@@ -386,14 +388,16 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
   /**
    * Resolves the data name and type qualifier for {@code parameter} by matching a {@link Data @Data} annotation or the
-   * parameter name against {@code dataNameTypeMap}.
+   * parameter name against {@code dataNameTypeMap}. The parameter name is only used if it is present in the class file.
+   * Otherwise {@link Parameter#getName()} returns a synthetic name like {@code arg0}, which must not be matched against
+   * the data names.
    *
    * @param parameter        method parameter, not {@code null}
    * @param parameterType    type descriptor of the method parameter, not {@code null}
    * @param dataNameTypeMap  mapping of data names to their types, not {@code null}
    *
    * @return  the resolved data name and qualifier, or {@code null} if the parameter is not annotated with a named
-   *          {@code @Data} and no data entry matches the parameter name
+   *          {@code @Data} and its name is either not present or does not match any data entry
    *
    * @throws StageRunnerConfigurationException  if the {@code @Data} name is unknown, or if the named data entry has a
    *                                            type which cannot be supplied to the parameter
@@ -417,6 +421,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
       throw new StageRunnerConfigurationException("Unknown @Data name '" + dataName + "' for parameter " + parameter);
     }
+
+    if (!parameter.isNamePresent())
+      return null;
 
     var parameterName = parameter.getName();
     if (hasLength(parameterName) && (dataType = dataNameTypeMap.get(parameterName)) != null)
@@ -469,12 +476,33 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
         if (nameWithQualifier.qualifier == nwq2.qualifier && !nameWithQualifier.name.equals(nwq2.name))
         {
           throw new StageRunnerConfigurationException("Ambiguous type for parameter " + parameter +
-              "; please specify @Data annotation");
+              "; please specify @Data annotation" + missingParameterNameHint(parameter));
         }
       }
     }
 
     return nameWithQualifier;
+  }
+
+
+  /**
+   * Returns a hint for an exception message if the name of {@code parameter} is not present in the class file, as the
+   * parameter could not be matched by name in that case.
+   *
+   * @param parameter  method parameter, not {@code null}
+   *
+   * @return  hint, or an empty string if the parameter name is present
+   *
+   * @since 0.4.0
+   */
+  @Contract(pure = true)
+  private static @NotNull String missingParameterNameHint(@NotNull Parameter parameter)
+  {
+    if (parameter.isNamePresent())
+      return "";
+
+    return " (parameter names are not available, compile " +
+        parameter.getDeclaringExecutable().getDeclaringClass().getName() + " with -parameters to match by name)";
   }
 
 

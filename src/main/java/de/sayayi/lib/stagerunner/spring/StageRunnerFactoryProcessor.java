@@ -306,6 +306,9 @@ public class StageRunnerFactoryProcessor<R>
    * <p>
    * A {@code @Data} annotation without name is rejected. Parameters of the stage runner interface method are never
    * assigned the stage context, so the annotation would have no effect.
+   * <p>
+   * This method is invoked from the constructor. It must not be made overridable, as an override would run before the
+   * subclass has been initialized.
    *
    * @param dataAnnotation  optional {@link Data @Data} annotation on the parameter, may be {@code null}
    * @param parameterNames  reflected parameter names of the stage runner interface method, may be {@code null}
@@ -317,7 +320,7 @@ public class StageRunnerFactoryProcessor<R>
    *                                            can be derived for the parameter
    */
   @Contract(pure = true)
-  protected @NotNull String getDataNameForParameter(Data dataAnnotation, String[] parameterNames, int p)
+  private @NotNull String getDataNameForParameter(Data dataAnnotation, String[] parameterNames, int p)
   {
     if (dataAnnotation != null)
     {
@@ -692,7 +695,7 @@ public class StageRunnerFactoryProcessor<R>
    */
   @Contract(pure = true)
   @SuppressWarnings("ExtractMethodRecommender")
-  @NotNull Method findFunctionalInterfaceMethod(@NotNull Class<?> interfaceType)
+  static @NotNull Method findFunctionalInterfaceMethod(@NotNull Class<?> interfaceType)
   {
     if (!interfaceType.isInterface())
       throw new StageRunnerConfigurationException(interfaceType.getName() + " is not an interface");

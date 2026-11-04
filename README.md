@@ -261,6 +261,9 @@ Stage function method parameters may include a `StageContext` and any values fro
 - any other parameter receives the data entry named like the parameter or, if there is none, the entry matching its
   type.
 
+Matching by parameter name requires the classes to be compiled with `-parameters`. Without it, parameters which are
+not annotated with `@Data("name")` are matched by type only.
+
 Values are converted to the parameter type with Spring's `ConversionService` where necessary. `@Data` without a name
 is only allowed on a parameter which could receive the stage context; it keeps the stage context away from that
 parameter. Invalid bindings are rejected at startup. See the `@Data` Javadoc for the complete rules.
