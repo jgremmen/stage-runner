@@ -53,6 +53,7 @@ import java.util.*;
 import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.isAbstract;
+import static java.lang.reflect.Modifier.isStatic;
 import static java.util.Objects.requireNonNull;
 import static org.springframework.aop.framework.AopProxyUtils.ultimateTargetClass;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
@@ -165,6 +166,14 @@ public class StageRunnerFactoryProcessor<R>
    * @since 0.4.0
    */
   private volatile boolean stageFunctionsDiscovered;
+
+  /**
+   * Static stage function methods which have already been analyzed. A static method is exposed by every bean whose
+   * class declares or inherits it, but must be registered only once.
+   *
+   * @since 0.4.0
+   */
+  private final Set<Method> analysedStaticStageFunctions = new HashSet<>();
 
   /** Filter deciding which discovered stage functions are registered; accepts all functions by default. */
   private StageFunctionFilter stageFunctionFilter = (bean, stage, order, name) -> true;
@@ -453,6 +462,9 @@ public class StageRunnerFactoryProcessor<R>
    * function annotation and registers each match. Non-public methods are not considered. Beans whose type cannot carry
    * the annotation according to {@link org.springframework.core.annotation.AnnotationUtils#isCandidateClass(Class,
    * Class) AnnotationUtils.isCandidateClass}, such as JDK types, are skipped without scanning their methods.
+   * <p>
+   * A static stage function method is registered only for the first analyzed bean whose class declares or inherits it.
+   * For any other bean exposing the same method, the method is skipped.
    *
    * @param bean  the bean to inspect, not {@code null}
    *
@@ -470,7 +482,7 @@ public class StageRunnerFactoryProcessor<R>
       return;
 
     for(var method: beanType.getMethods())
-      if (isStageFunction(method))
+      if (isStageFunction(method) && (!isStatic(method.getModifiers()) || analysedStaticStageFunctions.add(method)))
       {
         registerStageFunction(
             findMergedAnnotationAttributes(method, annotationType, false, false),
