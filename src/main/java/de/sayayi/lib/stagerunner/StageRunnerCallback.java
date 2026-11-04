@@ -110,6 +110,11 @@ public interface StageRunnerCallback<S extends Enum<S>>
    * In case of an exception, {@link #stageExceptionHandler(StageContext, Throwable)} or
    * {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)} has already been
    * invoked.
+   * <p>
+   * If the stage function failed with an {@link Error}, or the exception handler threw an exception, that exception is
+   * propagated to the caller of {@link StageRunner#run(java.util.Map, StageRunnerCallback) run}. An exception thrown by
+   * this method does not replace it, but is added to it as {@link Throwable#addSuppressed(Throwable) suppressed}
+   * exception.
    *
    * @param stageContext  stage context, not {@code null}
    */

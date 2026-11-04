@@ -207,7 +207,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     if (state == RUNNING && (index <= functionIndex || processedStages.contains(stage)))
     {
       abort();
-      throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage + " and order " + order);
+      throw new StageRunnerConfigurationException("stage runner has passed beyond stage " + stage +
+          " and order " + order);
     }
 
     functionArray.insert(index, stageFunction);
@@ -379,35 +380,20 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
         }
 
         functionArray.executionState[functionIndex] = EXECUTING;
-        try {
-          callback.preStageFunctionCallback(this, stageFunctionEntry.description);
-        } catch(Throwable ex) {
-          // the stage function has not been executed
-          functionArray.executionState[functionIndex] = WAITING;
-          throw ex;
-        }
 
-        try {
-          if (aborted)
-            functionArray.executionState[functionIndex] = WAITING;
-          else
-            stageFunctionEntry.function.process(this);
-        } catch(Throwable ex) {
-          functionArray.executionState[functionIndex] = FAILED;
+        // if the pre-stage function callback fails, the stage function has not been executed
+        runAndCleanUpOnFailure(
+            () -> callback.preStageFunctionCallback(this, stageFunctionEntry.description),
+            () -> functionArray.executionState[functionIndex] = WAITING);
 
-          if (ex instanceof Error error)
-            throw error;
+        runAndAlwaysFinalize(
+            () -> executeStageFunction(stageFunctionEntry, callback),
+            () -> {
+              if (functionArray.executionState[functionIndex] == EXECUTING)
+                functionArray.executionState[functionIndex] = PROCESSED;
 
-          if (ex instanceof StageRunnerConfigurationException stageRunnerConfigurationException)
-            callback.stageConfigurationExceptionHandler(this, stageRunnerConfigurationException);
-          else
-            callback.stageExceptionHandler(this, ex);
-        } finally {
-          if (functionArray.executionState[functionIndex] == EXECUTING)
-            functionArray.executionState[functionIndex] = PROCESSED;
-
-          callback.postStageFunctionCallback(this);
-        }
+              callback.postStageFunctionCallback(this);
+            });
 
         // the stage has completed if no other function of the same stage follows; the callback is notified while the
         // context still points to the last function of the stage, so it reports the completed stage as current stage
@@ -427,6 +413,91 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
     }
 
     return !aborted;
+  }
+
+
+  /**
+   * Executes the current stage function, unless the execution has been aborted. An exception thrown by the stage
+   * function marks it as failed and is passed to the exception handler of {@code callback}, except for an
+   * {@link Error}, which is rethrown unchanged.
+   *
+   * @param stageFunctionEntry  entry of the current stage function, not {@code null}
+   * @param callback            stage runner callback, not {@code null}
+   *
+   * @throws RuntimeException  any exception thrown by the exception handler of {@code callback}
+   * @throws Error             any error thrown by the stage function
+   */
+  private void executeStageFunction(@NotNull StageOrderFunction<S> stageFunctionEntry,
+                                    @NotNull StageRunnerCallback<S> callback)
+  {
+    if (aborted)
+    {
+      functionArray.executionState[functionIndex] = WAITING;
+      return;
+    }
+
+    try {
+      stageFunctionEntry.function.process(this);
+    } catch(Error error) {
+      functionArray.executionState[functionIndex] = FAILED;
+      throw error;
+    } catch(StageRunnerConfigurationException ex) {
+      functionArray.executionState[functionIndex] = FAILED;
+      callback.stageConfigurationExceptionHandler(this, ex);
+    } catch(Throwable ex) {
+      functionArray.executionState[functionIndex] = FAILED;
+      callback.stageExceptionHandler(this, ex);
+    }
+  }
+
+
+  /**
+   * Runs {@code action}, followed by {@code finalizer} regardless of whether {@code action} has succeeded. This is the
+   * equivalent of a {@code try}/{@code finally} block in which an exception from the {@code finally} part does not
+   * replace the exception from the {@code try} part.
+   * <p>
+   * If {@code action} fails, its exception is propagated and an exception thrown by {@code finalizer} is added to it as
+   * {@link Throwable#addSuppressed(Throwable) suppressed} exception. If {@code action} succeeds, an exception thrown by
+   * {@code finalizer} propagates unchanged.
+   *
+   * @param action     action to run, not {@code null}
+   * @param finalizer  action to run after {@code action}, not {@code null}
+   *
+   * @since 0.4.0
+   */
+  private static void runAndAlwaysFinalize(@NotNull Runnable action, @NotNull Runnable finalizer)
+  {
+    runAndCleanUpOnFailure(action, finalizer);
+    finalizer.run();
+  }
+
+
+  /**
+   * Runs {@code action}. Only if it fails, {@code failureCleanup} is run before the exception of {@code action} is
+   * rethrown. If {@code action} succeeds, {@code failureCleanup} is not run.
+   * <p>
+   * An exception thrown by {@code failureCleanup} does not replace the exception of {@code action}, but is added to it
+   * as {@link Throwable#addSuppressed(Throwable) suppressed} exception.
+   *
+   * @param action          action to run, not {@code null}
+   * @param failureCleanup  action to run if {@code action} fails, not {@code null}
+   *
+   * @since 0.4.0
+   */
+  private static void runAndCleanUpOnFailure(@NotNull Runnable action, @NotNull Runnable failureCleanup)
+  {
+    try {
+      action.run();
+    } catch(Throwable failure) {
+      try {
+        failureCleanup.run();
+      } catch(Throwable cleanupFailure) {
+        if (cleanupFailure != failure)
+          failure.addSuppressed(cleanupFailure);
+      }
+
+      throw failure;
+    }
   }
 
 

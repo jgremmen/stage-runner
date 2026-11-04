@@ -217,7 +217,8 @@ class StageRunnerTest
     val factory = new MyStageRunnerFactory();
     val functions = new ArrayList<StageContext.Function<TestStage>>();
 
-    factory.addStageFunction(START, "S", ctx -> ctx.addStageFunction(INIT, "late", c -> {}));
+    factory.addStageFunction(START, "S", ctx ->
+        ctx.addStageFunction(INIT, "late", c -> {}));
     factory.addStageFunction(END, "E", ctx -> {});
 
     assertThrows(StageRunnerConfigurationException.class,
@@ -251,7 +252,7 @@ class StageRunnerTest
             throw exception;
           }
         })));
-    assertEquals(asList("S:WAITING", "E:WAITING"), states(contexts.get(0).getFunctions()));
+    assertEquals(asList("S:WAITING", "E:WAITING"), states(contexts.getFirst().getFunctions()));
   }
 
 
@@ -362,6 +363,70 @@ class StageRunnerTest
 
     assertEquals(emptyList(), handled);
     assertEquals(asList("S:FAILED", "E:WAITING"), states(functions));
+  }
+
+
+  @Test
+  @DisplayName("Exception from postStageFunctionCallback does not mask an error thrown by a stage function")
+  void postStageFunctionCallbackDoesNotMaskError()
+  {
+    val factory = new MyStageRunnerFactory();
+    val error = new StackOverflowError();
+    val callbackException = new IllegalStateException("callback");
+
+    factory.addStageFunction(START, ctx -> { throw error; });
+
+    assertSame(error, assertThrows(StackOverflowError.class,
+        () -> factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+          @Override
+          public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+            throw callbackException;
+          }
+        })));
+
+    assertArrayEquals(new Throwable[] { callbackException }, error.getSuppressed());
+  }
+
+
+  @Test
+  @DisplayName("Exception from postStageFunctionCallback does not mask the exception of the exception handler")
+  void postStageFunctionCallbackDoesNotMaskHandlerException()
+  {
+    val factory = new MyStageRunnerFactory();
+    val failure = new IllegalArgumentException("boom");
+    val callbackException = new IllegalStateException("callback");
+
+    factory.addStageFunction(START, ctx -> { throw failure; });
+
+    val ex = assertThrows(StageRunnerException.class,
+        () -> factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+          @Override
+          public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+            throw callbackException;
+          }
+        }));
+
+    assertSame(failure, ex.getCause());
+    assertArrayEquals(new Throwable[] { callbackException }, ex.getSuppressed());
+  }
+
+
+  @Test
+  @DisplayName("Exception from postStageFunctionCallback propagates if the stage function succeeded")
+  void postStageFunctionCallbackExceptionPropagates()
+  {
+    val factory = new MyStageRunnerFactory();
+    val callbackException = new IllegalStateException("callback");
+
+    factory.addStageFunction(START, ctx -> {});
+
+    assertSame(callbackException, assertThrows(IllegalStateException.class,
+        () -> factory.createRunner().run(emptyMap(), new StageRunnerCallback<>() {
+          @Override
+          public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+            throw callbackException;
+          }
+        })));
   }
 
 
