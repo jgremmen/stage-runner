@@ -25,7 +25,9 @@ publishOnCentral {
   afterEvaluate {
     projectLongName = "${project.description}"
   }
-  projectDescription = 'Stage Runner Framework'
+  projectDescription = 'Lightweight Java library for executing ordered stage functions grouped by the constants ' +
+                       'of a user-defined stage enum, with shared data, dynamic registration, callbacks and an ' +
+                       'optional Spring integration for annotated bean methods'
 
   licenseName = 'Apache License, Version 2.0'
   licenseUrl = 'https://www.apache.org/licenses/LICENSE-2.0'
