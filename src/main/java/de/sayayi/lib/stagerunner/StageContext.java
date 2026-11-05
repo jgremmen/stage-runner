@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Predicate;
 
+import static java.util.Objects.requireNonNull;
+
 
 /**
  * Context of a single stage runner execution, passed to every {@link StageFunction} and {@link StageRunnerCallback}
@@ -83,6 +85,8 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    * @param name  data name, not {@code null}
    *
    * @return  data value for name {@code name} or {@code null} if no data is available
+   *
+   * @throws NullPointerException  if {@code name} is {@code null}
    *
    * @param <T>  data type
    *
@@ -168,6 +172,7 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    * @return  {@code true} if a stage function with {@code name} exists and has been enabled by this invocation,
    *          {@code false} otherwise
    *
+   * @throws NullPointerException               if {@code name} is {@code null}
    * @throws StageRunnerConfigurationException  if the stage runner has terminated or has already passed beyond the
    *                                            stage and order of the stage function
    *
@@ -175,8 +180,11 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    *
    * @see #enableNamedStageFunctions(Predicate)
    */
-  default boolean enableNamedStageFunction(@NotNull String name) {
-    return !enableNamedStageFunctions(n -> n.equals(name)).isEmpty();
+  default boolean enableNamedStageFunction(@NotNull String name)
+  {
+    requireNonNull(name, "name must not be null");
+
+    return !enableNamedStageFunctions(name::equals).isEmpty();
   }
 
 
@@ -191,6 +199,7 @@ public interface StageContext<S extends Enum<S>> extends StageFunctionConfigurer
    * @return  a set with the stage function names which have been enabled as a result of this invocation, never
    *          {@code null}
    *
+   * @throws NullPointerException               if {@code nameFilter} is {@code null}
    * @throws StageRunnerConfigurationException  if the stage runner has terminated or has already passed beyond the
    *                                            stage and order of an accepted stage function. In the latter case none
    *                                            of the accepted stage functions is enabled

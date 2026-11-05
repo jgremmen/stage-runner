@@ -398,6 +398,8 @@ Notes:
   lazy `@Bean` method returning an interface whose implementation declares the stage functions is therefore skipped.
   Declare the implementation class as return type, or enable `setCreateLazySingletons` to instantiate all of them.
   Beans of other scopes are not considered.
+- Only beans of the application context the processor is registered in are discovered. Beans of a parent context,
+  e.g. the root context of a Spring MVC application, are not.
 - Static methods are supported and registered once, even if several beans expose them.
 - Beans proxied by Spring AOP are supported. For JDK dynamic proxies, the stage function method must be exposed by
   one of the proxy interfaces.

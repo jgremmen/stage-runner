@@ -128,7 +128,7 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   @SuppressWarnings("unchecked")
   public <T> T getData(@NotNull String name) {
-    return (T)data.get(name);
+    return (T)data.get(requireNonNull(name, "name must not be null"));
   }
 
 
@@ -232,6 +232,8 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public @NotNull Set<String> enableNamedStageFunctions(@NotNull Predicate<String> nameFilter)
   {
+    requireNonNull(nameFilter, "nameFilter must not be null");
+
     if (state.isTerminated())
       throw new StageRunnerConfigurationException("stage runner has terminated");
 
@@ -268,10 +270,12 @@ final class StageContextImpl<S extends Enum<S>> implements StageContext<S>
   @Override
   public boolean enableNamedStageFunction(@NotNull String name)
   {
+    requireNonNull(name, "name must not be null");
+
     if (state.isTerminated())
       throw new StageRunnerConfigurationException("stage runner has terminated");
 
-    if (enabledStageFunctionNames.contains(requireNonNull(name, "name must not be null")))
+    if (enabledStageFunctionNames.contains(name))
       return false;
 
     final var stageFunction = stageRunnerFactory.namedStageFunction(name);

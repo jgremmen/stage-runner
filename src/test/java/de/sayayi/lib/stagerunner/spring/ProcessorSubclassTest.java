@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * protected accessors.
  * <p>
  * It also covers the rejection of a stage type which does not match the stage function annotation when accessing the
- * stage runner factory.
+ * stage runner factory, and that the record of analyzed beans is released after discovery.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0
@@ -68,6 +68,24 @@ class ProcessorSubclassTest
       // the subclass registered the function with a fixed order instead of the annotated one
       assertEquals(List.of("INIT#1"), processor.registered);
       assertEquals(List.of("value"), context.getBean(SubclassBean.class).log);
+    }
+  }
+
+
+  @Test
+  @DisplayName("Bean analyzed during discovery is analyzed again after discovery")
+  void analyseAfterDiscovery()
+  {
+    try(var context = new AnnotationConfigApplicationContext(SubclassConfiguration.class)) {
+      final var processor = context.getBean(CustomProcessor.class);
+      final var bean = context.getBean(SubclassBean.class);
+
+      assertEquals(List.of("INIT#1"), processor.registered);
+
+      // the bookkeeping of discovery has been released, so the bean is not recognized as already analyzed
+      processor.analyseStageFunctions(bean);
+
+      assertEquals(List.of("INIT#1", "INIT#1"), processor.registered);
     }
   }
 

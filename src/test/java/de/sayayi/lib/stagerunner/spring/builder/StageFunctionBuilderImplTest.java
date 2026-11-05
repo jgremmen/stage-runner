@@ -215,15 +215,17 @@ class StageFunctionBuilderImplTest
   }
 
 
-  @SuppressWarnings("SameParameterValue")
+  @SuppressWarnings({"SameParameterValue", "unchecked", "rawtypes"})
   private Object dataBinding(String name, TypeDescriptor type) throws ReflectiveOperationException
   {
+    final var typeQualifierType = (Class<? extends Enum>)Class
+        .forName(StageFunctionBuilderImpl.class.getName() + "$TypeQualifier");
     final var constructor = Class
         .forName(StageFunctionBuilderImpl.class.getName() + "$DataBinding")
-        .getDeclaredConstructor(String.class, StageFunctionBuilderImpl.TypeQualifier.class, TypeDescriptor.class);
+        .getDeclaredConstructor(String.class, typeQualifierType, TypeDescriptor.class);
     constructor.setAccessible(true);
 
-    return constructor.newInstance(name, StageFunctionBuilderImpl.TypeQualifier.IDENTICAL, type);
+    return constructor.newInstance(name, Enum.valueOf(typeQualifierType, "IDENTICAL"), type);
   }
 
 

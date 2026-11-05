@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 import static de.sayayi.lib.stagerunner.TestStage.*;
@@ -33,7 +34,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests that {@code null} arguments are rejected where they are passed to the stage runner API.
  * <p>
  * Covered are the stage runner factory (stage enum type, regular and named stage functions), the stage context (adding
- * stage functions) and the stage runner (factory, data map and callback).
+ * stage functions, data access and enabling named stage functions) and the stage runner (factory, data map and
+ * callback).
  *
  * @author Jeroen Gremmen
  * @since 0.4.0
@@ -89,6 +91,43 @@ class NullContractTest
     factory.addStageFunction(INIT, ctx -> {
       assertNullRejected("stage", () -> ctx.addStageFunction(null, c -> {}));
       assertNullRejected("function", () -> ctx.addStageFunction(END, null));
+      executed.add("INIT");
+    });
+
+    assertTrue(factory.createRunner().run(emptyMap()));
+    assertEquals(List.of("INIT"), executed);
+  }
+
+
+  @Test
+  @DisplayName("Stage context rejects a null data name independent of the data map")
+  void contextGetData()
+  {
+    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    var executed = new ArrayList<String>();
+
+    factory.addStageFunction(INIT, ctx -> {
+      assertNullRejected("name", () -> ctx.getData(null));
+      executed.add("INIT");
+    });
+
+    // a hash map accepts null keys, so the rejection must not depend on the data map
+    assertTrue(factory.createRunner().run(new HashMap<>()));
+    assertTrue(factory.createRunner().run(emptyMap()));
+    assertEquals(List.of("INIT", "INIT"), executed);
+  }
+
+
+  @Test
+  @DisplayName("Stage context rejects a null name or name filter, even without named stage functions")
+  void contextEnableNamedStageFunctions()
+  {
+    var factory = new DefaultStageRunnerFactory<>(TestStage.class);
+    var executed = new ArrayList<String>();
+
+    factory.addStageFunction(INIT, ctx -> {
+      assertNullRejected("name", () -> ctx.enableNamedStageFunction(null));
+      assertNullRejected("nameFilter", () -> ctx.enableNamedStageFunctions(null));
       executed.add("INIT");
     });
 

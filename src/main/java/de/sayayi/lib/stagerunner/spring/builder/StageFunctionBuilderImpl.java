@@ -827,7 +827,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * Describes how a data map value fits a method parameter. The declaration order also reflects the match strength: an
    * earlier constant is a stronger match than a later one.
    */
-  public enum TypeQualifier
+  private enum TypeQualifier
   {
     /** The parameter type and the data value type are identical. */
     IDENTICAL,

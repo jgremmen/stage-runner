@@ -17,6 +17,8 @@ package de.sayayi.lib.stagerunner.exception;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Serial;
+
 
 /**
  * Base class for all exceptions thrown by the stage runner library.
@@ -30,6 +32,10 @@ import org.jetbrains.annotations.NotNull;
  */
 public class StageRunnerException extends RuntimeException
 {
+  @Serial
+  private static final long serialVersionUID = -2868347670902944275L;
+
+
   /**
    * Constructs a new stage runner exception with the specified detail message.
    * The cause is not initialized, and may subsequently be initialized by a call to {@link #initCause}.

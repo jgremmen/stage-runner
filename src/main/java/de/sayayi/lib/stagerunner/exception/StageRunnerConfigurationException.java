@@ -17,6 +17,8 @@ package de.sayayi.lib.stagerunner.exception;
 
 import org.jetbrains.annotations.NotNull;
 
+import java.io.Serial;
+
 
 /**
  * Exception thrown when a stage runner or its stage functions are configured incorrectly.
@@ -29,6 +31,10 @@ import org.jetbrains.annotations.NotNull;
  */
 public class StageRunnerConfigurationException extends StageRunnerException
 {
+  @Serial
+  private static final long serialVersionUID = 6572383369734890799L;
+
+
   /**
    * Constructs a new stage runner configuration exception with the specified detail message.
    * The cause is not initialized, and may subsequently be initialized by a call to {@link #initCause}.

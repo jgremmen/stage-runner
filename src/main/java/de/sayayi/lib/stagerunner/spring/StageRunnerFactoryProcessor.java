@@ -187,7 +187,7 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Static stage function methods which have already been analyzed. A static method is exposed by every bean whose
-   * class declares or inherits it, but must be registered only once.
+   * class declares or inherits it, but must be registered only once. Cleared once discovery has completed.
    *
    * @since 0.4.0
    */
@@ -195,7 +195,7 @@ public class StageRunnerFactoryProcessor<R>
 
   /**
    * Bean instances which have already been analyzed, compared by identity. A bean instance exposed by more than one
-   * bean name is analyzed only once.
+   * bean name is analyzed only once. Cleared once discovery has completed.
    *
    * @since 0.4.1
    */
@@ -459,8 +459,9 @@ public class StageRunnerFactoryProcessor<R>
    *     non-singleton scopes alike.
    *   </li>
    * </ul>
-   * Non singleton beans are skipped. Until this method has completed, running the stage runner fails with a
-   * {@link StageRunnerException}.
+   * Non singleton beans are skipped. Only beans of the bean factory owning this processor are discovered; beans of a
+   * parent bean factory, like the root application context of a web application, are not. Until this method has
+   * completed, running the stage runner fails with a {@link StageRunnerException}.
    *
    * @throws StageRunnerConfigurationException  if a stage function of a bean cannot be registered
    * @throws IllegalStateException              if the owning bean factory is not a
@@ -507,6 +508,10 @@ public class StageRunnerFactoryProcessor<R>
       }
     }
 
+    // the bookkeeping is only needed during discovery and would otherwise keep every analyzed bean reachable
+    analysedBeans.clear();
+    analysedStaticStageFunctions.clear();
+
     stageFunctionsDiscovered = true;
   }
 
@@ -522,6 +527,10 @@ public class StageRunnerFactoryProcessor<R>
    * <p>
    * Each bean instance is analyzed only once, so a bean instance which is exposed by more than one bean name has its
    * stage functions registered only once. Different proxies for the same target are different bean instances.
+   * <p>
+   * Both rules only apply during discovery in {@link #afterSingletonsInstantiated()}. The record of analyzed beans and
+   * static methods is released once discovery has completed, so a later invocation, for example by a subclass,
+   * analyzes the bean again and registers its stage functions, including static ones, once more.
    *
    * @param bean  the bean to inspect, not {@code null}
    *
