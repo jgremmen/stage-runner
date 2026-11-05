@@ -391,8 +391,11 @@ Once all non-lazy singletons have been instantiated, the processor:
 
 Notes:
 
-- Lazy-init singletons and objects created by factory beans are only instantiated if their type declares stage
-  functions. Beans of other scopes are not considered.
+- Lazy-init singletons and objects created by factory beans are only instantiated if their *declared* type (the
+  return type of the `@Bean` method, the bean class or the factory bean's object type) declares stage functions. A
+  lazy `@Bean` method returning an interface whose implementation declares the stage functions is therefore skipped.
+  Declare the implementation class as return type, or enable `setCreateLazySingletons` to instantiate all of them.
+  Beans of other scopes are not considered.
 - Static methods are supported and registered once, even if several beans expose them.
 - Beans proxied by Spring AOP are supported. For JDK dynamic proxies, the stage function method must be exposed by
   one of the proxy interfaces.
@@ -410,11 +413,13 @@ Notes:
 | `setStageFunctionNameGenerator`     | Derives the stage function name from the annotation attributes and the method.                |
 | `setConversionService`              | Conversion service for parameter values (default: the unique `ConversionService` bean, or the shared default conversion service). |
 | `setCopyInterfaceMethodAnnotations` | Copies the annotations of the runner interface method to the generated proxy method.          |
+| `setCreateLazySingletons`           | Instantiates all lazy-init singletons and factory bean products during discovery, regardless of their declared type. |
 | `setStageFunctionBuilder`           | Replaces the default stage function builder.                                                  |
 | `setStageRunnerProxyBuilder`        | Replaces the default runner proxy builder.                                                    |
 
 `setConversionService` and `setCopyInterfaceMethodAnnotations` only affect the default builders and must be invoked
-before the corresponding builder exists. For further customization, subclass the processor and use its protected
+before the corresponding builder exists. `setCreateLazySingletons` must be invoked before the stage functions are
+discovered. For further customization, subclass the processor and use its protected
 methods.
 
 The generated proxy implements `FactoryAccessor`, which gives access to the underlying factory for registering

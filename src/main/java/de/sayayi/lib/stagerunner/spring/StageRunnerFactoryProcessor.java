@@ -80,9 +80,10 @@ import static org.springframework.util.StringUtils.hasLength;
  * function annotation. Matching methods are turned into stage functions and registered with an internal
  * {@link StageRunnerFactory} which the proxy delegates to. Only public methods, including inherited ones, are
  * considered. The annotation may also be inherited from an overridden or implemented method or be present as a
- * meta-annotation of a composed annotation (see {@link #isStageFunction(Method)}). Lazy-init singletons declaring stage
- * functions are created at that point; lazy-init singletons without stage functions are not. The stage runner cannot be
- * run before the stage functions have been discovered (see {@link #afterSingletonsInstantiated()}).
+ * meta-annotation of a composed annotation (see {@link #isStageFunction(Method)}). Lazy-init singletons whose declared
+ * type has stage functions are created at that point; other lazy-init singletons are not, unless
+ * {@link #setCreateLazySingletons(boolean) setCreateLazySingletons} is enabled. The stage runner cannot be run before
+ * the stage functions have been discovered (see {@link #afterSingletonsInstantiated()}).
  * <p>
  * The behavior can be customized by supplying a {@link StageFunctionFilter}, a {@link StageFunctionBuilder}, a
  * {@link StageRunnerProxyBuilder}, a {@link ConversionService} or a stage function name generator through the various
@@ -173,6 +174,14 @@ public class StageRunnerFactoryProcessor<R>
    * @since 0.4.0
    */
   private volatile boolean stageFunctionsDiscovered;
+
+  /**
+   * Whether singletons which have not been created yet are created during discovery, regardless of their declared
+   * type.
+   *
+   * @since 0.4.1
+   */
+  private boolean createLazySingletons;
 
   /**
    * Static stage function methods which have already been analyzed. A static method is exposed by every bean whose
@@ -436,7 +445,11 @@ public class StageRunnerFactoryProcessor<R>
    *   </li>
    *   <li>
    *     Singletons which have not been created yet, like lazy-init singletons or objects created by factory beans, are
-   *     analyzed by type. They are only created if they declare stage functions.
+   *     analyzed by their declared type: the return type of a {@code @Bean} method, the bean class or the object type
+   *     of a factory bean. They are only created if the declared type has stage functions. Stage functions declared
+   *     only by the actual class of the bean, for example a subclass of an interface typed {@code @Bean} method, are
+   *     therefore not found. Enable {@link #setCreateLazySingletons(boolean) setCreateLazySingletons} to create these
+   *     singletons regardless of their declared type.
    *   </li>
    *   <li>
    *     The target bean of a scoped proxy ({@code scopedTarget.*}) is skipped. Its stage functions are discovered and
@@ -478,8 +491,13 @@ public class StageRunnerFactoryProcessor<R>
               beanType = targetType;
           }
 
-          if (beanType != null && hasStageFunctions(ClassUtils.getUserClass(beanType)))
+          if (createLazySingletons || beanType != null && hasStageFunctions(ClassUtils.getUserClass(beanType)))
             analyseStageFunctions(listableBeanFactory.getBean(beanName));
+          else if (logger.isDebugEnabled())
+          {
+            logger.debug("skip bean '" + beanName + "' which has not been created yet: declared type " +
+                (beanType == null ? "unknown" : beanType.getName()) + " has no stage functions");
+          }
         }
       } catch(StageRunnerConfigurationException ex) {
         throw new StageRunnerConfigurationException(
@@ -1069,6 +1087,34 @@ public class StageRunnerFactoryProcessor<R>
     }
 
     this.copyInterfaceMethodAnnotations = copyInterfaceMethodAnnotations;
+  }
+
+
+  /**
+   * Controls whether singletons which have not been created yet are created during discovery, regardless of their
+   * declared type. This affects lazy-init singletons and objects created by factory beans. The setting is disabled by
+   * default.
+   * <p>
+   * If disabled, such a singleton is only created if its declared type (the return type of a {@code @Bean} method, the
+   * bean class or the object type of a factory bean) has stage functions. If the stage functions are declared only by
+   * the actual class of the bean, they are not discovered. Enabling this setting creates every such singleton, so its
+   * actual class is analyzed, at the cost of no longer creating lazy-init singletons lazily. Alternatively, declare the
+   * actual class as the return type of the {@code @Bean} method.
+   *
+   * @param createLazySingletons  {@code true} to create all singletons during discovery, {@code false} to create only
+   *                              singletons whose declared type has stage functions
+   *
+   * @throws IllegalStateException  if the stage functions have already been discovered
+   *
+   * @since 0.4.1
+   */
+  @Contract(mutates = "this")
+  public void setCreateLazySingletons(boolean createLazySingletons)
+  {
+    if (stageFunctionsDiscovered)
+      throw new IllegalStateException("create lazy singletons must be set before the stage functions are discovered");
+
+    this.createLazySingletons = createLazySingletons;
   }
 
 
