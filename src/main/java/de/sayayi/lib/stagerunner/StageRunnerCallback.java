@@ -42,7 +42,7 @@ import org.jetbrains.annotations.NotNull;
  *     failed
  *   </li>
  *   <li>
- *     {@link #postStageFunctionCallback(StageContext)}
+ *     {@link #postStageFunctionCallback(StageContext)}, unless {@code preStageFunctionCallback} has thrown an exception
  *   </li>
  *   <li>
  *     {@link #postStageCallback(StageContext, Enum)}, if the function is the last one of its stage and the execution
@@ -105,6 +105,10 @@ public interface StageRunnerCallback<S extends Enum<S>>
    * If the execution is {@link StageContext#abort() aborted} by this method, the stage function is not executed and
    * remains {@link StageContext.FunctionState#WAITING waiting}. {@link #postStageFunctionCallback(StageContext)} is
    * still invoked.
+   * <p>
+   * If this method throws an exception, the stage function is not executed and remains
+   * {@link StageContext.FunctionState#WAITING waiting}, {@link #postStageFunctionCallback(StageContext)} is not invoked
+   * and the exception is propagated to the caller of {@link StageRunner#run(java.util.Map, StageRunnerCallback) run}.
    *
    * @param stageContext  stage context, not {@code null}
    * @param description   optional description for the stage function which was provided on
@@ -117,6 +121,10 @@ public interface StageRunnerCallback<S extends Enum<S>>
 
   /**
    * Notifies the callback after a stage function has been executed, regardless of whether it has succeeded.
+   * <p>
+   * The method is not invoked if {@link #preStageFunctionCallback(StageContext, String) preStageFunctionCallback} has
+   * thrown an exception, as the stage function has not been executed then. Resources acquired in
+   * {@code preStageFunctionCallback} must therefore be released there if it fails.
    * <p>
    * In case of an exception, {@link #stageExceptionHandler(StageContext, Throwable)} or
    * {@link #stageConfigurationExceptionHandler(StageContext, StageRunnerConfigurationException)} has already been

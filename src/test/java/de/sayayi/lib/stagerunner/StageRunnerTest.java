@@ -329,12 +329,13 @@ class StageRunnerTest
 
 
   @Test
-  @DisplayName("Function remains waiting if preStageFunctionCallback fails")
+  @DisplayName("Function remains waiting and postStageFunctionCallback is skipped if preStageFunctionCallback fails")
   void failingPreStageFunctionCallbackKeepsFunctionWaiting()
   {
     val factory = new MyStageRunnerFactory();
     val contexts = new ArrayList<StageContext<TestStage>>();
     val exception = new IllegalStateException("callback failed");
+    val postStageFunctionCallbacks = new ArrayList<StageContext<TestStage>>();
 
     factory.addStageFunction(START, "S", ctx -> fail());
     factory.addStageFunction(END, "E", ctx -> fail());
@@ -347,8 +348,15 @@ class StageRunnerTest
             contexts.add(stageContext);
             throw exception;
           }
+
+
+          @Override
+          public void postStageFunctionCallback(@NotNull StageContext<TestStage> stageContext) {
+            postStageFunctionCallbacks.add(stageContext);
+          }
         })));
     assertEquals(asList("S:WAITING", "E:WAITING"), states(contexts.getFirst().getFunctions()));
+    assertTrue(postStageFunctionCallbacks.isEmpty(), "postStageFunctionCallback must not be invoked");
   }
 
 

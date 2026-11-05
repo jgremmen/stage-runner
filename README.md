@@ -228,7 +228,9 @@ For each stage function, the callback methods are invoked in this order:
 1. `preStageCallback`, if the function is the first one of its stage.
 2. `preStageFunctionCallback`.
 3. `stageExceptionHandler` or `stageConfigurationExceptionHandler`, if the function has failed.
-4. `postStageFunctionCallback`, regardless of whether the function has succeeded.
+4. `postStageFunctionCallback`, regardless of whether the function has succeeded. It is not invoked if
+   `preStageFunctionCallback` has thrown an exception; the function is then not executed and the exception is
+   propagated to the caller of `run`.
 5. `postStageCallback`, if the function is the last one of its stage and the run has neither been aborted nor
    terminated by an exception.
 
