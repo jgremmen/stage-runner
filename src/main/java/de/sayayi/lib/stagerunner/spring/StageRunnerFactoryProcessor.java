@@ -32,6 +32,9 @@ import org.apache.commons.logging.LogFactory;
 import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Unmodifiable;
+import org.springframework.aop.framework.Advised;
+import org.springframework.aop.scope.ScopedObject;
+import org.springframework.aop.target.AbstractBeanFactoryBasedTargetSource;
 import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.BeanFactoryAware;
 import org.springframework.beans.factory.InitializingBean;
@@ -54,8 +57,12 @@ import java.util.function.BiFunction;
 
 import static java.lang.reflect.Modifier.isAbstract;
 import static java.lang.reflect.Modifier.isStatic;
+import static java.util.Collections.newSetFromMap;
 import static java.util.Objects.requireNonNull;
 import static org.springframework.aop.framework.AopProxyUtils.ultimateTargetClass;
+import static org.springframework.aop.framework.autoproxy.AutoProxyUtils.determineTargetClass;
+import static org.springframework.aop.scope.ScopedProxyUtils.getTargetBeanName;
+import static org.springframework.aop.scope.ScopedProxyUtils.isScopedTarget;
 import static org.springframework.beans.factory.config.ConfigurableBeanFactory.SCOPE_SINGLETON;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
 import static org.springframework.core.ResolvableType.forMethodParameter;
@@ -174,6 +181,14 @@ public class StageRunnerFactoryProcessor<R>
    * @since 0.4.0
    */
   private final Set<Method> analysedStaticStageFunctions = new HashSet<>();
+
+  /**
+   * Bean instances which have already been analyzed, compared by identity. A bean instance exposed by more than one
+   * bean name is analyzed only once.
+   *
+   * @since 0.4.1
+   */
+  private final Set<Object> analysedBeans = newSetFromMap(new IdentityHashMap<>());
 
   /** Filter deciding which discovered stage functions are registered; accepts all functions by default. */
   private StageFunctionFilter stageFunctionFilter = (bean, stage, order, name) -> true;
@@ -423,6 +438,11 @@ public class StageRunnerFactoryProcessor<R>
    *     Singletons which have not been created yet, like lazy-init singletons or objects created by factory beans, are
    *     analyzed by type. They are only created if they declare stage functions.
    *   </li>
+   *   <li>
+   *     The target bean of a scoped proxy ({@code scopedTarget.*}) is skipped. Its stage functions are discovered and
+   *     invoked through the scoped proxy, which is the bean exposed to the application. This works for singleton and
+   *     non-singleton scopes alike.
+   *   </li>
    * </ul>
    * Non singleton beans are skipped. Until this method has completed, running the stage runner fails with a
    * {@link StageRunnerException}.
@@ -441,12 +461,23 @@ public class StageRunnerFactoryProcessor<R>
 
     for(var beanName: listableBeanFactory.getBeanNamesForType(Object.class, false, false))
     {
+      // the target of a scoped proxy is analyzed through its scoped proxy
+      if (isScopedTarget(beanName))
+        continue;
+
       try {
         if (listableBeanFactory.containsSingleton(beanName) && !listableBeanFactory.isFactoryBean(beanName))
           analyseStageFunctions(listableBeanFactory.getBean(beanName));
         else
         {
           var beanType = listableBeanFactory.getType(beanName, false);
+          if (beanType != null && ScopedObject.class.isAssignableFrom(beanType))
+          {
+            var targetType = determineTargetClass(listableBeanFactory, getTargetBeanName(beanName));
+            if (targetType != null)
+              beanType = targetType;
+          }
+
           if (beanType != null && hasStageFunctions(ClassUtils.getUserClass(beanType)))
             analyseStageFunctions(listableBeanFactory.getBean(beanName));
         }
@@ -468,6 +499,9 @@ public class StageRunnerFactoryProcessor<R>
    * <p>
    * A static stage function method is registered only for the first analyzed bean whose class declares or inherits it.
    * For any other bean exposing the same method, the method is skipped.
+   * <p>
+   * Each bean instance is analyzed only once, so a bean instance which is exposed by more than one bean name has its
+   * stage functions registered only once. Different proxies for the same target are different bean instances.
    *
    * @param bean  the bean to inspect, not {@code null}
    *
@@ -479,9 +513,9 @@ public class StageRunnerFactoryProcessor<R>
   protected void analyseStageFunctions(@NotNull Object bean)
   {
     final var annotationType = stageFunctionAnnotation.getAnnotationType();
-    final var beanType = ultimateTargetClass(bean);
+    final var beanType = determineStageFunctionType(bean);
 
-    if (!isCandidateClass(beanType, annotationType))
+    if (!isCandidateClass(beanType, annotationType) || !analysedBeans.add(bean))
       return;
 
     for(var method: beanType.getMethods())
@@ -491,6 +525,37 @@ public class StageRunnerFactoryProcessor<R>
             findMergedAnnotationAttributes(method, annotationType, false, false),
             method, bean);
       }
+  }
+
+
+  /**
+   * Determines the class to scan for stage function methods of the given bean.
+   * <p>
+   * For a proxy whose target is obtained from the bean factory, like a scoped proxy, the class is determined from the
+   * target bean definition. The target class reported by the proxy itself depends on whether the target bean had
+   * already been created when the proxy was built: it is either the user class or, if the target is proxied itself, the
+   * generated proxy class. For all other beans, the ultimate target class is used. In either case, a generated CGLIB
+   * subclass is resolved to its user class.
+   *
+   * @param bean  bean to inspect, not {@code null}
+   *
+   * @return  class declaring the stage function methods of {@code bean}, never {@code null}
+   *
+   * @since 0.4.1
+   */
+  @Contract(pure = true)
+  private @NotNull Class<?> determineStageFunctionType(@NotNull Object bean)
+  {
+    if (bean instanceof Advised advised &&
+        advised.getTargetSource() instanceof AbstractBeanFactoryBasedTargetSource targetSource &&
+        beanFactory instanceof ConfigurableListableBeanFactory listableBeanFactory)
+    {
+      var targetType = determineTargetClass(listableBeanFactory, targetSource.getTargetBeanName());
+      if (targetType != null)
+        return ClassUtils.getUserClass(targetType);
+    }
+
+    return ClassUtils.getUserClass(ultimateTargetClass(bean));
   }
 
 
