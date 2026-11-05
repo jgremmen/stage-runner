@@ -67,6 +67,7 @@ import static net.bytebuddy.dynamic.scaffold.subclass.ConstructorStrategy.Defaul
 import static net.bytebuddy.matcher.ElementMatchers.*;
 import static org.springframework.core.BridgeMethodResolver.findBridgedMethod;
 import static org.springframework.core.ResolvableType.forClassWithGenerics;
+import static org.springframework.core.ResolvableType.forMethodParameter;
 import static org.springframework.core.annotation.AnnotatedElementUtils.findMergedAnnotation;
 import static org.springframework.util.StringUtils.hasLength;
 
@@ -142,7 +143,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * A parameter of type {@link StageContext}, which is not annotated with {@link Data @Data}, receives the stage
    * context itself. A {@code @Data} annotation without name is only allowed on a parameter which can be assigned the
    * stage context; it prevents the stage context from being bound and the parameter is resolved as if it was not
-   * annotated. If the method is static, {@code bean} is ignored.
+   * annotated. A parameter annotation which is not declared on {@code stageFunction} itself is inherited from the
+   * corresponding parameter of a method it overrides or implements (see {@link #findDataAnnotations(Method)}). If the
+   * method is static, {@code bean} is ignored.
    * <p>
    * Parameters are bound using {@code stageFunction} as declared on the target class. If {@code bean} is a JDK dynamic
    * proxy, the generated stage function invokes the corresponding interface method on the proxy instead.
@@ -165,6 +168,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       @NotNull Object bean)
   {
     final var methodParameters = stageFunction.getParameters();
+    final var dataAnnotations = findDataAnnotations(stageFunction);
     final var parameters = new ParameterBinding[methodParameters.length];
     final var stageContextType = forClassWithGenerics(
         StageContext.class, stageFunctionAnnotation.getStageType());
@@ -172,7 +176,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     for(var p = 0; p < methodParameters.length; p++)
     {
       final var parameterType = new TypeDescriptor(new MethodParameter(stageFunction, p));
-      final var dataAnnotation = findMergedAnnotation(methodParameters[p], Data.class);
+      final var dataAnnotation = dataAnnotations[p];
       final var acceptsStageContext = parameterType.getResolvableType().isAssignableFrom(stageContextType);
 
       // @Data without a name only serves to prevent the stage context from being bound to the parameter
@@ -190,7 +194,9 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
 
       parameters[p] = isStageContext
           ? new StageContextBinding()
-          : new DataBinding(findNameWithQualifier(methodParameters[p], parameterType, dataNameTypeMap), parameterType);
+          : new DataBinding(
+              findNameWithQualifier(methodParameters[p], dataAnnotation, parameterType, dataNameTypeMap),
+              parameterType);
     }
 
     var invocableMethod = stageFunction;
@@ -216,6 +222,137 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
       throw linkageFailure("failed to generate stage function for method " + methodDescription,
           invocableMethod.getDeclaringClass(), ex);
     }
+  }
+
+
+  /**
+   * Returns the {@link Data @Data} annotation of each parameter of {@code method}.
+   * <p>
+   * The stage function annotation is found on {@code method} even if it is only declared on a method which
+   * {@code method} overrides or implements. Accordingly, a parameter which is not annotated itself inherits the
+   * {@code @Data} annotation of the corresponding parameter of the closest overridden or implemented method declaring
+   * one. Interfaces of a class are searched before its superclass. Static methods do not override and only provide
+   * their own parameter annotations.
+   *
+   * @param method  stage function method, not {@code null}
+   *
+   * @return  array with the {@code @Data} annotation for each parameter, with {@code null} for a parameter without
+   *          annotation, never {@code null}
+   *
+   * @since 0.4.1
+   */
+  @Contract(pure = true)
+  private static Data @NotNull [] findDataAnnotations(@NotNull Method method)
+  {
+    final var parameters = method.getParameters();
+    final var dataAnnotations = new Data[parameters.length];
+    var missingAnnotations = 0;
+
+    for(var p = 0; p < parameters.length; p++)
+      if ((dataAnnotations[p] = findMergedAnnotation(parameters[p], Data.class)) == null)
+        missingAnnotations++;
+
+    if (missingAnnotations > 0 && !Modifier.isStatic(method.getModifiers()))
+    {
+      for(var overriddenMethod: findOverriddenMethods(method))
+      {
+        final var overriddenParameters = overriddenMethod.getParameters();
+
+        for(var p = 0; p < parameters.length; p++)
+          if (dataAnnotations[p] == null &&
+              (dataAnnotations[p] = findMergedAnnotation(overriddenParameters[p], Data.class)) != null &&
+              --missingAnnotations == 0)
+            return dataAnnotations;
+      }
+    }
+
+    return dataAnnotations;
+  }
+
+
+  /**
+   * Returns the methods which {@code method} overrides or implements, closest first. For each class, starting with the
+   * class declaring {@code method}, its interfaces including their super-interfaces are searched before its superclass.
+   *
+   * @param method  instance method, not {@code null}
+   *
+   * @return  overridden or implemented methods, never {@code null}
+   *
+   * @since 0.4.1
+   */
+  @Contract(pure = true)
+  private static @NotNull List<Method> findOverriddenMethods(@NotNull Method method)
+  {
+    final var declaringClass = method.getDeclaringClass();
+    final var types = new LinkedHashSet<Class<?>>();
+
+    for(var type = declaringClass; type != null && type != Object.class; type = type.getSuperclass())
+    {
+      types.add(type);
+      addInterfaces(type, types);
+    }
+
+    types.remove(declaringClass);
+
+    final var overriddenMethods = new ArrayList<Method>();
+
+    for(var type: types)
+      for(var candidate: type.getDeclaredMethods())
+        if (isOverriddenBy(candidate, method))
+          overriddenMethods.add(candidate);
+
+    return overriddenMethods;
+  }
+
+
+  /**
+   * Adds the interfaces implemented by {@code type}, including their super-interfaces, to {@code types}.
+   *
+   * @param type   class or interface, not {@code null}
+   * @param types  set collecting the interfaces, not {@code null}
+   *
+   * @since 0.4.1
+   */
+  private static void addInterfaces(@NotNull Class<?> type, @NotNull Set<Class<?>> types)
+  {
+    for(var interfaceType: type.getInterfaces())
+      if (types.add(interfaceType))
+        addInterfaces(interfaceType, types);
+  }
+
+
+  /**
+   * Tells whether {@code candidate} is overridden or implemented by {@code method}. A generic parameter of
+   * {@code candidate} matches if it resolves to the parameter type of {@code method} in the class declaring
+   * {@code method}.
+   *
+   * @param candidate  method declared by a superclass or an interface, not {@code null}
+   * @param method     overriding method, not {@code null}
+   *
+   * @return  {@code true} if {@code method} overrides or implements {@code candidate}, {@code false} otherwise
+   *
+   * @since 0.4.1
+   */
+  @Contract(pure = true)
+  private static boolean isOverriddenBy(@NotNull Method candidate, @NotNull Method method)
+  {
+    final var modifiers = candidate.getModifiers();
+
+    if (Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers) || candidate.isBridge() ||
+        !candidate.getName().equals(method.getName()) ||
+        candidate.getParameterCount() != method.getParameterCount())
+      return false;
+
+    final var parameterTypes = method.getParameterTypes();
+
+    if (Arrays.equals(candidate.getParameterTypes(), parameterTypes))
+      return true;
+
+    for(var p = 0; p < parameterTypes.length; p++)
+      if (forMethodParameter(candidate, p, method.getDeclaringClass()).resolve() != parameterTypes[p])
+        return false;
+
+    return true;
   }
 
 
@@ -358,6 +495,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * {@code -parameters}, the parameter name is not available and the parameter is matched by type only.
    *
    * @param parameter        method parameter, not {@code null}
+   * @param dataAnnotation   {@code @Data} annotation of the parameter, possibly inherited, or {@code null}
    * @param parameterType    type descriptor of the method parameter, not {@code null}
    * @param dataNameTypeMap  mapping of data names to their types, not {@code null}
    *
@@ -368,11 +506,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    */
   @Contract(pure = true)
   private @NotNull NameWithQualifier findNameWithQualifier(@NotNull Parameter parameter,
+                                                           Data dataAnnotation,
                                                            @NotNull TypeDescriptor parameterType,
                                                            @NotNull Map<String,ResolvableType> dataNameTypeMap)
   {
     var nameWithQualifier =
-        findNameWithQualifierByParameterName(parameter, parameterType, dataNameTypeMap);
+        findNameWithQualifierByParameterName(parameter, dataAnnotation, parameterType, dataNameTypeMap);
 
     if (nameWithQualifier == null &&
         (nameWithQualifier = findNameWithQualifierByParameterType(parameter, parameterType, dataNameTypeMap)) == null)
@@ -393,6 +532,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * the data names.
    *
    * @param parameter        method parameter, not {@code null}
+   * @param dataAnnotation   {@code @Data} annotation of the parameter, possibly inherited, or {@code null}
    * @param parameterType    type descriptor of the method parameter, not {@code null}
    * @param dataNameTypeMap  mapping of data names to their types, not {@code null}
    *
@@ -404,12 +544,12 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    */
   @Contract(pure = true)
   private NameWithQualifier findNameWithQualifierByParameterName(@NotNull Parameter parameter,
+                                                                 Data dataAnnotation,
                                                                  @NotNull TypeDescriptor parameterType,
                                                                  @NotNull Map<String,ResolvableType> dataNameTypeMap)
   {
     ResolvableType dataType;
 
-    var dataAnnotation = findMergedAnnotation(parameter, Data.class);
     if (dataAnnotation != null && hasLength(dataAnnotation.name()))
     {
       var dataName = dataAnnotation.name();

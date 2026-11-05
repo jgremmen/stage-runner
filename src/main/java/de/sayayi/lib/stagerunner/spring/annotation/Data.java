@@ -61,6 +61,10 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
  * {@code StageFunctionConfigurer} or {@code Object}. It prevents the parameter from receiving the stage context and
  * continues with the last rule.
  * <p>
+ * Like the stage function annotation, the annotation is inherited: a stage function parameter without {@code @Data}
+ * uses the annotation of the corresponding parameter of the closest method it overrides or implements, searching the
+ * interfaces of a class before its superclass. An annotation on the stage function parameter itself takes precedence.
+ * <p>
  * All violations are detected at startup and rejected with a
  * {@link de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException StageRunnerConfigurationException}.
  *

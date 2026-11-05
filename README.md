@@ -347,6 +347,10 @@ Stage function method parameters may include a `StageContext` and any values fro
 Matching by parameter name requires the classes to be compiled with `-parameters`. Without it, parameters which are
 not annotated with `@Data("name")` are matched by type only.
 
+Like the stage function annotation, `@Data` is inherited: if the stage function is declared on an interface or
+superclass method, the `@Data` annotations of that method's parameters apply to the implementation as well. An
+annotation on the implementing method's parameter takes precedence.
+
 Values are converted to the parameter type with Spring's `ConversionService` where necessary (in the example above,
 `List<Integer>` is converted to `List<Long>`). `@Data` without a name is only allowed on a parameter which could
 receive the stage context; it keeps the stage context away from that parameter. Invalid bindings are rejected at
