@@ -15,7 +15,6 @@
  */
 package de.sayayi.lib.stagerunner.spring;
 
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 
@@ -44,6 +43,5 @@ public interface StageFunctionFilter
    *
    * @return  {@code true} to register the stage function, {@code false} to skip it
    */
-  @Contract(pure = true)
   boolean filter(@NotNull Object bean, @NotNull Enum<?> stage, int order, String name);
 }

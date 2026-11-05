@@ -17,6 +17,7 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.TestStage;
 import de.sayayi.lib.stagerunner.exception.StageRunnerException;
+import de.sayayi.lib.stagerunner.spring.builder.StageFunctionBuilderImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.FactoryBean;
@@ -27,6 +28,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.core.convert.support.DefaultConversionService;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -38,8 +40,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests the discovery of stage functions on singleton beans independent of their creation time.
  * <p>
  * Covered aspects are the discovery on all kinds of singleton beans, not creating lazy-init singletons without stage
- * functions, creating lazy-init singletons and factory bean products with an interface as declared type on request, and
- * rejecting a stage runner execution before the discovery has completed.
+ * functions, creating lazy-init singletons and factory bean products with an interface as declared type on request,
+ * rejecting changes of discovery settings after the discovery, and rejecting a stage runner execution before the
+ * discovery has completed.
  *
  * @author Jeroen Gremmen
  * @since 0.4.0
@@ -96,13 +99,19 @@ class StageFunctionDiscoveryTest
 
 
   @Test
-  @DisplayName("Creating lazy singletons cannot be changed after discovery")
-  void createLazySingletonsAfterDiscoveryFails()
+  @DisplayName("Discovery settings cannot be changed after discovery")
+  void discoverySettingsAfterDiscoveryFail()
   {
     try(var context = new AnnotationConfigApplicationContext(InterfaceTypedConfiguration.class)) {
       var processor = context.getBean(StageRunnerFactoryProcessor.class);
 
       assertThrows(IllegalStateException.class, () -> processor.setCreateLazySingletons(true));
+      assertThrows(IllegalStateException.class,
+          () -> processor.setStageFunctionFilter((bean, stage, order, name) -> true));
+      assertThrows(IllegalStateException.class,
+          () -> processor.setStageFunctionNameGenerator((attributes, method) -> null));
+      assertThrows(IllegalStateException.class,
+          () -> processor.setStageFunctionBuilder(new StageFunctionBuilderImpl(new DefaultConversionService())));
     }
   }
 

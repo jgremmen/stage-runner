@@ -17,7 +17,6 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageRunnerFactory;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Method;
@@ -61,7 +60,6 @@ public interface StageRunnerProxyBuilder
    *
    * @throws StageRunnerConfigurationException  if the proxy cannot be built for the given interface
    */
-  @Contract(pure = true)
   <R,S extends Enum<S>> @NotNull R createProxy(@NotNull Class<S> stageType,
                                                @NotNull Class<R> stageRunnerInterfaceType,
                                                @NotNull Method stageRunnerInterfaceMethod,

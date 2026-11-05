@@ -17,7 +17,6 @@ package de.sayayi.lib.stagerunner.spring;
 
 import de.sayayi.lib.stagerunner.StageFunction;
 import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
-import org.jetbrains.annotations.Contract;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.core.ResolvableType;
 
@@ -59,7 +58,6 @@ public interface StageFunctionBuilder
    * @throws StageRunnerConfigurationException  if the method cannot be adapted to a stage function, for example when a
    *                                            parameter cannot be matched against the data name/type map
    */
-  @Contract(pure = true)
   <S extends Enum<S>> @NotNull StageFunction<S> createStageFunction(
       @NotNull StageFunctionAnnotation stageFunctionAnnotation,
       @NotNull Map<String,ResolvableType> dataNameTypeMap,

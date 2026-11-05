@@ -62,7 +62,6 @@ abstract class AbstractBuilder
    *
    * @since 0.4.0
    */
-  @Contract(pure = true)
   protected static @NotNull MethodHandles.Lookup hostLookup(@NotNull Class<?> hostClass)
   {
     final var lookup = MethodHandles.lookup();

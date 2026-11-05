@@ -87,7 +87,9 @@ import static org.springframework.util.StringUtils.hasLength;
  * <p>
  * The behavior can be customized by supplying a {@link StageFunctionFilter}, a {@link StageFunctionBuilder}, a
  * {@link StageRunnerProxyBuilder}, a {@link ConversionService} or a stage function name generator through the various
- * setter methods.
+ * setter methods. The processor must be configured before the application context is refreshed, usually in the bean
+ * method creating it. Configuration methods are not thread safe, and settings which affect the discovery of stage
+ * functions are rejected once the stage functions have been discovered.
  * <p>
  * The functional method of the stage runner interface must return {@code boolean} or {@code void}. Its parameters are
  * passed to the stage runner as data, named by the {@link Data @Data} annotation or the parameter name. A parameter of
@@ -402,7 +404,7 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @since 0.4.0
    */
-  protected synchronized @NotNull StageFunctionBuilder getStageFunctionBuilder()
+  protected @NotNull StageFunctionBuilder getStageFunctionBuilder()
   {
     if (stageFunctionBuilder == null)
     {
@@ -746,7 +748,6 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @throws StageRunnerConfigurationException  if the proxy cannot be created
    */
-  @Contract(pure = true)
   @SuppressWarnings("unchecked")
   protected <S extends Enum<S>> @NotNull R createStageRunnerProxy()
   {
@@ -1009,7 +1010,7 @@ public class StageRunnerFactoryProcessor<R>
    * @since 0.3.1
    */
   @Contract(mutates = "this")
-  public synchronized void setConversionService(ConversionService conversionService)
+  public void setConversionService(ConversionService conversionService)
   {
     requireNonNull(conversionService, "conversionService must not be null");
 
@@ -1042,11 +1043,18 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionBuilder  stage function builder, not {@code null}
    *
-   * @throws NullPointerException  if {@code stageFunctionBuilder} is {@code null}
+   * @throws NullPointerException   if {@code stageFunctionBuilder} is {@code null}
+   * @throws IllegalStateException  if the stage functions have already been discovered
    */
   @Contract(mutates = "this")
-  public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder) {
-    this.stageFunctionBuilder = requireNonNull(stageFunctionBuilder, "stageFunctionBuilder must not be null");
+  public void setStageFunctionBuilder(@NotNull StageFunctionBuilder stageFunctionBuilder)
+  {
+    requireNonNull(stageFunctionBuilder, "stageFunctionBuilder must not be null");
+
+    if (stageFunctionsDiscovered)
+      throw new IllegalStateException("stage function builder must be set before the stage functions are discovered");
+
+    this.stageFunctionBuilder = stageFunctionBuilder;
   }
 
 
@@ -1056,11 +1064,18 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionFilter  stage function filter, not {@code null}
    *
-   * @throws NullPointerException  if {@code stageFunctionFilter} is {@code null}
+   * @throws NullPointerException   if {@code stageFunctionFilter} is {@code null}
+   * @throws IllegalStateException  if the stage functions have already been discovered
    */
   @Contract(mutates = "this")
-  public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter) {
-    this.stageFunctionFilter = requireNonNull(stageFunctionFilter, "stageFunctionFilter must not be null");
+  public void setStageFunctionFilter(@NotNull StageFunctionFilter stageFunctionFilter)
+  {
+    requireNonNull(stageFunctionFilter, "stageFunctionFilter must not be null");
+
+    if (stageFunctionsDiscovered)
+      throw new IllegalStateException("stage function filter must be set before the stage functions are discovered");
+
+    this.stageFunctionFilter = stageFunctionFilter;
   }
 
 
@@ -1131,7 +1146,8 @@ public class StageRunnerFactoryProcessor<R>
    *
    * @param stageFunctionNameGenerator  stage function name generator, not {@code null}
    *
-   * @throws NullPointerException  if {@code stageFunctionNameGenerator} is {@code null}
+   * @throws NullPointerException   if {@code stageFunctionNameGenerator} is {@code null}
+   * @throws IllegalStateException  if the stage functions have already been discovered
    *
    * @since 0.3.2
    */
@@ -1139,7 +1155,14 @@ public class StageRunnerFactoryProcessor<R>
   public void setStageFunctionNameGenerator(
       @NotNull BiFunction<AnnotationAttributes,Method,String> stageFunctionNameGenerator)
   {
-    this.stageFunctionNameGenerator =
-        requireNonNull(stageFunctionNameGenerator, "stageFunctionNameGenerator must not be null");
+    requireNonNull(stageFunctionNameGenerator, "stageFunctionNameGenerator must not be null");
+
+    if (stageFunctionsDiscovered)
+    {
+      throw new IllegalStateException(
+          "stage function name generator must be set before the stage functions are discovered");
+    }
+
+    this.stageFunctionNameGenerator = stageFunctionNameGenerator;
   }
 }
