@@ -101,7 +101,8 @@ public interface StageDefinition
    * <p>
    * The description is passed to
    * {@link de.sayayi.lib.stagerunner.StageRunnerCallback#preStageFunctionCallback preStageFunctionCallback}. If the
-   * stage function annotation has no description property, stage functions are registered without description.
+   * stage function annotation has no description property or the description is empty, stage functions are registered
+   * without description.
    */
   @Target(METHOD)
   @Retention(RUNTIME)

@@ -180,15 +180,26 @@ public final class StageFunctionAnnotation
 
 
   /**
-   * Extracts the description value from the given annotation attributes.
+   * Extracts the description value from the given annotation attributes. An empty description is treated as no
+   * description and results in {@code null} being returned.
    *
    * @param annotationAttributes  attributes of a concrete stage function annotation instance, not {@code null}
    *
-   * @return  the description value, or {@code null} if the annotation does not declare a description property
+   * @return  the description value, or {@code null} if the annotation does not declare a description property or the
+   *          description is empty
    */
   @Contract(pure = true)
-  public String getDescription(@NotNull AnnotationAttributes annotationAttributes) {
-    return descriptionProperty == null ? null : annotationAttributes.getString(descriptionProperty);
+  public String getDescription(@NotNull AnnotationAttributes annotationAttributes)
+  {
+    if (descriptionProperty != null)
+    {
+      final var description = annotationAttributes.getString(descriptionProperty);
+      if (hasLength(description))
+        return description;
+    }
+
+    return null;
+
   }
 
 

@@ -20,6 +20,7 @@ import de.sayayi.lib.stagerunner.exception.StageRunnerConfigurationException;
 import de.sayayi.lib.stagerunner.spring.annotation.StageDefinition;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.annotation.AnnotationAttributes;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Retention;
@@ -35,8 +36,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests {@link StageFunctionAnnotation#buildFrom(Class)}.
  * <p>
  * Covers the detection of the stage definition properties of a fully and a minimally specified stage function
- * annotation, the rejection of malformed annotations, and accepting an annotation which is only applicable to
- * annotation types for use as meta-annotation.
+ * annotation, the rejection of malformed annotations, accepting an annotation which is only applicable to annotation
+ * types for use as meta-annotation, and treating an empty name or description as absent.
  *
  * @since 0.3.0
  */
@@ -55,6 +56,27 @@ class StageFunctionAnnotationTest
     assertEquals("stage", sfa.getStageProperty());
     assertEquals("priority", sfa.getOrderProperty());
     assertEquals("comment", sfa.getDescriptionProperty());
+  }
+
+
+  @Test
+  @DisplayName("Empty name and description are treated as absent")
+  void emptyNameAndDescription()
+  {
+    final StageFunctionAnnotation sfa = StageFunctionAnnotation.buildFrom(StageDef.class);
+    final var attributes = new AnnotationAttributes(StageDef.class);
+
+    attributes.put("scope", "");
+    attributes.put("comment", "");
+
+    assertNull(sfa.getName(attributes));
+    assertNull(sfa.getDescription(attributes));
+
+    attributes.put("scope", "name");
+    attributes.put("comment", "description");
+
+    assertEquals("name", sfa.getName(attributes));
+    assertEquals("description", sfa.getDescription(attributes));
   }
 
 

@@ -301,7 +301,7 @@ public @interface StageDef
 The annotation must have runtime retention and be applicable to methods (or to annotation types, for use as a
 meta-annotation). A `@Stage` property returning the stage enum is mandatory. `@Order` (`int`), `@Description` and
 `@Name` (both `String`) are optional, and each may be used at most once. A method with a non-empty name is registered
-as a named stage function.
+as a named stage function. An empty description is treated as no description, so callbacks receive `null`.
 
 ### 2. Define a runner interface
 
