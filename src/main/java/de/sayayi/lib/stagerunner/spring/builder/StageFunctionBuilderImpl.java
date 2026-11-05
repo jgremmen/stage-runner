@@ -209,7 +209,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
     final var hostLookup = hostLookup(invocableMethod.getDeclaringClass());
 
     try {
-      return this.<S>createStageFunctionType(methodDescription, parameters, stageFunctionAnnotation, hostLookup)
+      return this.<S>createStageFunctionType(invocableMethod, methodDescription, parameters, stageFunctionAnnotation,
+              hostLookup)
           .getDeclaredConstructor(Object.class, ConversionService.class, TypeDescriptor[].class)
           .newInstance(bean, conversionService, Arrays
               .stream(parameters)
@@ -404,7 +405,8 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * Returns the generated stage function class for the given method and parameter binding, either from the cache or by
    * building a fresh class through {@link #buildStageFunctionClass}.
    *
-   * @param method                   target method, not {@code null}
+   * @param invocableMethod          reflective target method, used as cache key, not {@code null}
+   * @param method                   description of {@code invocableMethod}, not {@code null}
    * @param parameters               resolved parameter bindings, not {@code null}
    * @param stageFunctionAnnotation  stage function annotation descriptor, not {@code null}
    * @param hostLookup               lookup on the class declaring {@code method}, not {@code null}
@@ -415,6 +417,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    */
   @SuppressWarnings("unchecked")
   private @NotNull <S extends Enum<S>> Class<? extends StageFunction<S>> createStageFunctionType(
+      @NotNull Method invocableMethod,
       @NotNull MethodDescription method,
       @NotNull ParameterBinding[] parameters,
       @NotNull StageFunctionAnnotation stageFunctionAnnotation,
@@ -422,7 +425,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
   {
     return (Class<? extends StageFunction<S>>)stageFunctionClassCache
         .computeIfAbsent(
-            new CacheKey(method, stageFunctionAnnotation.getStageType(), List.of(parameters)),
+            new CacheKey(invocableMethod, stageFunctionAnnotation.getStageType(), List.of(parameters)),
             key -> buildStageFunctionClass(method, parameters, stageFunctionAnnotation, hostLookup));
   }
 
@@ -847,6 +850,10 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    * binding.
    * <p>
    * The parameter bindings are kept as a list, so they are compared by content rather than by reference.
+   * <p>
+   * The method is kept as reflective {@link Method}, as it compares its declaring class by identity. A ByteBuddy
+   * {@link MethodDescription} only compares names and signatures, so two classes with the same name from different
+   * class loaders would share one generated class.
    *
    * @param method      the target method, not {@code null}
    * @param stageType   the stage enumeration type implemented by the generated class, not {@code null}
@@ -854,7 +861,7 @@ public final class StageFunctionBuilderImpl extends AbstractBuilder implements S
    *
    * @since 0.4.0
    */
-  private record CacheKey(@NotNull MethodDescription method,
+  private record CacheKey(@NotNull Method method,
                           @NotNull Class<?> stageType,
                           @NotNull List<ParameterBinding> parameters) {
   }
